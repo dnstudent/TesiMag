@@ -1,0 +1,320 @@
+---
+title: "Pairing stations"
+author: "Davide Nicoli"
+date: "`r Sys.Date()`"
+output: html_notebook
+---
+
+## Pairing stations in the SCIA and DPC datasets
+I guess I can trust more SCIA's metadata and DPC series (edit: ??), so I have to pair the records.
+
+**TODO:**
+
+- [x] properly parse DPC metadata;
+- [ ] implement a non-naive mixed metadata join (position, user_code, name, region);
+- [ ] implement tests on data:
+    - [ ] outliers;
+    - [ ] m:1, m:m series (check if there are series with different identifiers but representing data from different time frames, maybe because a station was displaced);
+
+```{r common_utils, message = FALSE}
+# Common utilities
+library(stringr)
+library(dplyr)
+library(arrow)
+library(ggplot2)
+library(sf)
+library(purrr)
+library(patchwork)
+library(tidyselect)
+source("load.R")
+tvar <- "T_MIN"
+start_date <- as.Date("1960-01-01")
+stop_date <- as.Date("2023-01-01")
+temp <- file.path("temp", "pairing")
+```
+
+### Spatial join
+A naive approach is to join spatially using `sf`'s `st_join` combined with `join = st_is_within_distance` and a small `dist`.
+```{r, eval = FALSE, echo = FALSE}
+sscia <- load.metadata("SCIA", tvar)
+sdpc <- load.metadata("DPC", tvar)
+joined <- st_join(sscia, sdpc, join = st_is_within_distance, dist = units::set_units(10, "m"), left = FALSE, suffix = c(".scia", ".dpc")) |> st_drop_geometry()
+write_parquet(joined, str_glue("{temp}/joined_{tvar}.parquet"))
+```
+
+```{r join-stats}
+joined <- read_parquet(str_glue("{temp}/joined_{tvar}.parquet"))
+joined |> select(internal_id, anagrafica, user_code, station, starts_with("elevation"))
+```
+
+This leads to a number of matches in the order of 500. (~25% of the total number of stations). I will start my assessment by checking the differences between series matched this way. In a second moment I will try to match the remaining stations using the least distance in terms of series data.
+
+```{r, eval = FALSE, echo = FALSE}
+# Filtering and caching dpc series, as they are slow to load:
+source("load.R")
+dpc <- load.series("DPC", tvar, start_date <= date & date < stop_date) |> arrange(station, date)
+write_parquet(dpc, str_glue("{temp}/dpc_{tvar}.parquet"))
+```
+
+```{r, eval = FALSE, echo = FALSE}
+# Pivoting both datasets to wide format, and padding missing dates. Subsequent computations will be faster.
+library(tidyr)
+library(padr)
+scia <- load.series("SCIA", tvar, start_date <= date & date < stop_date)
+dpc <- read_parquet(str_glue("{temp}/dpc_{tvar}.parquet"))
+
+pivot_wider(scia, id_cols = date, names_from = internal_id, values_from = {{ tvar }}) |>
+    arrange(date) |>
+    pad(interval = "d") |>
+    write_parquet(str_glue("{temp}/scia_wider_{tvar}.parquet"))
+pivot_wider(dpc, id_cols = date, names_from = station, values_from = {{ tvar }}) |>
+    arrange(date) |>
+    pad(interval = "d") |>
+    write_parquet(str_glue("{temp}/dpc_wider_{tvar}.parquet"))
+```
+
+```{r def-some, include = FALSE}
+# Declaring some routines to assess data availability
+library(tidyselect)
+library(lubridate)
+
+data_availability <- function(series) {
+    1.0 - (length(which(is.na(series))) / length(series))
+}
+
+data_availability.wrtdate <- function(series, dates, flag_date, cmp = `>=`) {
+    series[cmp(dates, flag_date)] |> data_availability()
+}
+
+availability_filter <- function(data, after_date = 0.5, global = 0.5) {
+    select(
+        data,
+        where(~ data_availability.wrtdate(.x, data$date, as.Date("2005-01-01")) > after_date | data_availability(.x) > global)
+    )
+}
+
+t_equality <- function(x, y) {
+    nas <- is.na(x) | is.na(y)
+    all.equal(x[!nas], y[!nas]) |> isTRUE()
+}
+
+rmse <- function(x, y) {
+    tryCatch(
+        {
+            sqrt(mean((x - y)^2, na.rm = TRUE))
+        },
+        error = \(e) NA
+    )
+}
+
+mae <- function(x, y) {
+    tryCatch(
+        {
+            sqrt(mean(abs(x - y), na.rm = TRUE))
+        },
+        error = \(e) NA
+    )
+}
+```
+
+### Differences between series distant at most 10m
+For each match `rmse` and `mae` are computed. The distribution of these metrics is shown below.
+
+```{r join-diffs1}
+scia <- read_parquet(str_glue("{temp}/scia_wider_{tvar}.parquet"))
+dpc <- read_parquet(str_glue("{temp}/dpc_wider_{tvar}.parquet"))
+
+differences1 <- joined |>
+    select(iscia = internal_id, idpc = station) |>
+    rowwise(iscia, idpc) |>
+    summarise(rmse = rmse(scia[[toString(iscia)]], dpc[[idpc]]), mae = mae(scia[[toString(iscia)]], dpc[[idpc]]), .groups = "drop") |>
+    pivot_longer(cols = c(rmse, mae), names_to = "metric")
+
+diffs1 <- ggplot(data = differences1) +
+    geom_histogram(aes(x = value, color = metric), bins = 30, position = "dodge") +
+    labs(x = "Difference [°C]", y = "Count")
+
+diffs1
+```
+
+Some facts are worth noting:
+
+* differences are dauntingly high:
+    + we expected that truncating to integer values would have sufficed to match many series, but here we see that mean differences are in the order of 1°C;
+    + this must be investigated further; maybe the statistic suffers from outliers produced by incorrect measurements;
+* some metrics are NA: this should be investigated;
+
+#### NA metrics
+```{r def-plot-series, include = FALSE}
+plot_series <- function(iscia, idpc, scia, dpc) {
+    scia_info <- joined |>
+        filter(internal_id == iscia) |>
+        select(anagrafica, user_code) |>
+        as.list()
+    data <- inner_join(select(scia, date, T = {{ iscia }}), select(dpc, date, T = {{ idpc }}), join_by(date == date), suffix = c(
+        ".scia",
+        ".dpc"
+    )) |>
+        pivot_longer(cols = starts_with("T"), names_pattern = "T\\.(.*)", names_to = "db") |>
+        drop_na() |>
+        padr::pad("d", group = "db")
+    ggplot(data = data) +
+        geom_line(aes(date, value,
+            color = db,
+            linetype = db
+        ), na.rm = TRUE) +
+        labs(title = idpc, subtitle = str_glue("{iscia} {scia_info$anagrafica} ({scia_info$user_code})")) +
+        theme(plot.title = element_text(size = rel(0.4)), plot.subtitle = element_text(size = rel(0.4)))
+}
+```
+
+Matches that produce NA distances:
+```{r err-na}
+# Retrieving the matches with NA metrics
+err_na <- differences1 |>
+    filter(is.na(value)) |>
+    distinct(iscia, .keep_all = TRUE)
+err_na
+```
+
+Plotting some examples to assess the situation:
+```{r, warning = FALSE, fig.width=10, fig.height=10}
+plots <- err_na |>
+    slice_head(n = 4) |>
+    rowwise(iscia, idpc) |>
+    summarise(plot = list(plot_series(toString(iscia), idpc, scia, dpc)), .groups = "drop")
+wrap_plots(plots$plot, guides = "collect")
+```
+It seems that many of these series do not overlap in time. Also the plot of `TN_LIG_SV_ALASSIO_02_200043067` shows that some errors in data range ($\mathrm{T} < -50°C$) **persist even in DPC series**, contradicting the documentation.
+
+### Checking absurd temperatures
+Checking absurd temperatures by filtering $\mathrm{T} <= -51°C | \mathrm{T} >= 40°C$
+```{r}
+# Va sistemato a seconda di tvar
+read_parquet(str_glue("{temp}/dpc_{tvar}.parquet")) |> filter(T_MIN <= -51.0 | T_MIN >= 40.0)
+load.series("SCIA", tvar) |> filter(T_MIN < -40.0 | T_MIN > 40.0)
+# read_parquet(str_glue("{temp}/dpc_{tvar}.parquet")) |> filter(T_MAX < -30.0 | T_MAX > 50)
+```
+DPC series still need some data cleaning.
+
+Naive cleaning:
+```{r, eval = FALSE}
+library(rlang)
+dpc <- read_parquet(str_glue("{temp}/dpc_{tvar}.parquet"))
+if (tvar == "T_MIN") {
+    dpc[[tvar]][dpc[[tvar]] <= -51.0 | dpc[[tvar]] >= 40.0] <- NA
+} else if (tvar == "T_MAX") {
+    dpc[[tvar]][dpc[[tvar]] <= -20.0 | dpc[[tvar]] >= 50.0] <- NA
+} else {
+    error("tvar must be T_MIN or T_MAX")
+}
+write_parquet(dpc, str_glue("{temp}/dpc_{tvar}_qc1.parquet"))
+pivot_wider(dpc, id_cols = date, names_from = station, values_from = {{ tvar }}) |>
+    arrange(date) |>
+    padr::pad(interval = "d") |>
+    write_parquet(str_glue("{temp}/dpc_wider_{tvar}_qc1.parquet"))
+```
+This works up to a certain point: some series still present absurd temperatures.
+
+A better approach would probably be to **drop all outliers wrt a rolling windowed mean** or redo the qc steps performed by Brunetti.
+
+### Differences having removed absurd temperatures
+```{r, eval = FALSE}
+scia <- read_parquet(str_glue("{temp}/scia_wider_{tvar}.parquet"))
+dpc <- read_parquet(str_glue("{temp}/dpc_wider_{tvar}_qc1.parquet"))
+
+joined |>
+    select(iscia = internal_id, idpc = station) |>
+    rowwise(iscia, idpc) |>
+    summarise(rmse = rmse(scia[[toString(iscia)]], dpc[[idpc]]), mae = mae(scia[[toString(iscia)]], dpc[[idpc]]), .groups = "drop") |>
+    pivot_longer(cols = c(rmse, mae), names_to = "metric") |>
+    write_parquet(str_glue("{temp}/differences_{tvar}_qc1.parquet"))
+```
+
+```{r}
+differences2 <- read_parquet(str_glue("{temp}/differences_{tvar}_qc1.parquet"))
+diffs2 <- ggplot(data = differences2) +
+    geom_histogram(aes(x = value, color = metric), bins = 30, position = "dodge") +
+    labs(x = "Difference [°C]", y = "Count")
+
+(diffs1 + ggtitle("Not corrected")) / (diffs2 + ggtitle("Corrected"))
+```
+Differences are not significantly reduced.
+
+### Assessing how series that are different behave
+```{r}
+scia <- read_parquet(str_glue("{temp}/scia_wider_{tvar}.parquet"))
+dpc <- read_parquet(str_glue("{temp}/dpc_wider_{tvar}_qc1.parquet"))
+joined <- read_parquet(str_glue("{temp}/joined_{tvar}.parquet"))
+
+differences2 <- joined |>
+    select(iscia = internal_id, idpc = station) |>
+    rowwise(iscia, idpc) |>
+    summarise(rmse = rmse(scia[[toString(iscia)]], dpc[[idpc]]), mae = mae(scia[[toString(iscia)]], dpc[[idpc]]), .groups = "drop")
+
+small_diffs <- filter(differences2, 0.0 < rmse & rmse < 1.0) |> arrange(rmse)
+small_diffs
+
+big_diffs <- filter(differences2, 1.0 <= rmse) |> arrange(rmse)
+big_diffs
+```
+
+Plotting a random sample:
+```{r}
+plot_series("14909", "TN_SAR_NU_MONTE_TULUI_02_000424000", scia, dpc)
+```
+Incidentally, this plot shows that an important contributing factor to the difference may be the fact that the DPC series presents "bad" values.
+
+```{r, fig.width=10, fig.height=10}
+plots <- small_diffs |>
+    slice_head(n = 9) |>
+    rowwise(iscia, idpc) |>
+    summarise(plot = list(plot_series(toString(iscia), idpc, scia, dpc)), .groups = "drop")
+wrap_plots(plots$plot, guides = "collect")
+```
+
+```{r, fig.width=10, fig.height=10}
+plots <- big_diffs |>
+    slice_tail(n = 9) |>
+    rowwise(iscia, idpc) |>
+    summarise(plot = list(plot_series(toString(iscia), idpc, scia, dpc)), .groups = "drop")
+wrap_plots(plots$plot, guides = "collect")
+```
+These plots show that the high differences are due to erroneous matchups. The user_code should provide a good indicator of this situation. I should check **why stations so close from one another are registering such distant results**.
+
+## Assessing what's up with duplicated stations in DPC
+It seems that some DPC stations provide more than one series each, as shown by the fact that ther are stations closer than 50m and/or repeated locs:
+```{r, message=FALSE}
+stations.dpc <- load.metadata("DPC", tvar)
+# Repeated locs
+stations.dpc |>
+    arrange(loc, digits) |>
+    group_by(loc) |>
+    mutate(count = n()) |>
+    filter(count > 1)
+
+# Closer than 50m
+stations.dpc |>
+    st_join(stations.dpc, st_is_within_distance, left = FALSE, dist = units::set_units(50, "m")) |>
+    select(starts_with("station"), starts_with("elevation"), starts_with("user_code")) |>
+    arrange(station.x) |>
+    group_by(station.x) |>
+    mutate(count = n()) |>
+    filter(!(station.x == station.y)) |>
+    filter(count > 1)
+```
+
+
+## Implementing a less naive matcher
+```{r}
+# source("plot_helpers.R")
+
+# as_lonlat <- function(data) {
+#     data |>
+#         mutate(lonlat = st_coordinates(data) |> as_tibble() |> rename(lon = X, lat = Y)) |>
+#         unnest(lonlat)
+# }
+
+# stations.scia <- load.metadata("SCIA", tvar) |> as_lonlat()
+# stations.dpc <- load.metadata("DPC", tvar) |> as_lonlat()
+```
