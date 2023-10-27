@@ -2,78 +2,73 @@ library(dplyr)
 library(tidyr)
 library(lubridate)
 library(sf)
+library(purrr)
+library(tsibble)
 
-source("paths.R")
-source("load.BRUN.R")
-source("load.DPC.R")
-source("load.SCIA.R")
-source("load.ITA.R")
-source("load_utils.R") #  MUST BE LOADED LAST
+source("src/paths/paths.R")
+source("src/load/read/BRUN.R")
+source("src/load/read/DPC.R")
+source("src/load/read/SCIA.R")
+source("src/load/load_utils.R")
 
-load.series <- load.data("series")
+read.series <- compose(\(t) as_tsibble(t, key = identifier, index = date), read.data("series"))
+load.series <- compose(\(t) as_tsibble(t, key = identifier, index = date), load.data("series"))
 
-load.series.single <- function(db, tvar, id) {
-  do.call(paste("load", db, "series.single", sep = "."), list(tvar, id))
+read.series.single <- function(db, tvar, id) {
+  do.call(paste("read", db, "series.single", sep = "."), list(tvar, id))
 }
 
-retrieve.series <- function(db, tvar, ...) {
-  retrieve.data("series", db, tvar, ...) |> as_tsibble(index = date, key = identifier)
-}
+# is.scia <- is.numeric
+# is.dpc <- is.character
+# load.series.named <- function(tvar, ...) {
+#   stations <- list(...)
+#   reqs <- tibble(
+#     db = map(stations, \(s) ifelse(is.scia(s), "SCIA", "DPC")) |> as.character(),
+#     identifier = as.character(stations)
+#   )
+#   scia <- load.series("SCIA", tvar, internal_id %in% (reqs |> filter(db == "SCIA") |> pull(identifier) |> as.integer())) |>
+#     mutate(station = as.character(identifier), .keep = "unused") |>
+#     as_tibble()
+#   if (filter(reqs, db == "DPC") |> nrow() < 1) {
+#     dpc <- tibble()
+#   } else {
+#     dpc <- reqs |>
+#       filter(db == "DPC") |>
+#       rowwise() |>
+#       reframe(data = load.BRUN.series.single(tvar, identifier) |> as_tibble()) |>
+#       unnest(data)
+#   }
+#   bind_rows(
+#     scia = scia,
+#     dpc = dpc,
+#     .id = "db"
+#   ) |>
+#     mutate(db = as.factor(db)) |>
+#     as_tsibble(index = date, key = c(db, station))
+# }
 
-is.scia <- is.numeric
-is.dpc <- is.character
-load.series.named <- function(tvar, ...) {
-  stations <- list(...)
-  reqs <- tibble(
-    db = map(stations, \(s) ifelse(is.scia(s), "SCIA", "DPC")) |> as.character(),
-    identifier = as.character(stations)
-  )
-  scia <- load.series("SCIA", tvar, internal_id %in% (reqs |> filter(db == "SCIA") |> pull(identifier) |> as.integer())) |>
-    mutate(station = as.character(identifier), .keep = "unused") |>
-    as_tibble()
-  if (filter(reqs, db == "DPC") |> nrow() < 1) {
-    dpc <- tibble()
-  } else {
-    dpc <- reqs |>
-      filter(db == "DPC") |>
-      rowwise() |>
-      reframe(data = load.BRUN.series.single(tvar, identifier) |> as_tibble()) |>
-      unnest(data)
-  }
+read.metadata <- read.data("metadata")
+load.metadata <- compose(\(data) st_as_sf(data, coords = c("lon", "lat"), crs = "EPSG:4326"), load.data("metadata"))
+
+load.metadata.allvars <- function(db, ..., .cache_kwargs = list()) {
   bind_rows(
-    scia = scia,
-    dpc = dpc,
-    .id = "db"
-  ) |>
-    mutate(db = as.factor(db)) |>
-    as_tsibble(index = date, key = c(db, station))
-}
-
-load.metadata <- load.data("metadata")
-
-retrieve.metadata <- function(db, tvar, ...) {
-  retrieve.data("metadata", db, tvar, ...) |> st_as_sf(coords = c("lon", "lat"), crs = "EPSG:4326")
-}
-
-retrieve.metadata.allvars <- function(db, ...) {
-  bind_rows(
-    T_MIN = retrieve.metadata(db, "T_MIN", ...),
-    T_MAX = retrieve.metadata(db, "T_MAX", ...),
+    T_MIN = load.metadata(db, "T_MIN", ..., .cache_kwargs = .cache_kwargs),
+    T_MAX = load.metadata(db, "T_MAX", ..., .cache_kwargs = .cache_kwargs),
     .id = "tvar"
   )
 }
 
-retrieve.metadata.all <- function(...) {
+load.metadata.all <- function(..., .cache_kwargs = list()) {
   bind_rows(
-    SCIA = retrieve.metadata.allvars("SCIA", ...),
-    DPC = retrieve.metadata.allvars("DPC", ...),
+    SCIA = load.metadata.allvars("SCIA", .cache_kwargs = .cache_kwargs),
+    DPC = load.metadata.allvars("DPC", ..., .cache_kwargs = .cache_kwargs),
     .id = "db"
   )
 }
 
-retrieve.series.fromnet <- function(tvar, net_name, ...) {
-  identifiers <- retrieve.metadata("SCIA", tvar) |>
+load.series.fromnet <- function(tvar, net_name, ...) {
+  identifiers <- load.metadata("SCIA", tvar) |>
     filter(rete == net_name) |>
     pull(identifier)
-  retrieve.series("SCIA", tvar, ...) |> filter(identifier %in% identifiers)
+  load.series("SCIA", tvar, ...) |> filter(identifier %in% identifiers)
 }
