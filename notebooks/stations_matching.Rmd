@@ -28,7 +28,7 @@ library(patchwork)
 library(tidyselect)
 source("load.R")
 tvar <- "T_MIN"
-start_date <- as.Date("1960-01-01")
+start_date <- as.Date("1980-01-01")
 stop_date <- as.Date("2023-01-01")
 temp <- file.path("temp", "pairing")
 ```
@@ -146,7 +146,7 @@ Some facts are worth noting:
 
 #### NA metrics
 ```{r def-plot-series, include = FALSE}
-plot_series <- function(iscia, idpc, scia, dpc) {
+plot_series.dbcompare <- function(iscia, idpc, scia, dpc, diffs = FALSE) {
     scia_info <- joined |>
         filter(internal_id == iscia) |>
         select(anagrafica, user_code) |>
@@ -154,17 +154,29 @@ plot_series <- function(iscia, idpc, scia, dpc) {
     data <- inner_join(select(scia, date, T = {{ iscia }}), select(dpc, date, T = {{ idpc }}), join_by(date == date), suffix = c(
         ".scia",
         ".dpc"
-    )) |>
-        pivot_longer(cols = starts_with("T"), names_pattern = "T\\.(.*)", names_to = "db") |>
-        drop_na() |>
-        padr::pad("d", group = "db")
-    ggplot(data = data) +
-        geom_line(aes(date, value,
-            color = db,
-            linetype = db
-        ), na.rm = TRUE) +
-        labs(title = idpc, subtitle = str_glue("{iscia} {scia_info$anagrafica} ({scia_info$user_code})")) +
-        theme(plot.title = element_text(size = rel(0.4)), plot.subtitle = element_text(size = rel(0.4)))
+    ))
+    if (!diffs) {
+        data <- data |>
+            pivot_longer(cols = starts_with("T"), names_pattern = "T\\.(.*)", names_to = "db") |>
+            drop_na() |>
+            padr::pad("d", group = "db")
+        ggplot(data = data) +
+            geom_line(aes(date, value,
+                color = db,
+                linetype = db
+            ), na.rm = TRUE) +
+            labs(title = idpc, subtitle = str_glue("{iscia} {scia_info$anagrafica} ({scia_info$user_code})")) +
+            theme(plot.title = element_text(size = rel(0.8)), plot.subtitle = element_text(size = rel(0.8)))
+    } else {
+        data <- data |>
+            transmute(date, `dpc-scia` = T.dpc - T.scia) |>
+            drop_na() |>
+            padr::pad("d")
+        ggplot(data = data) +
+            geom_line(aes(date, `dpc-scia`), na.rm = TRUE) +
+            labs(title = idpc, subtitle = str_glue("{iscia} {scia_info$anagrafica} ({scia_info$user_code})")) +
+            theme(plot.title = element_text(size = rel(0.8)), plot.subtitle = element_text(size = rel(0.8)))
+    }
 }
 ```
 
@@ -182,7 +194,7 @@ Plotting some examples to assess the situation:
 plots <- err_na |>
     slice_head(n = 4) |>
     rowwise(iscia, idpc) |>
-    summarise(plot = list(plot_series(toString(iscia), idpc, scia, dpc)), .groups = "drop")
+    summarise(plot = list(plot_series.dbcompare(toString(iscia), idpc, scia, dpc)), .groups = "drop")
 wrap_plots(plots$plot, guides = "collect")
 ```
 It seems that many of these series do not overlap in time. Also the plot of `TN_LIG_SV_ALASSIO_02_200043067` shows that some errors in data range ($\mathrm{T} < -50°C$) **persist even in DPC series**, contradicting the documentation.
@@ -191,8 +203,11 @@ It seems that many of these series do not overlap in time. Also the plot of `TN_
 Checking absurd temperatures by filtering $\mathrm{T} <= -51°C | \mathrm{T} >= 40°C$
 ```{r}
 # Va sistemato a seconda di tvar
-read_parquet(str_glue("{temp}/dpc_{tvar}.parquet")) |> filter(T_MIN <= -51.0 | T_MIN >= 40.0)
-load.series("SCIA", tvar) |> filter(T_MIN < -40.0 | T_MIN > 40.0)
+read_parquet(str_glue("{temp}/dpc_{tvar}.parquet")) |>
+    filter(abs(T_MIN) >= 50.0) |>
+    group_by(station) |>
+    summarise(n_outside = n())
+load.series("SCIA", tvar) |> filter(abs(T_MIN) > 40.0)
 # read_parquet(str_glue("{temp}/dpc_{tvar}.parquet")) |> filter(T_MAX < -30.0 | T_MAX > 50)
 ```
 DPC series still need some data cleaning.
@@ -250,18 +265,19 @@ joined <- read_parquet(str_glue("{temp}/joined_{tvar}.parquet"))
 differences2 <- joined |>
     select(iscia = internal_id, idpc = station) |>
     rowwise(iscia, idpc) |>
-    summarise(rmse = rmse(scia[[toString(iscia)]], dpc[[idpc]]), mae = mae(scia[[toString(iscia)]], dpc[[idpc]]), .groups = "drop")
+    summarise(rmse = rmse(scia[[toString(iscia)]], dpc[[idpc]]), mae = mae(scia[[toString(iscia)]], dpc[[idpc]]), .groups = "drop") |>
+    arrange(rmse)
 
-small_diffs <- filter(differences2, 0.0 < rmse & rmse < 1.0) |> arrange(rmse)
+small_diffs <- filter(differences2, rmse < 1.0)
 small_diffs
 
-big_diffs <- filter(differences2, 1.0 <= rmse) |> arrange(rmse)
+big_diffs <- filter(differences2, 1.0 <= rmse)
 big_diffs
 ```
 
 Plotting a random sample:
 ```{r}
-plot_series("14909", "TN_SAR_NU_MONTE_TULUI_02_000424000", scia, dpc)
+plot_series.dbcompare("11379", "TN_BAS_PZ_ALBANO_DI_LUCANIA_02_000179900", scia, dpc)
 ```
 Incidentally, this plot shows that an important contributing factor to the difference may be the fact that the DPC series presents "bad" values.
 
@@ -269,7 +285,7 @@ Incidentally, this plot shows that an important contributing factor to the diffe
 plots <- small_diffs |>
     slice_head(n = 9) |>
     rowwise(iscia, idpc) |>
-    summarise(plot = list(plot_series(toString(iscia), idpc, scia, dpc)), .groups = "drop")
+    summarise(plot = list(plot_series.dbcompare(toString(iscia), idpc, scia, dpc)), .groups = "drop")
 wrap_plots(plots$plot, guides = "collect")
 ```
 
@@ -277,7 +293,7 @@ wrap_plots(plots$plot, guides = "collect")
 plots <- big_diffs |>
     slice_tail(n = 9) |>
     rowwise(iscia, idpc) |>
-    summarise(plot = list(plot_series(toString(iscia), idpc, scia, dpc)), .groups = "drop")
+    summarise(plot = list(plot_series.dbcompare(toString(iscia), idpc, scia, dpc)), .groups = "drop")
 wrap_plots(plots$plot, guides = "collect")
 ```
 These plots show that the high differences are due to erroneous matchups. The user_code should provide a good indicator of this situation. I should check **why stations so close from one another are registering such distant results**.
@@ -285,25 +301,46 @@ These plots show that the high differences are due to erroneous matchups. The us
 ## Assessing what's up with duplicated stations in DPC
 It seems that some DPC stations provide more than one series each, as shown by the fact that ther are stations closer than 50m and/or repeated locs:
 ```{r, message=FALSE}
-stations.dpc <- load.metadata("DPC", tvar)
+stations.dpc <- load.metadata("DPC", tvar) |> arrange(anagrafica, version)
 # Repeated locs
-stations.dpc |>
-    arrange(loc, digits) |>
-    group_by(loc) |>
-    mutate(count = n()) |>
-    filter(count > 1)
+rlocs <- full_join(stations.dpc, stations.dpc |> st_drop_geometry(), join_by(anagrafica), multiple = "all", na_matches = "never", relationship = "many-to-many") |>
+    filter(station.x != station.y) |>
+    arrange(station.x)
+rlocs |> select(anagrafica, starts_with("station"), starts_with("elevation"), starts_with("version"))
 
 # Closer than 50m
-stations.dpc |>
+c50 <- stations.dpc |>
     st_join(stations.dpc, st_is_within_distance, left = FALSE, dist = units::set_units(50, "m")) |>
     select(starts_with("station"), starts_with("elevation"), starts_with("user_code")) |>
     arrange(station.x) |>
     group_by(station.x) |>
     mutate(count = n()) |>
     filter(!(station.x == station.y)) |>
-    filter(count > 1)
+    filter(count > 1) |>
+    ungroup()
+c50
 ```
 
+```{r}
+nest_join(stations.dpc, stations.dpc |> st_drop_geometry(), join_by(anagrafica), unmatched = "drop", na_matches = "never", name = "matches") |> filter(n() > 1)
+```
+
+
+Inspecting some of these stations:
+```{r, fig.width=10, fig.height=10}
+source("plot_helpers.R")
+plot_poster <- function(stations, tvar, id1, id2, n, plotting_fn, ncol) {
+    stations |>
+        slice_head(n = n) |>
+        rowwise() |>
+        summarise(plot = list(plotting_fn(tvar, {{ id1 }}, {{ id2 }}, show.legend = FALSE)), .groups = "drop") |>
+        pull(plot) |>
+        wrap_plots(ncol = ncol)
+}
+
+plot_poster(rlocs, "T_MIN", station.x, station.y, 9, plot_series, 3)
+```
+It can be seen that not all matches come from different time frames of the same station. A good data management strategy should be to georef the measurements and couple the series from the same station.
 
 ## Implementing a less naive matcher
 ```{r}
@@ -318,3 +355,69 @@ stations.dpc |>
 # stations.scia <- load.metadata("SCIA", tvar) |> as_lonlat()
 # stations.dpc <- load.metadata("DPC", tvar) |> as_lonlat()
 ```
+
+## Checking whether there is a sistematic difference between DPC and SCIA
+Brunetti suspects that DPC series register the extremes in the daily means instead of the extremes among all daily measures, as should SCIA do.
+```{r}
+tmin <- 8
+tmax <- 10
+
+this_filter <- function(data) {
+    data |>
+        select(T = starts_with("T")) |>
+        drop_na() |>
+        filter(tmin <= T & T <= tmax)
+}
+dates_filter <- expr(start_date <= date & date < stop_date)
+
+all_values <- bind_rows(
+    dpc.T_MIN = load.series("DPC", "T_MIN", start_date <= date & date < stop_date) |> this_filter(),
+    dpc.T_MAX = load.series("DPC", "T_MAX", start_date <= date & date < stop_date) |> this_filter(),
+    scia.T_MIN = load.series("SCIA", "T_MIN", start_date <= date & date < stop_date) |> this_filter(),
+    scia.T_MAX = load.series("SCIA", "T_MAX", start_date <= date & date < stop_date) |> this_filter(),
+    .id = "db"
+) |>
+    separate_wider_delim("db", ".", names = c("db", "variable")) |>
+    mutate(db = as.factor(db), variable = as.factor(variable))
+gc()
+all_values
+
+ggplot(data = all_values) +
+    geom_histogram(aes(T, color = db), binwidth = 0.1) +
+    facet_grid(. ~ variable)
+```
+
+```{r}
+dpc <- load.DPC.series.single("T_MIN", "TN_SAR_SS_ARDARA_02_000420500")
+scia <- load.SCIA.series.single("T_MIN", 14960)
+diff <- left_join(
+    dpc, scia, join_by(date),
+    suffix = c(".dpc", ".scia")
+) |> mutate(diff = T_MIN.dpc - T_MIN.scia)
+```
+
+```{r}
+ggplot(data = diff) +
+    geom_line(aes(date, diff))
+```
+
+# ```{r}
+# tmin <- 0
+# tmax <- 45
+
+# diffs <- function(tvar) {
+#     inner_join(
+#         load.series("DPC", tvar, start_date <= date & date < stop_date) |> select(date, T = {{ tvar }}) |> drop_na() |> filter(tmin <= T & T <= tmax),
+#         load.series("SCIA", tvar, start_date <= date & date < stop_date) |> select(date, T = {{ tvar }}) |> drop_na() |> filter(tmin <= T & T <= tmax),
+#         join_by(date),
+#         suffix = c(".dpc", ".scia")
+#     ) |> transmute(dpc_scia = T.dpc - T.scia)
+# }
+# all_values <- bind_rows(
+#     T_MIN = diffs("T_MIN"),
+#     T_MAX = diffs("T_MAX"),
+#     .id = "variable"
+# ) |> mutate(variable = as.factor(variable))
+# gc()
+# all_values
+# ```
