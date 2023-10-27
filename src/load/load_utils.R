@@ -1,45 +1,56 @@
 library(arrow)
 
-cache_path <- function(db, tvar, suffix, cache_section) {
-    file.path(cache_section, db, paste0(tvar, toString(suffix), ".parquet"))
+cache_path <- function(details, suffix, cache_section) {
+    file.path(cache_section, paste(head(details, -1), collapse = "/"), paste0(tail(details, 1), toString(suffix), ".parquet"))
 }
 
-save_in_cache <- function(data, db, tvar, suffix, cache_section, overwrite = FALSE) {
-    cache_file <- cache_path(db, tvar, suffix, cache_section)
-    if (!overwrite & file.exists(cache_file)) {
-        message("Cache already exists: ", cache_file)
+save_in_cache <- function(data, details, suffix, cache_section, overwrite = FALSE) {
+    cache_file_path <- cache_path(details, suffix, cache_section)
+    if (!overwrite & file.exists(cache_file_path)) {
+        message("Cache already exists: ", cache_file_path)
     } else {
-        if (!dir.exists(dirname(cache_file))) {
-            dir.create(dirname(cache_file), recursive = TRUE)
+        if (!dir.exists(dirname(cache_file_path))) {
+            dir.create(dirname(cache_file_path), recursive = TRUE)
         }
-        write_parquet(data, cache_file)
+        write_parquet(data, cache_file_path)
     }
 }
 
-cached_data <- function(db, tvar, otherwise, cache_section, suffix = "", load_cache = TRUE, overwrite = FALSE, verbose = TRUE) {
-    cache_file <- cache_path(db, tvar, suffix, cache_section)
-    if (load_cache & file.exists(cache_file)) {
-        verbose & message("Cache found: ", db, "->", tvar, ", loading from disk")
+cached_data <- function(details, otherwise, cache_section, suffix = "", load_cache = TRUE, overwrite = FALSE, verbose = TRUE) {
+    cache_file <- cache_path(details, suffix, cache_section)
+    if (load_cache && file.exists(cache_file)) {
+        if (verbose) message("Cache found: ", paste(details, collapse = "/"), ", suffix: <", suffix, ">, loading from disk")
         read_parquet(cache_file)
     } else {
         if (!file.exists(cache_file)) {
-            verbose & message("Cache not found: ", db, "->", tvar)
+            if (verbose) message("Cache not found: ", paste(details, collapse = "/"), ", suffix: <", suffix, ">")
         } else {
-            verbose & message("Cache existed but was not loaded: ", db, "->", tvar)
+            if (verbose) message("Cache existed but was not loaded: ", paste(details, collapse = "/"), ", suffix: <", suffix, ">")
         }
-        data <- otherwise(db, tvar)
-        if (overwrite | !file.exists(cache_file)) {
-            verbose & message("Saving to disk")
-            save_in_cache(data, db, tvar, suffix, cache_section, overwrite)
+        data <- do.call(otherwise, details)
+        if (overwrite || !file.exists(cache_file)) {
+            if (verbose) message("Saving to disk")
+            save_in_cache(data, details, suffix, cache_section, overwrite)
         }
         data
     }
 }
 
-load.data <- function(kind) {
-    function(db, tvar) do.call(paste("load", db, paste0("_", kind), sep = "."), list(tvar))
+read.data <- function(kind) {
+    function(db, tvar, ...) do.call(paste("read", db, kind, sep = "."), list(tvar, ...))
 }
 
-retrieve.data <- function(kind, db, tvar, cache_root = file.path("cache"), ...) {
-    cached_data(db, tvar, otherwise = load.data(kind), cache_section = file.path(cache_root, kind), ...)
+load.data <- function(kind) {
+    function(db, tvar, ..., .cache_root = file.path("cache"), .cache_kwargs = list()) {
+        do.call(
+            cached_data, c(
+                list(
+                    details = list(db, tvar, ...),
+                    otherwise = read.data(kind),
+                    cache_section = file.path(.cache_root, kind)
+                ),
+                .cache_kwargs
+            )
+        )
+    }
 }
