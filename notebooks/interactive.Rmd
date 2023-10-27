@@ -109,11 +109,11 @@ adj3_src <- "/Users/davidenicoli/Local_Workspace/Datasets/COPERNICUS DEM30/Coper
 
 ```{r}
 a <- rast(sea_src)
-empty <- matrix(seq(1), ncol = 3601, nrow = 3601)
+empty <- matrix(rep(0.0), ncol = 3601, nrow = 3601)
 for (coord in missing_coords) {
   e <- align(ext(coord[1], coord[1] + 1, coord[2], coord[2] + 1), a, snap = "out")
   tile <- rast(empty, extent = e, crs = crs(a))
-  writeRaster(tile, filename = paste0("missing_N", coord[2], "_E0", coord[1], "_WBM.tif"), datatype = "INT1U")
+  writeRaster(tile, filename = paste0("missing2/", "missing_N", coord[2], "_E0", coord[1], ".tif"), datatype = "FLT4S")
 }
 ```
 

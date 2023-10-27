@@ -3,3 +3,10 @@
 .RData
 .Ruserdata
 *.tif
+*.parquet
+*.pdf
+*.geojson
+temp/
+cache/
+missing*/
+
