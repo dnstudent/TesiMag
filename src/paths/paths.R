@@ -1,9 +1,10 @@
+library(fs, warn.conflicts = FALSE)
+library(stringr, warn.conflicts = FALSE)
+
 source("src/paths/ITA.R")
 source("src/paths/DPC.R")
 source("src/paths/BRUN.R")
 source("src/paths/SCIA.R")
-library(fs)
-library(stringr)
 
 path.ds <- "/Users/davidenicoli/Local_Workspace/Datasets"
 

@@ -2,7 +2,11 @@
 .Rhistory
 .RData
 .Ruserdata
-.vscode
+.vscode/
+.virtual_documents/
+.ipynb_checkpoints/
+*.Rproj
+*.code-workspace
 *.tif
 *.parquet
 *.pdf
@@ -10,4 +14,6 @@
 temp/
 cache/
 missing*/
+.env
+.Renviron
 

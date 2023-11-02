@@ -1,8 +1,8 @@
-library(dplyr)
-library(stringr)
-library(tidyr)
-library(tidyselect)
-library(forcats)
+library(dplyr, warn.conflicts = FALSE)
+library(stringr, warn.conflicts = FALSE)
+library(tidyr, warn.conflicts = FALSE)
+library(tidyselect, warn.conflicts = FALSE)
+library(forcats, warn.conflicts = FALSE)
 
 source("src/paths/paths.R")
 source("src/load/read/brunetti.R")
