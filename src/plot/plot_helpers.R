@@ -1,10 +1,10 @@
-library(purrr)
-library(ggplot2)
-library(stringr)
-library(tibble)
-library(tsibble)
+library(purrr, warn.conflicts = FALSE)
+library(ggplot2, warn.conflicts = FALSE)
+library(stringr, warn.conflicts = FALSE)
+library(tibble, warn.conflicts = FALSE)
+library(tsibble, warn.conflicts = FALSE)
 
-source("load.R")
+source("src/load/load.R")
 
 
 plot_series <- function(tvar, s1, s2, ...) {

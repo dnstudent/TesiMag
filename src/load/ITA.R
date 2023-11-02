@@ -1,11 +1,15 @@
-library(stars)
+library(terra, warn.conflicts = FALSE)
 
-source("paths.R")
+source("src/paths/paths.R")
 
-load.DEM.COP30 <- function() {
-    ls.COP30() |>
-        st_mosaic() |>
-        read_stars()
+load.DEM.COP30 <- function(cached = TRUE) {
+    if (cached) {
+        rast(path.cached.COP30)
+    } else {
+        ls.COP30() |>
+            sprc() |>
+            merge()
+    }
 }
 
 missing_coords <- list(

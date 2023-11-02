@@ -1,6 +1,7 @@
 path.ds <- "/Users/davidenicoli/Local_Workspace/Datasets"
 
 path.COP30 <- file.path(path.ds, "COPERNICUS DEM30")
+path.cached.COP30 <- fs::path_rel("./temp/dem/dem.tif")
 path.boundaries.italy.states <- file.path(path.ds, "geoBoundaries", "ITA-ADM1", "geoBoundaries-ITA-ADM1.geojson")
 
 ls.COP30.missing <- function() {

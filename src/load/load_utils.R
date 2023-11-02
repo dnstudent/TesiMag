@@ -1,4 +1,4 @@
-library(arrow)
+library(arrow, warn.conflicts = FALSE)
 
 cache_path <- function(details, suffix, cache_section) {
     file.path(cache_section, paste(head(details, -1), collapse = "/"), paste0(tail(details, 1), toString(suffix), ".parquet"))

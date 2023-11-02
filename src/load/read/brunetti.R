@@ -1,8 +1,8 @@
-library(vroom)
-library(dplyr)
-library(stringr)
-library(tibble)
-library(tidyr)
+library(vroom, warn.conflicts = FALSE)
+library(dplyr, warn.conflicts = FALSE)
+library(stringr, warn.conflicts = FALSE)
+library(tibble, warn.conflicts = FALSE)
+library(tidyr, warn.conflicts = FALSE)
 
 source("src/paths/paths.R")
 
