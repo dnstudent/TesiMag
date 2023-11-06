@@ -1,6 +1,7 @@
 library(arrow, warn.conflicts = FALSE)
 library(dplyr, warn.conflicts = FALSE)
 library(forcats, warn.conflicts = FALSE)
+library(tibble, warn.conflicts = FALSE)
 
 source("src/paths/paths.R")
 
@@ -11,7 +12,18 @@ read.SCIA.series <- function(tvar) {
 }
 
 read.SCIA.series.single <- function(tvar, id) {
-    load.SCIA.series_(tvar) |> filter(identifier == as.integer(id))
+    series_path <- file.path("scia_split", tvar, paste0(id, ".parquet"))
+    read_parquet(series_path, as_data_frame = TRUE) |> add_column(identifier = id)
+}
+
+read.SCIA.series.bunch <- function(tvar, ids, many = FALSE) {
+    ids <- as.integer(ids)
+    series_paths <- file.path("scia_split", tvar, paste0(ids, ".parquet"))
+    as_tibble(ids) |>
+        rename(myid = 1) |>
+        rowwise() |>
+        reframe(data = read.SCIA.series.single(tvar, myid)) |>
+        unnest(data)
 }
 
 read.SCIA.metadata <- function(tvar) {
