@@ -16,4 +16,4 @@ cache/
 missing*/
 .env
 .Renviron
-
+.DS_Store

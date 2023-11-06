@@ -1,7 +1,8 @@
 source("src/paths/paths.R")
 source("src/load/read/brunetti.R")
 
-read.DPC.series.single <- \(tvar, flavor, identifier) read.brunetti.series.single("DPC", tvar, flavor, identifier)
+read.DPC.series.single <- \(tvar, identifier, flavor) read.brunetti.series("DPC", tvar, flavor, identifier)
+read.DPC.series.bunch <- \(tvar, identifiers, flavor) read.brunetti.series("DPC", tvar, flavor, identifiers)
 
 read.DPC.series <- function(tvar, flavor) {
     read.brunetti.series("DPC", tvar, flavor, NULL)
