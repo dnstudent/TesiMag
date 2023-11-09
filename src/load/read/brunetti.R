@@ -71,12 +71,17 @@ describe.brunetti.region_ita_ <- function(data) {
         )
 }
 
+italian_states_ <- tibble(
+    code = c("ABR", "BAS", "CAL", "CAM", "EMR", "FVG", "LAZ", "LIG", "LOM", "MAR", "MOL", "PIE", "PUG", "SAR", "SIC", "TOS", "TAA", "UMB", "VDA", "VEN"),
+    name = c("Abruzzo", "Basilicata", "Calabria", "Campania", "Emilia-Romagna", "Friuli-Venezia Giulia", "Lazio", "Liguria", "Lombardia", "Marche", "Molise", "Piemonte", "Puglia", "Sardegna", "Sicilia", "Toscana", "Trentino-Alto Adige", "Umbria", "Valle D'Aosta", "Veneto")
+)
+
 widths.series_ <- c(5, 3, rep(7, 31))
-read.brunetti.series <- function(db, tvar, flavor, identifier = NULL) {
-    if (is.null(identifier)) {
+read.brunetti.series <- function(db, tvar, flavor, identifiers = NULL) {
+    if (is.null(identifiers)) {
         path_s <- path.datafile(db, tvar, flavor, check = TRUE)
     } else {
-        path_s <- file.path(path.root(db, tvar, flavor), identifier)
+        path_s <- file.path(path.root(db, tvar, flavor), identifiers)
     }
     vroom_fwf(path_s,
         fwf_widths(widths.series_, col_names = c("year", "month", seq.int(1, 31))),
@@ -87,4 +92,15 @@ read.brunetti.series <- function(db, tvar, flavor, identifier = NULL) {
         pivot_longer(cols = seq(4, 34), names_to = "day", values_to = tvar, names_transform = as.integer) |>
         mutate(date = make_date(year, month, day), .keep = "unused") |>
         filter(!is.na(date))
+}
+
+read.brunetti.series.single <- function(db, tvar, flavor, identifier) {
+    vroom_fwf(file.path(path.root(db, tvar, flavor), identifier),
+        fwf_widths(widths.series_, col_names = c("year", "month", seq.int(1, 31))),
+        col_types = cols(year = "i", month = "i", .default = "d"),
+        na = c("", "NA", "-90.0"), progress = FALSE
+    ) |>
+        pivot_longer(cols = seq(3, 33), names_to = "day", values_to = tvar, names_transform = as.integer) |>
+        mutate(date = make_date(year, month, day), .keep = "unused") |>
+        drop_na(date)
 }
