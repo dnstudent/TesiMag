@@ -15,8 +15,8 @@ source("src/load/load_utils.R")
 read.series <- compose(\(t) as_tsibble(t, key = identifier, index = date), read.data("series"))
 load.series <- compose(\(t) as_tsibble(t, key = identifier, index = date), load.data("series"))
 
-read.series.single <- function(db, tvar, id) {
-  do.call(paste("read", db, "series.single", sep = "."), list(tvar, id)) |> as_tsibble(key = identifier, index = date)
+read.series.single <- function(db, tvar, id, ...) {
+  do.call(paste("read", db, "series.single", sep = "."), list(tvar, id, ...)) |> as_tsibble(index = date)
 }
 read.series.bunch <- function(db, tvar, ids, ...) {
   do.call(paste("read", db, "series.bunch", sep = "."), list(tvar, ids, ...)) |> as_tsibble(key = identifier, index = date)

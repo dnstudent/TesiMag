@@ -12,8 +12,8 @@ read.SCIA.series <- function(tvar) {
 }
 
 read.SCIA.series.single <- function(tvar, id) {
-    series_path <- file.path("scia_split", tvar, paste0(id, ".parquet"))
-    read_parquet(series_path, as_data_frame = TRUE) |> add_column(identifier = id)
+    series_path <- file.path("scia_split", tvar, paste0(as.integer(id), ".parquet"))
+    read_parquet(series_path, as_data_frame = TRUE)
 }
 
 read.SCIA.series.bunch <- function(tvar, ids, many = FALSE) {

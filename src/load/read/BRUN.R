@@ -7,10 +7,7 @@ library(forcats, warn.conflicts = FALSE)
 source("src/paths/paths.R")
 source("src/load/read/brunetti.R")
 
-italian_states_ <- tibble(
-    code = c("ABR", "BAS", "CAL", "CAM", "EMR", "FVG", "LAZ", "LIG", "LOM", "MAR", "MOL", "PIE", "PUG", "SAR", "SIC", "TOS", "TAA", "UMB", "VDA", "VEN"),
-    name = c("Abruzzo", "Basilicata", "Calabria", "Campania", "Emilia-Romagna", "Friuli-Venezia Giulia", "Lazio", "Liguria", "Lombardia", "Marche", "Molise", "Piemonte", "Puglia", "Sardegna", "Sicilia", "Toscana", "Trentino-Alto Adige", "Umbria", "Valle D'Aosta", "Veneto")
-)
+
 
 describe.BRUN.metadata_ <- function(data) {
     data |>
@@ -35,8 +32,12 @@ read.BRUN.metadata <- function(tvar, flavor) {
 }
 
 
-read.BRUN.series.single <- function(tvar, flavor, identifier) {
-    read.brunetti.series("BRUN", tvar, flavor, identifier)
+read.BRUN.series.single <- function(tvar, identifier, flavor) {
+    read.brunetti.series.single("BRUN", tvar, flavor, identifier)
+}
+
+read.BRUN.series.bunch <- function(tvar, identifiers, flavor) {
+    read.brunetti.series("BRUN", tvar, flavor, identifiers)
 }
 
 read.BRUN.series <- function(tvar, flavor) {
