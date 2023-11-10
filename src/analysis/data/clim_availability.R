@@ -39,8 +39,8 @@ is_month_usable <- function(x, ...) UseMethod("is_month_usable", x)
 #'
 #' @param monthly_availability The vector of availabilities for a given month (e.g.: Jan 2005: TRUE, Jan 2006: TRUE, Jan 2007: FALSE, ...)
 #' @return A boolean value representing whether the data at hand is usable to compute a climate normal or not
-is_climatology_computable.logical <- function(monthly_availability) {
-    sum(monthly_availability) / length(monthly_availability) >= 0.8
+is_climatology_computable.logical <- function(monthly_availability, frac_year_threshold = 0.8) {
+    sum(monthly_availability) / length(monthly_availability) >= frac_year_threshold
 }
 
 #' Assess the usability of a complete series of daily data for climate normal computation according to WMO standards.
@@ -48,11 +48,11 @@ is_climatology_computable.logical <- function(monthly_availability) {
 #' @param data The time series of recorded values for a given month. It must be a \code{tsibble} object without gaps (complete).
 #' @param variable The name of the variable to assess the availability of.
 #' @return A boolean \code{tsibble} representing whether the data at hand is usable to compute a climate normal or not
-is_climatology_computable.tbl_ts <- function(data, variable, .start = NULL, .end = NULL) {
+is_climatology_computable.tbl_ts <- function(data, variable, .start = NULL, .end = NULL, max_na_days = 10, max_consecutive_nas = 4, frac_year_threshold = 0.8) {
     data |>
-        is_month_usable.tbl_ts(variable, .start, .end, groups = "keep") |>
+        is_month_usable.tbl_ts(variable, .start, .end, max_na_days, max_consecutive_nas, groups = "keep") |>
         index_by(month = ~ month(.)) |>
-        summarise(clim_available = is_climatology_computable.logical(available))
+        summarise(clim_available = is_climatology_computable.logical(available, frac_year_threshold))
 }
 
 is_climatology_computable <- function(x, ...) UseMethod("is_climatology_computable", x)
