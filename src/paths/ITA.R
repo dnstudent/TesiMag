@@ -2,7 +2,21 @@ path.ds <- "/Users/davidenicoli/Local_Workspace/Datasets"
 
 path.COP30 <- file.path(path.ds, "COPERNICUS DEM30")
 path.cached.COP30 <- fs::path_rel("./temp/dem/dem.tif")
-path.boundaries.italy.states <- file.path(path.ds, "geoBoundaries", "ITA-ADM1", "geoBoundaries-ITA-ADM1.geojson")
+
+path.boundaries.italy.integer <- function(level) {
+    str_glue(file.path(path.ds, "geoBoundaries", "ITA-ADM{level}", "geoBoundaries-ITA-ADM{level}.geojson"))
+}
+path.boundaries.italy.character <- function(level) {
+    level <- switch(level,
+        "country" = 0,
+        "state" = 1,
+        "province" = 2
+    )
+    path.boundaries.italy.integer(level)
+}
+path.boundaries.italy <- function(level) UseMethod("path.boundaries.italy", level)
+
+# path.boundaries.italian_states <- file.path(path.ds, "geoBoundaries", "ITA-ADM1", "geoBoundaries-ITA-ADM1.geojson")
 
 ls.COP30.missing <- function() {
     list.files(path = file.path(path.COP30, "missing"), recursive = FALSE, full.names = TRUE, pattern = "^missing_N\\d{2}_E0\\d{2}.tif$")

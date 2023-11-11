@@ -68,6 +68,6 @@ build.DEM.COP30.sea_mask <- function() {
     sea
 }
 
-load.italy <- function() {
-    st_read(path.boundaries.italy.states)
+load.italian_boundaries <- function(level) {
+    st_read(path.boundaries.italy(level))
 }

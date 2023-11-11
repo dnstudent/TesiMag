@@ -59,7 +59,7 @@ load.metadata.allvars <- function(db, ..., .cache_kwargs = list()) {
     T_MIN = load.metadata(db, "T_MIN", ..., .cache_kwargs = .cache_kwargs),
     T_MAX = load.metadata(db, "T_MAX", ..., .cache_kwargs = .cache_kwargs),
     .id = "tvar"
-  )
+  ) |> mutate(tvar = factor(tvar, levels = c("T_MIN", "T_MAX"), ordered = TRUE))
 }
 
 load.metadata.all <- function(..., .cache_kwargs = list()) {
