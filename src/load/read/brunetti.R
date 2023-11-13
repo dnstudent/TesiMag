@@ -34,7 +34,8 @@ read.brunetti.metadata.raw_ <- function(db, tvar, flavor) {
             lon = as.double(lon),
             lat = as.double(lat),
             elevation = as.double(elevation),
-            region_ = classify_region_(identifier)
+            region_ = classify_region_(identifier),
+            identifier = str_split_i(identifier, fixed("."), 1)
         )
 }
 
@@ -88,7 +89,7 @@ read.brunetti.series <- function(db, tvar, flavor, identifiers = NULL) {
         col_types = cols(year = "i", month = "i", .default = "d"),
         na = c("", "NA", "-90.0"), id = "file", progress = FALSE, num_threads = 7
     ) |>
-        mutate(identifier = factor(str_split_i(file, "/", -1)), .keep = "unused", .before = 1) |>
+        mutate(identifier = factor(str_split_i(file, "/", -1) |> str_split_i(fixed("."), 1)), .keep = "unused", .before = 1) |>
         pivot_longer(cols = seq(4, 34), names_to = "day", values_to = tvar, names_transform = as.integer) |>
         mutate(date = make_date(year, month, day), .keep = "unused") |>
         filter(!is.na(date))

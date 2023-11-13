@@ -27,9 +27,10 @@ is_month_usable.numeric <- function(series, max_na_days = 10, max_consecutive_na
 
 is_month_usable.tbl_ts <- function(data, variable, .start = NULL, .end = NULL, max_na_days = 10, max_consecutive_nas = 4, groups = NULL) {
     filter_data(data, .start, .end) |>
-        mutate(isna_ = is.na(.data[[variable]])) |>
+        fill_gaps(.full = TRUE, .start = .start, .end = .end) |>
+        group_by_key() |>
         index_by(year_month = ~ yearmonth(.)) |>
-        summarise(available = is_month_usable.logical(isna_, max_na_days, max_consecutive_nas), .groups = groups)
+        summarise(available = is_month_usable.logical(is.na({{ variable }}), max_na_days, max_consecutive_nas), .groups = groups)
 }
 
 is_month_usable <- function(x, ...) UseMethod("is_month_usable", x)
