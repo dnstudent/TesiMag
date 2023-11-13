@@ -1,3 +1,4 @@
+library(arrow, warn.conflicts = FALSE)
 library(dplyr, warn.conflicts = FALSE)
 library(tidyr, warn.conflicts = FALSE)
 library(lubridate, warn.conflicts = FALSE)
@@ -75,4 +76,15 @@ load.series.fromnet <- function(tvar, net_name, ...) {
     filter(rete == net_name) |>
     pull(identifier)
   load.series("SCIA", tvar, ...) |> filter(identifier %in% identifiers)
+}
+
+open.dataset <- function(db, kind) {
+  res <- switch(db,
+    "DPC" = open.dataset("BRUN", kind) |> filter(dpc)
+  )
+  if (!is.null(res)) {
+    res
+  } else {
+    open_dataset(file.path("db", kind, stringr::str_to_lower(db)), format = "feather")
+  }
 }
