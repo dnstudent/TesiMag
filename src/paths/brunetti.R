@@ -30,3 +30,15 @@ brunetti.root.relative <- function(db, tvar, flavor) {
         ) |> paste0(tvar)
     )
 }
+
+brunetti.series_file.relative <- function(flavor, identifier) {
+    paste0(
+        identifier,
+        switch(flavor,
+            raw = "",
+            qc_era5 = ".era",
+            qc_homo = ".qcg",
+            stop("Invalid section name: ", flavor)
+        )
+    )
+}
