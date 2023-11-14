@@ -6,6 +6,7 @@ library(tsibble, warn.conflicts = FALSE)
 library(sf, warn.conflicts = FALSE)
 library(digest, warn.conflicts = FALSE)
 library(stringdist, warn.conflicts = FALSE)
+library(stars, warn.conflicts = FALSE)
 
 source("src/load/load.R")
 
@@ -97,6 +98,18 @@ analyze_match <- function(data, db1, db2, tvar, ...f = list(), ...s = list()) {
         mutate(Tinfo = Tinfo(c(list(db1, tvar, identifier.x), ...f), c(list(db2, tvar, identifier.y), ...s))) |>
         unnest(Tinfo)
 }
+
+# analyze_match.2 <- function(matches, series.scia, series.dpc) {
+#     data |>
+#         mutate(
+#             delH = elevation.x - elevation.y,
+#             delZ = dem.x - dem.y,
+#             strSym = stringsim(normalize_name(anagrafica.x), normalize_name(anagrafica.y), method = "jw")
+#         ) |>
+#         rowwise() |>
+#         mutate(Tinfo = Tinfo(c(list(db1, tvar, identifier.x), ...f), c(list(db2, tvar, identifier.y), ...s))) |>
+#         unnest(Tinfo)
+# }
 
 split_by <- function(data, ...) {
 

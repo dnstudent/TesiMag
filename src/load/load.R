@@ -88,3 +88,7 @@ open.dataset <- function(db, kind) {
     open_dataset(file.path("db", kind, stringr::str_to_lower(db)), format = "feather")
   }
 }
+
+st_md_to_sf <- function(metadata) {
+  metadata |> st_as_sf(coords = c("lon", "lat"), crs = "EPSG:4326")
+}

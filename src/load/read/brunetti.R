@@ -82,7 +82,7 @@ read.brunetti.series <- function(db, tvar, flavor, identifiers = NULL) {
     if (is.null(identifiers)) {
         path_s <- path.datafile(db, tvar, flavor, check = TRUE)
     } else {
-        path_s <- file.path(path.root(db, tvar, flavor), identifiers)
+        path_s <- file.path(path.root(db, tvar, flavor), brunetti.series_file.relative(flavor, identifiers))
     }
     vroom_fwf(path_s,
         fwf_widths(widths.series_, col_names = c("year", "month", seq.int(1, 31))),
@@ -96,7 +96,7 @@ read.brunetti.series <- function(db, tvar, flavor, identifiers = NULL) {
 }
 
 read.brunetti.series.single <- function(db, tvar, flavor, identifier) {
-    vroom_fwf(file.path(path.root(db, tvar, flavor), identifier),
+    vroom_fwf(file.path(path.root(db, tvar, flavor), brunetti.series_file.relative(flavor, identifier)),
         fwf_widths(widths.series_, col_names = c("year", "month", seq.int(1, 31))),
         col_types = cols(year = "i", month = "i", .default = "d"),
         na = c("", "NA", "-90.0"), progress = FALSE

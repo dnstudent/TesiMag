@@ -19,3 +19,5 @@ db/
 .Renviron
 .DS_Store
 tokens
+
+build/
