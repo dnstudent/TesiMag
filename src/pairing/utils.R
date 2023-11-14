@@ -37,7 +37,24 @@ overlap <- function(s1, s2) {
     1 - sum(xor(is.na(s1), is.na(s2))) / length(s1)
 }
 
-Tinfo <- function(details1, details2) {
+Tinfo.numeric <- function(s1, s2) {
+    difference <- s1 - s2
+    tibble(
+        delT = mean(abs(difference), na.rm = TRUE),
+        sdT = sd(abs(difference), na.rm = TRUE),
+        corT = cor(s1, s2, use = "na.or.complete"),
+        overlap = overlap(s1, s2),
+        minilap = minimal_overlap(s1, s2),
+        valid_days.x = sum(!is.na(s1)),
+        valid_days.y = sum(!is.na(s2)),
+        valid_days_both = sum(!is.na(s1) & !is.na(s2)),
+        f0 = mean(difference == 0, na.rm = TRUE),
+        fplus = mean(difference > 0, na.rm = TRUE),
+        fsemiside = max(fplus + f0, 1 - (fplus + f0))
+    ) |> select(-fplus)
+}
+
+Tinfo.details <- function(details1, details2) {
     s1 <- do.call(read.series.single, details1) |>
         drop_na() |>
         fill_gaps() |>
@@ -69,8 +86,8 @@ add_distances <- function(match_table, m.db1, m.db2) {
     bind_cols(
         match_table,
         distance = st_distance(
-            left_join(match_table |> st_drop_geometry(), m.db1, join_by(identifier.x == identifier)) |> st_as_sf(),
-            left_join(match_table |> st_drop_geometry(), m.db2, join_by(identifier.y == identifier)) |> st_as_sf(),
+            left_join(match_table |> st_drop_geometry(), m.db1, join_by(identifier.x == identifier, variable.x == variable), relationship = "many-to-one") |> st_as_sf(),
+            left_join(match_table |> st_drop_geometry(), m.db2, join_by(identifier.y == identifier, variable.y == variable), relationship = "many-to-one") |> st_as_sf(),
             by_element = TRUE
         ) |> units::drop_units()
     )
@@ -90,7 +107,7 @@ clean_match_table <- function(data) {
         bind_rows(subset(data, is.same))
 }
 
-analyze_match <- function(data, db1, db2, tvar, ...f = list(), ...s = list()) {
+analyze_matches <- function(data, db1, db2, tvar, ...f = list(), ...s = list()) {
     data |>
         mutate(delH = elevation.x - elevation.y, delZ = dem.x - dem.y) |>
         mutate(strSym = stringsim(normalize_name(anagrafica.x), normalize_name(anagrafica.y), method = "jw")) |>
@@ -99,17 +116,25 @@ analyze_match <- function(data, db1, db2, tvar, ...f = list(), ...s = list()) {
         unnest(Tinfo)
 }
 
-# analyze_match.2 <- function(matches, series.scia, series.dpc) {
-#     data |>
-#         mutate(
-#             delH = elevation.x - elevation.y,
-#             delZ = dem.x - dem.y,
-#             strSym = stringsim(normalize_name(anagrafica.x), normalize_name(anagrafica.y), method = "jw")
-#         ) |>
-#         rowwise() |>
-#         mutate(Tinfo = Tinfo(c(list(db1, tvar, identifier.x), ...f), c(list(db2, tvar, identifier.y), ...s))) |>
-#         unnest(Tinfo)
-# }
+analyze_matches.wide <- function(matches, table.scia, table.dpc, table.scia.means, table.dpc.means) {
+    matches <- matches |>
+        semi_join(
+            tibble(identifier.y = table.dpc |> colnames() |> tail(-1)),
+            by = "identifier.y"
+        )
+    matches |>
+        mutate(
+            delH = elevation.x - elevation.y,
+            # delZ = dem.x - dem.y,
+            strSym = stringsim(normalize_name(anagrafica.x), normalize_name(anagrafica.y), method = "jw")
+        ) |>
+        rowwise() |>
+        mutate(
+            Tinfo = Tinfo.numeric(pull(table.scia, as.character(identifier.x)), pull(table.dpc, identifier.y)),
+            climatdelT = mean(abs(pull(table.scia.means, as.character(identifier.x)) - pull(table.dpc.means, identifier.y)), na.rm = TRUE)
+        ) |>
+        unnest(Tinfo)
+}
 
 split_by <- function(data, ...) {
 
