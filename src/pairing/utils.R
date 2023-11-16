@@ -124,14 +124,15 @@ analyze_matches.wide <- function(matches, table.scia, table.dpc, table.scia.mean
         )
     matches |>
         mutate(
-            delH = elevation.x - elevation.y,
-            # delZ = dem.x - dem.y,
+            delH = abs(elevation.x - elevation.y),
+            delZ = abs(dem.x - dem.y),
             strSym = stringsim(normalize_name(anagrafica.x), normalize_name(anagrafica.y), method = "jw")
         ) |>
         rowwise() |>
         mutate(
             Tinfo = Tinfo.numeric(pull(table.scia, as.character(identifier.x)), pull(table.dpc, identifier.y)),
-            climatdelT = mean(abs(pull(table.scia.means, as.character(identifier.x)) - pull(table.dpc.means, identifier.y)), na.rm = TRUE)
+            climatdelT = mean(abs(pull(table.scia.means, as.character(identifier.x)) - pull(table.dpc.means, identifier.y)), na.rm = TRUE),
+            climatsdT = sd(abs(pull(table.scia.means, as.character(identifier.x)) - pull(table.dpc.means, identifier.y)), na.rm = TRUE)
         ) |>
         unnest(Tinfo)
 }
