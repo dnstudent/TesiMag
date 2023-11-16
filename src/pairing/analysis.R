@@ -40,8 +40,8 @@ overlap <- function(s1, s2) {
 Tinfo.numeric <- function(s1, s2) {
     difference <- s1 - s2
     tibble(
+        maeT = mean(abs(difference), na.rm = TRUE),
         delT = mean(difference, na.rm = TRUE),
-        mae = mean(abs(difference), na.rm = TRUE),
         sdT = sd(difference, na.rm = TRUE),
         corT = cor(s1, s2, use = "na.or.complete"),
         overlap = overlap(s1, s2),
@@ -55,33 +55,33 @@ Tinfo.numeric <- function(s1, s2) {
     ) |> select(-fplus)
 }
 
-Tinfo.details <- function(details1, details2) {
-    s1 <- do.call(read.series.single, details1) |>
-        drop_na() |>
-        fill_gaps() |>
-        rename(T := details1[[2]])
-    s2 <- do.call(read.series.single, details2) |>
-        drop_na() |>
-        fill_gaps() |>
-        rename(T := details2[[2]])
+# Tinfo.details <- function(details1, details2) {
+#     s1 <- do.call(read.series.single, details1) |>
+#         drop_na() |>
+#         fill_gaps() |>
+#         rename(T := details1[[2]])
+#     s2 <- do.call(read.series.single, details2) |>
+#         drop_na() |>
+#         fill_gaps() |>
+#         rename(T := details2[[2]])
 
-    full_join(s1, s2, by = "date") |>
-        as_tibble() |>
-        summarise(
-            delT = mean(abs(T.x - T.y), na.rm = TRUE),
-            sdT = sd(abs(T.x - T.y), na.rm = TRUE),
-            corT = cor(T.x, T.y, use = "na.or.complete"),
-            overlap = overlap(T.x, T.y),
-            minilap = minimal_overlap(T.x, T.y),
-            valid_days.x = sum(!is.na(T.x)),
-            valid_days.y = sum(!is.na(T.y)),
-            valid_days_both = sum(!is.na(T.x) & !is.na(T.y)),
-            first_date.x = min(s1$date),
-            last_date.x = max(s1$date),
-            first_date.y = min(s2$date),
-            last_date.y = max(s2$date)
-        )
-}
+#     full_join(s1, s2, by = "date") |>
+#         as_tibble() |>
+#         summarise(
+#             delT = mean(abs(T.x - T.y), na.rm = TRUE),
+#             sdT = sd(abs(T.x - T.y), na.rm = TRUE),
+#             corT = cor(T.x, T.y, use = "na.or.complete"),
+#             overlap = overlap(T.x, T.y),
+#             minilap = minimal_overlap(T.x, T.y),
+#             valid_days.x = sum(!is.na(T.x)),
+#             valid_days.y = sum(!is.na(T.y)),
+#             valid_days_both = sum(!is.na(T.x) & !is.na(T.y)),
+#             first_date.x = min(s1$date),
+#             last_date.x = max(s1$date),
+#             first_date.y = min(s2$date),
+#             last_date.y = max(s2$date)
+#         )
+# }
 
 add_distances <- function(match_table, m.db1, m.db2) {
     bind_cols(
@@ -117,12 +117,18 @@ analyze_matches <- function(data, db1, db2, tvar, ...f = list(), ...s = list()) 
         unnest(Tinfo)
 }
 
-analyze_matches.wide <- function(matches, table.scia, table.dpc, table.scia.means, table.dpc.means) {
+analyze_matches.wide <- function(matches, table.scia, table.dpc, table.scia.monthly, table.dpc.monthly) {
     matches <- matches |>
         semi_join(
             tibble(identifier.y = table.dpc |> colnames() |> tail(-1)),
             by = "identifier.y"
         )
+    table.scia.climat <- table.scia.monthly |>
+        index_by(month = ~ month(.)) |>
+        summarise(across(everything(), ~ mean(., na.rm = TRUE)))
+    table.dpc.climat <- table.dpc.monthly |>
+        index_by(month = ~ month(.)) |>
+        summarise(across(everything(), ~ mean(., na.rm = TRUE)))
     matches |>
         mutate(
             delH = abs(elevation.x - elevation.y),
@@ -132,9 +138,10 @@ analyze_matches.wide <- function(matches, table.scia, table.dpc, table.scia.mean
         rowwise() |>
         mutate(
             Tinfo = Tinfo.numeric(pull(table.scia, as.character(identifier.x)), pull(table.dpc, identifier.y)),
-            climatdelT = mean(pull(table.scia.means, as.character(identifier.x)) - pull(table.dpc.means, identifier.y), na.rm = TRUE),
-            climatmae = mean(abs(pull(table.scia.means, as.character(identifier.x)) - pull(table.dpc.means, identifier.y)), na.rm = TRUE),
-            climatsdT = sd(pull(table.scia.means, as.character(identifier.x)) - pull(table.dpc.means, identifier.y), na.rm = TRUE)
+            monthlydelT = mean(pull(table.scia.monthly, as.character(identifier.x)) - pull(table.dpc.monthly, identifier.y), na.rm = TRUE),
+            monthlymae = mean(abs(pull(table.scia.monthly, as.character(identifier.x)) - pull(table.dpc.monthly, identifier.y)), na.rm = TRUE),
+            monthlysdT = sd(pull(table.scia.monthly, as.character(identifier.x)) - pull(table.dpc.monthly, identifier.y), na.rm = TRUE),
+            climatcorT = cor(pull(table.scia.climat, identifier.x), pull(table.dpc.climat, identifier.y))
         ) |>
         unnest(Tinfo)
 }
