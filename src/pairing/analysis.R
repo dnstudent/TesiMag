@@ -40,8 +40,9 @@ overlap <- function(s1, s2) {
 Tinfo.numeric <- function(s1, s2) {
     difference <- s1 - s2
     tibble(
-        delT = mean(abs(difference), na.rm = TRUE),
-        sdT = sd(abs(difference), na.rm = TRUE),
+        delT = mean(difference, na.rm = TRUE),
+        mae = mean(abs(difference), na.rm = TRUE),
+        sdT = sd(difference, na.rm = TRUE),
         corT = cor(s1, s2, use = "na.or.complete"),
         overlap = overlap(s1, s2),
         minilap = minimal_overlap(s1, s2),
@@ -131,12 +132,9 @@ analyze_matches.wide <- function(matches, table.scia, table.dpc, table.scia.mean
         rowwise() |>
         mutate(
             Tinfo = Tinfo.numeric(pull(table.scia, as.character(identifier.x)), pull(table.dpc, identifier.y)),
-            climatdelT = mean(abs(pull(table.scia.means, as.character(identifier.x)) - pull(table.dpc.means, identifier.y)), na.rm = TRUE),
-            climatsdT = sd(abs(pull(table.scia.means, as.character(identifier.x)) - pull(table.dpc.means, identifier.y)), na.rm = TRUE)
+            climatdelT = mean(pull(table.scia.means, as.character(identifier.x)) - pull(table.dpc.means, identifier.y), na.rm = TRUE),
+            climatmae = mean(abs(pull(table.scia.means, as.character(identifier.x)) - pull(table.dpc.means, identifier.y)), na.rm = TRUE),
+            climatsdT = sd(pull(table.scia.means, as.character(identifier.x)) - pull(table.dpc.means, identifier.y), na.rm = TRUE)
         ) |>
         unnest(Tinfo)
-}
-
-split_by <- function(data, ...) {
-
 }

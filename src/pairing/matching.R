@@ -40,16 +40,16 @@ prepare_dss <- function(ds, matches_table, identifier_var, cast_dtype) {
             ~ pivot_wider(.x, id_cols = date, names_from = identifier, values_from = value) |>
                 arrange(date) |>
                 as_tsibble(index = date) |>
-                fill_gaps(.start = first_date, .end = last_date) |>
-                as_tibble()
+                fill_gaps(.start = first_date, .end = last_date)
         )
 
     means <- purrr::map(
         data,
         ~ . |>
-            group_by(month = month(date), year = year(date)) |>
-            summarise(across(-date, ~ mean(., na.rm = TRUE)), .groups = "drop_last") |>
-            summarise(across(-year, ~ mean(., na.rm = TRUE)), .groups = "drop")
+            index_by(ymt = ~ yearmonth(.)) |>
+            summarise(across(everything(), ~ mean(., na.rm = TRUE)))
+        # summarise(across(-date, ~ mean(., na.rm = TRUE)), .groups = "drop_last") |>
+        # summarise(across(-year, ~ mean(., na.rm = TRUE)), .groups = "drop")
     )
 
     list(data, means)

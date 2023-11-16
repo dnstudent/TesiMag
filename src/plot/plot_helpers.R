@@ -18,7 +18,7 @@ plot_series <- function(tvar, s1, s2, ...) {
         theme(plot.title = element_text(size = rel(0.8), color = "#ff5900"), plot.subtitle = element_text(size = rel(0.8), color = "#40d8e0"))
 }
 
-plot.sciavsdpc <- function(tvar, id.scia, id.dpc, flavor.dpc, diffs = TRUE, start_date = NULL, anagrafica.scia = NULL) {
+plot.sciavsdpc <- function(tvar, id.scia, id.dpc, flavor.dpc, diffs = TRUE, monthly = TRUE, start_date = NULL, anagrafica.scia = NULL) {
     s.scia <- read.series.single("SCIA", tvar, id.scia) |>
         drop_na({{ tvar }}) |>
         fill_gaps() |>
@@ -31,6 +31,16 @@ plot.sciavsdpc <- function(tvar, id.scia, id.dpc, flavor.dpc, diffs = TRUE, star
         s.scia <- filter(s.scia, date >= as.Date(start_date))
         s.dpc <- filter(s.dpc, date >= as.Date(start_date))
     }
+    if (monthly) {
+        s.scia <- s.scia |>
+            index_by(ymt = ~ yearmonth(.)) |>
+            summarise(T = mean(T, na.rm = TRUE)) |>
+            rename(date = ymt)
+        s.dpc <- s.dpc |>
+            index_by(ymt = ~ yearmonth(.)) |>
+            summarise(T = mean(T, na.rm = TRUE)) |>
+            rename(date = ymt)
+    }
     if (diffs) {
         inner_join(s.scia, s.dpc, by = "date") |>
             mutate(
@@ -39,11 +49,12 @@ plot.sciavsdpc <- function(tvar, id.scia, id.dpc, flavor.dpc, diffs = TRUE, star
                     is.na(T.x) & is.na(T.y) ~ "both",
                     is.na(T.x) ~ "scia",
                     is.na(T.y) ~ "dpc",
-                    .default = NA
+                    .default = "none"
                 ) |> factor(levels = c("none", "scia", "dpc", "both"))
             ) |>
             ggplot() +
-            geom_rect(aes(NULL, NULL, xmin = date, xmax = lag(date), fill = nas), ymin = -0.5, ymax = 0.5, alpha = 0.9, na.rm = TRUE) +
+            geom_rect(aes(NULL, NULL, xmin = date, xmax = lag(date), fill = nas), ymin = -0.5, ymax = 0.5, na.rm = TRUE) +
+            scale_fill_manual(values = c(alpha("white", 0), alpha(c("red", "blue", "green"), 0.8))) +
             geom_line(aes(date, diffs), na.rm = TRUE) +
             labs(title = str_glue("{id.scia}({anagrafica.scia}) vs {id.dpc}"))
     } else {
