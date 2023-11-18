@@ -3,6 +3,7 @@ library(ggplot2, warn.conflicts = FALSE)
 library(stringr, warn.conflicts = FALSE)
 library(tibble, warn.conflicts = FALSE)
 library(tsibble, warn.conflicts = FALSE)
+library(ggpubr, warn.conflicts = FALSE)
 
 source("src/load/load.R")
 
@@ -63,4 +64,11 @@ plot.sciavsdpc <- function(tvar, id.scia, id.dpc, flavor.dpc, diffs = TRUE, mont
         ggplot(data) +
             geom_line(aes(date, T, color = station, linetype = station))
     }
+}
+
+plot.multiple <- function(identifiers, flavor.dpc, diffs = TRUE, monthly = TRUE, start_date = NULL) {
+    plots <- identifiers |>
+        rowwise() |>
+        group_map(~ plot.sciavsdpc(.x[["variable"]], .x[["identifier.x"]], .x[["identifier.y"]], flavor.dpc, diffs, monthly, start_date, .x[["anagrafica.x"]]))
+    ggarrange(plotlist = plots, ncol = 1)
 }

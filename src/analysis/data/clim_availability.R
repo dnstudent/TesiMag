@@ -51,9 +51,16 @@ is_climatology_computable.logical <- function(monthly_availability, frac_year_th
 #' @return A boolean \code{tsibble} representing whether the data at hand is usable to compute a climate normal or not
 is_climatology_computable.tbl_ts <- function(data, variable, .start = NULL, .end = NULL, max_na_days = 10, max_consecutive_nas = 4, frac_year_threshold = 0.8) {
     data |>
-        is_month_usable.tbl_ts(variable, .start, .end, max_na_days, max_consecutive_nas, groups = "keep") |>
-        index_by(month = ~ month(.)) |>
+        is_month_usable.tbl_ts({{ variable }}, .start, .end, max_na_days, max_consecutive_nas, groups = "keep") |>
+        index_by(month = ~ month(., label = TRUE)) |>
         summarise(clim_available = is_climatology_computable.logical(available, frac_year_threshold))
+}
+
+is_climatology_computable.series <- function(s1, s2, dates, max_na_days = 10, max_consecutive_nas = 4, frac_year_threshold = 0.8) {
+    ina <- is.na(s1) & is.na(s2)
+    bind_cols(series = na_if(ina, TRUE), date = dates) |>
+        as_tsibble(index = date) |>
+        is_climatology_computable.tbl_ts(series, max_na_days = max_na_days, max_consecutive_nas = max_consecutive_nas, frac_year_threshold = frac_year_threshold)
 }
 
 is_climatology_computable <- function(x, ...) UseMethod("is_climatology_computable", x)
