@@ -1,5 +1,6 @@
 library(sf, warn.conflicts = FALSE)
 library(dplyr, warn.conflicts = FALSE)
+library(RcppRoll, warn.conflicts = FALSE)
 
 source("src/pairing/analysis.R")
 

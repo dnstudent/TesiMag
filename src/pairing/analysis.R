@@ -39,6 +39,8 @@ overlap <- function(s1, s2) {
 
 Tinfo.numeric <- function(s1, s2) {
     difference <- s1 - s2
+    valid1 <- !is.na(s1)
+    valid2 <- !is.na(s2)
     tibble(
         maeT = mean(abs(difference), na.rm = TRUE),
         delT = mean(difference, na.rm = TRUE),
@@ -46,9 +48,10 @@ Tinfo.numeric <- function(s1, s2) {
         corT = cor(s1, s2, use = "na.or.complete"),
         overlap = overlap(s1, s2),
         minilap = minimal_overlap(s1, s2),
-        valid_days.x = sum(!is.na(s1)),
-        valid_days.y = sum(!is.na(s2)),
-        valid_days_both = sum(!is.na(s1) & !is.na(s2)),
+        valid_days.x = sum(valid1),
+        valid_days.y = sum(valid2),
+        valid_days_inters = sum(valid1 & valid2),
+        valid_days_union = sum(valid1 | valid2),
         f0 = mean(difference == 0, na.rm = TRUE),
         fplus = mean(difference > 0, na.rm = TRUE),
         fsemiside = max(fplus + f0, 1 - (fplus + f0))
@@ -117,6 +120,15 @@ analyze_matches <- function(data, db1, db2, tvar, ...f = list(), ...s = list()) 
         unnest(Tinfo)
 }
 
+slope_diff <- function(s1, s2) {
+    diffs <- list(x = seq(1, length(s1)), y = s1 - s2)
+    if (all(is.na(diffs$y))) {
+        NA
+    } else {
+        lm(y ~ x, diffs, na.action = "na.omit")$coefficients[[2]]
+    }
+}
+
 analyze_matches.wide <- function(matches, table.scia, table.dpc, table.scia.monthly, table.dpc.monthly) {
     matches <- matches |>
         semi_join(
@@ -138,10 +150,12 @@ analyze_matches.wide <- function(matches, table.scia, table.dpc, table.scia.mont
         rowwise() |>
         mutate(
             Tinfo = Tinfo.numeric(pull(table.scia, as.character(identifier.x)), pull(table.dpc, identifier.y)),
+            monthlyslopeT = slope_diff(pull(table.scia.climat, as.character(identifier.x)), pull(table.dpc.climat, identifier.y)),
             monthlydelT = mean(pull(table.scia.monthly, as.character(identifier.x)) - pull(table.dpc.monthly, identifier.y), na.rm = TRUE),
             monthlymae = mean(abs(pull(table.scia.monthly, as.character(identifier.x)) - pull(table.dpc.monthly, identifier.y)), na.rm = TRUE),
             monthlysdT = sd(pull(table.scia.monthly, as.character(identifier.x)) - pull(table.dpc.monthly, identifier.y), na.rm = TRUE),
-            climatcorT = cor(pull(table.scia.climat, identifier.x), pull(table.dpc.climat, identifier.y))
+            climatcorT = cor(pull(table.scia.climat, as.character(identifier.x)), pull(table.dpc.climat, identifier.y), use = "na.or.complete"),
+            climat_availability = is_climatology_computable.series(pull(table.scia, as.character(identifier.x)), pull(table.dpc, identifier.y), table.scia$date) |> as_tibble() |> summarise(all_filter = all(clim_available), any_filter = any(clim_available))
         ) |>
-        unnest(Tinfo)
+        unnest(c(Tinfo, climat_availability))
 }
