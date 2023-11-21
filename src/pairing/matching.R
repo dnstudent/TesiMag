@@ -1,37 +1,33 @@
 library(sf, warn.conflicts = FALSE)
 library(dplyr, warn.conflicts = FALSE)
+library(arrow, warn.conflicts = FALSE)
 library(RcppRoll, warn.conflicts = FALSE)
 
 source("src/pairing/analysis.R")
 
-matches_table <- function(stations.scia, stations.dpc) {
+matches_table <- function(metadata.x, metadata.y, dist_km = 5) {
     st_join(
-        stations.scia,
-        stations.dpc,
+        metadata.x,
+        metadata.y,
         left = FALSE,
         suffix = c(".x", ".y"),
         join = st_is_within_distance,
-        dist = units::set_units(5, "km")
+        dist = units::set_units(dist_km, "km")
     ) |>
+        st_drop_geometry() |>
         filter(variable.x == variable.y) |>
-        group_by(variable.x, identifier.x) |>
-        mutate(matches.x = n()) |>
-        ungroup() |>
-        group_by(variable.y, identifier.y) |>
-        mutate(matches.y = n()) |>
-        ungroup() |>
-        add_distances(stations.scia, stations.dpc) |>
         rename(variable = variable.x) |>
         select(-variable.y) |>
-        st_drop_geometry()
+        add_distances(metadata.x, metadata.y)
 }
 
-prepare_dss <- function(ds, matches_table, identifier_var, cast_dtype) {
-    data <- semi_join(ds |> filter(first_date <= date, date <= last_date),
-        matches_table |>
+widen_split_data <- function(data_ds, matches, identifier_var, first_date = as.Date("2000-01-01"), last_date = as.Date("2022-12-31")) {
+    identifier_dtype <- schema(data_ds)$identifier$type
+    semi_join(data_ds |> filter(first_date <= date, date <= last_date),
+        matches |>
             select(identifier = {{ identifier_var }}, variable) |>
             as_arrow_table() |>
-            mutate(identifier = cast(identifier, cast_dtype)),
+            mutate(identifier = cast(identifier, identifier_dtype)),
         by = join_by(variable, identifier)
     ) |>
         collect() |>
@@ -43,15 +39,4 @@ prepare_dss <- function(ds, matches_table, identifier_var, cast_dtype) {
                 as_tsibble(index = date) |>
                 fill_gaps(.start = first_date, .end = last_date)
         )
-
-    means <- purrr::map(
-        data,
-        ~ . |>
-            index_by(ymt = ~ yearmonth(.)) |>
-            summarise(across(everything(), ~ mean(., na.rm = TRUE)))
-        # summarise(across(-date, ~ mean(., na.rm = TRUE)), .groups = "drop_last") |>
-        # summarise(across(-year, ~ mean(., na.rm = TRUE)), .groups = "drop")
-    )
-
-    list(data, means)
 }
