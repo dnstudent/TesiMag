@@ -18,7 +18,8 @@ matches_table <- function(metadata.x, metadata.y, dist_km = 5) {
         filter(variable.x == variable.y) |>
         rename(variable = variable.x) |>
         select(-variable.y) |>
-        add_distances(metadata.x, metadata.y)
+        add_distances(metadata.x, metadata.y) |>
+        mutate(across(starts_with("identifier"), as.character), match_id = as.character(row_number()))
 }
 
 widen_split_data <- function(data_ds, matches, identifier_var, first_date = as.Date("2000-01-01"), last_date = as.Date("2022-12-31")) {

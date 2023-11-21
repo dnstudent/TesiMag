@@ -14,3 +14,9 @@ build_date_stats <- function(db.metadata, db.data, variable) {
         ungroup()
     left_join(db.metadata, dates, by = "identifier")
 }
+
+is_climatology_computable.metadata <- function(db.metadata, db.data, ...) {
+    db.data |>
+        semi_join(db.metadata, by = c("variable", "identifier")) |>
+        is_climatology_computable.tbl_ts(value, ...)
+}
