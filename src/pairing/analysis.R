@@ -92,30 +92,30 @@ slope_diff <- function(s1, s2) {
 }
 
 
-analyze_matches <- function(matches, table.scia, table.dpc, climats = FALSE) {
-    table.scia.ymonthly <- table.scia |>
+analyze_matches <- function(matches, table.x, table.y, climats = FALSE, years_threshold = 10L) {
+    table.x.ymonthly <- table.x |>
         index_by(ymt = ~ yearmonth(.)) |>
-        summarise(across(where(is.double), ~ mean(., na.rm = TRUE)))
-    table.dpc.ymonthly <- table.dpc |>
+        summarise(across(!where(is.Date), ~ mean(., na.rm = TRUE)))
+    table.y.ymonthly <- table.y |>
         index_by(ymt = ~ yearmonth(.)) |>
-        summarise(across(where(is.double), ~ mean(., na.rm = TRUE)))
+        summarise(across(!where(is.Date), ~ mean(., na.rm = TRUE)))
 
     matches <- matches |>
         semi_join(
-            identifier.y = table.dpc |> as_tibble() |> select(!where(is.Date)) |> colnames() |> as_tibble_col("identifier.y"),
+            table.y |> as_tibble() |> select(!where(is.Date)) |> colnames() |> as_tibble_col("identifier.y"),
             by = "identifier.y"
         )
     if (climats) {
-        table.scia.climat <- table.scia.ymonthly |>
+        table.x.climat <- table.x.ymonthly |>
             index_by(month = ~ month(.)) |>
             summarise(across(everything(), ~ mean(., na.rm = TRUE)))
-        table.dpc.climat <- table.dpc.ymonthly |>
+        table.y.climat <- table.y.ymonthly |>
             index_by(month = ~ month(.)) |>
             summarise(across(everything(), ~ mean(., na.rm = TRUE)))
         matches <- matches |>
             rowwise() |>
             mutate(
-                climatcorT = cor(pull(table.scia.climat, as.character(identifier.x)), pull(table.dpc.climat, identifier.y), use = "na.or.complete"),
+                climatcorT = cor(pull(table.x.climat, identifier.x), pull(table.y.climat, identifier.y), use = "na.or.complete"),
             )
     }
     matches |>
@@ -126,15 +126,25 @@ analyze_matches <- function(matches, table.scia, table.dpc, climats = FALSE) {
         ) |>
         rowwise() |>
         mutate(
-            Tinfo = Tinfo.numeric(pull(table.scia, as.character(identifier.x)), pull(table.dpc, identifier.y)),
-            monthlyslopeT = slope_diff(pull(table.scia.ymonthly, as.character(identifier.x)), pull(table.dpc.ymonthly, identifier.y)),
-            monthlydelT = mean(pull(table.scia.monthly, as.character(identifier.x)) - pull(table.dpc.monthly, identifier.y), na.rm = TRUE),
-            monthlymae = mean(abs(pull(table.scia.monthly, as.character(identifier.x)) - pull(table.dpc.monthly, identifier.y)), na.rm = TRUE),
-            monthlysdT = sd(pull(table.scia.monthly, as.character(identifier.x)) - pull(table.dpc.monthly, identifier.y), na.rm = TRUE),
+            Tinfo = Tinfo.numeric(pull(table.x, identifier.x), pull(table.y, identifier.y)),
+            monthlyslopeT = slope_diff(pull(table.x.ymonthly, identifier.x), pull(table.y.ymonthly, identifier.y)),
+            monthlydelT = mean(pull(table.x.ymonthly, identifier.x) - pull(table.y.ymonthly, identifier.y), na.rm = TRUE),
+            monthlymae = mean(abs(pull(table.x.ymonthly, identifier.x) - pull(table.y.ymonthly, identifier.y)), na.rm = TRUE),
+            monthlysdT = sd(pull(table.x.ymonthly, identifier.x) - pull(table.y.ymonthly, identifier.y), na.rm = TRUE),
             climat_availability = is_climatology_computable.series(
-                pull(table.scia, as.character(identifier.x)),
-                pull(table.dpc, identifier.y), table.scia$date
+                pull(table.x, identifier.x),
+                pull(table.y, identifier.y), table.x$date,
+                n_years_minimum = years_threshold
             ) |> as_tibble() |> summarise(all_filter = all(clim_available), any_filter = any(clim_available))
         ) |>
         unnest(c(Tinfo, climat_availability))
+}
+
+compute_diffs <- function(matches, table.x, table.y) {
+    matches |>
+        select(starts_with("identifier")) |>
+        rowwise() |>
+        reframe(
+            date = pull(table.x, date), value.x = pull(table.x, identifier.x), value.y = pull(table.y, identifier.y), diffs = value.x - value.y, identifier.x = identifier.x, identifier.y = identifier.y
+        )
 }
