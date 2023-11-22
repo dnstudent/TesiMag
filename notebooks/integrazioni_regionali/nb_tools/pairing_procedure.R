@@ -86,3 +86,34 @@ merged_data <- function(matchlist, data.x.tmin, data.x.tmax, data.y.tmin, data.y
         select(-correction) |>
         left_join(matchlist |> select(variable, identifier.x, identifier.y, match_id), by = c("variable", "match_id"), relationship = "many-to-one")
 }
+
+arpa_schema <- schema(
+    identifier.x = string(),
+    db.x = string(),
+    date = date32(),
+    value = float(),
+    from.y = bool(),
+    variable = string(),
+    reference = string(),
+)
+merged_ds_schema <- schema(
+    identifier.x = string(),
+    identifier.y = string(),
+    db.x = string(),
+    db.y = string(),
+    date = date32(),
+    value = float(),
+    from.y = bool(),
+    variable = string(),
+    reference = string(),
+)
+
+write_arpa_for_merge <- function(data, reference) {
+    data |>
+        arrange(variable, identifier, date) |>
+        rename(identifier.x = identifier) |>
+        mutate(identifier.y = NA_character_, db.x = paste("ARPA", reference), db.y = NA_character_, from.y = FALSE, reference = reference) |>
+        relocate(identifier.x, identifier.y, db.x, db.y, date, value, from.y, variable, reference) |>
+        as_arrow_table(schema = merged_ds_schema) |>
+        write_feather(file.path("db", "pieces", paste0(reference, ".feather")))
+}
