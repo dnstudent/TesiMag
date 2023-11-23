@@ -13,7 +13,7 @@ diffs_table <- function(match_table, data.x, data.y) {
         reframe(diffs = data.x |> pull(identifier.x) - data.y |> pull(identifier.y), date = data.x$date, match_id = match_id) |>
         pivot_wider(id_cols = date, values_from = diffs, names_from = match_id) |>
         as_tsibble(index = date) |>
-        fill_gaps()
+        fill_gaps(.full = TRUE)
 }
 
 #' Computes monthly corrections for a given diffs table

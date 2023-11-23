@@ -2,14 +2,16 @@ library(arrow, warn.conflicts = FALSE)
 library(stars, warn.conflicts = FALSE)
 library(dplyr, warn.conflicts = FALSE)
 
+source("notebooks/integrazioni_regionali/nb_tools/state_avail.R")
 source("src/load/load.R")
+source("src/analysis/data/clim_availability.R")
 source("src/pairing/analysis.R")
 source("src/pairing/matching.R")
 source("src/pairing/plots.R")
 source("src/pairing/combining.R")
 source("src/pairing/displaying.R")
 
-plot_availabilities <- function(metadata.x, data.x, metadata.y, data.y) {
+plot_availabilities <- function(data.x, data.y) {
     plot_state_avail(bind_rows(
         db1 = data.x |> mutate(identifier = as.character(identifier)),
         db2 = data.y |> mutate(identifier = as.character(identifier)),
@@ -112,7 +114,7 @@ write_arpa_for_merge <- function(data, reference) {
     data |>
         arrange(variable, identifier, date) |>
         rename(identifier.x = identifier) |>
-        mutate(identifier.y = NA_character_, db.x = paste("ARPA", reference), db.y = NA_character_, from.y = FALSE, reference = reference) |>
+        mutate(identifier.y = NA_character_, db.x = reference, db.y = NA_character_, from.y = FALSE, reference = reference) |>
         relocate(identifier.x, identifier.y, db.x, db.y, date, value, from.y, variable, reference) |>
         as_arrow_table(schema = merged_ds_schema) |>
         write_feather(file.path("db", "pieces", paste0(reference, ".feather")))
