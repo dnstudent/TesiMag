@@ -1,14 +1,14 @@
 library(sf, warn.conflicts = FALSE)
 library(dplyr, warn.conflicts = FALSE)
 library(arrow, warn.conflicts = FALSE)
-library(RcppRoll, warn.conflicts = FALSE)
+library(stars, warn.conflicts = FALSE)
 
 source("src/pairing/analysis.R")
 
-matches_table <- function(metadata.x, metadata.y, dist_km = 5) {
+matches_table <- function(metadata.x, metadata.y, dist_km = 5, dem = read_stars(file.path("temp", "dem", "dem30.tif"))) {
     st_join(
-        metadata.x,
-        metadata.y,
+        metadata.x |> prepare_metadata(dem),
+        metadata.y |> prepare_metadata(dem),
         left = FALSE,
         suffix = c(".x", ".y"),
         join = st_is_within_distance,
