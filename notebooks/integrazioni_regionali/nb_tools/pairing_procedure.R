@@ -119,3 +119,18 @@ write_arpa_for_merge <- function(data, reference) {
         as_arrow_table(schema = merged_ds_schema) |>
         write_feather(file.path("db", "pieces", paste0(reference, ".feather")))
 }
+
+open_db_state_data <- function(db, state.name) {
+    md <- open.dataset(db, "metadata") |> filter(state == state.name)
+    if (db == "DPC" || db == "BRUN") {
+        md <- filter(md, flavor == "qc_era5")
+        ds <- open.dataset(db, "data") |>
+            semi_join(md, by = c("flavor", "variable", "identifier"))
+    } else {
+        ds <- open.dataset(db, "data") |>
+            semi_join(md, by = c("variable", "identifier"))
+    }
+    ds |>
+        mutate(identifier = cast(identifier, utf8())) |>
+        collect()
+}
