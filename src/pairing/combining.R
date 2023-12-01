@@ -1,5 +1,9 @@
 library(dplyr, warn.conflicts = FALSE)
 
+compute_ts <- function(date) {
+    2 * pi * yday(date) / yday(ceiling_date(date, unit = "year") - 1)
+}
+
 #' Computes a diffs table for a given match table, loading the data series from the given tables.
 #'
 #' @param match_table A match table, as returned by \code{\link{match_table}}, complete with two series identifer columns and a match_id column.
@@ -26,7 +30,7 @@ monthly_corrections <- function(diffs_table) {
         summarise(across(everything(), ~ mean(., na.rm = TRUE))) |>
         index_by(mt = ~ month(.)) |>
         summarise(across(everything(), ~ mean(., na.rm = TRUE))) |>
-        mutate(t = yday(date) / yday(ceiling_date(date, unit = "year") - 1)) |>
+        mutate(t = compute_ts(date)) |>
         as_tibble() |>
         select(-ymt, -mt)
 }
@@ -40,27 +44,54 @@ prepare_for_modeling <- function(monthly_corrections) {
 }
 
 model_and_predict_corrections <- function(monthly_diffs, ts) {
-    model <- lm(diffs ~ sin(pi * t) + sin(2 * pi * t) + sin(3 * pi * t), data = monthly_diffs)
+    model <- lm(diffs ~ sin(t) + sin(2 * t) + cos(t) + cos(2 * t), data = monthly_diffs)
     bind_cols(correction = predict(model, ts), date = ts$date)
 }
 
-update_left <- function(match_table, data.x, data.y) {
-    data.x <- mutate(data.x, t = yday(data.x$date) / yday(ceiling_date(data.x$date, unit = "year") - 1))
+coalesce_group <- function(identifier.x, identifiers.y, match_ids, data.x, data.y, corrections) {
+    replacement_values <- select(data.y, all_of(identifiers.y)) + select(corrections, all_of(match_ids))
+    coalesce(pull(data.x, identifier.x), !!!replacement_values)
+}
+
+# value_from <- function(identifier.x, identifiers.y, data.x, data.y) {
+#     integ_data <- select(data.y, identifiers.y)
+# }
+
+update_left <- function(match_table, data.x, data.y, ...) {
+    data.x <- fill_gaps(data.x) |>
+        as_tibble() |>
+        mutate(data.x, t = compute_ts(date)) |>
+        arrange(date)
+    data.y <- fill_gaps(data.y) |>
+        as_tibble() |>
+        arrange(date)
+    #  Computing a correction table for each match
     corrections <- diffs_table(match_table, data.x, data.y) |>
         monthly_corrections() |>
         prepare_for_modeling() |>
         group_by(match_id) |>
-        group_modify(~ model_and_predict_corrections(., data.x |> select(t, date)))
-    merged_series <- match_table |>
-        select(identifier.x, identifier.y, match_id) |>
-        rowwise() |>
+        group_modify(~ model_and_predict_corrections(., data.x |> select(t, date))) |>
+        pivot_wider(id_cols = date, names_from = match_id, values_from = correction) |>
+        arrange(date) |>
+        select(-date)
+    match_table |>
+        arrange(identifier.x, abs(delT), ...) |>
+        # rowwise() |>
+        # reframe(
+        #     value = coalesce(data.x |> pull(identifier.x), data.y |> pull(identifier.y), .size = nrow(data.x)),
+        #     date = data.x$date,
+        #     match_id = as.character(match_id),
+        #     from.y = is.na(data.x |> pull(identifier.x)) & !is.na(data.y |> pull(identifier.y))
+        # )
+        group_by(identifier.x) |>
         reframe(
-            value = coalesce(data.x |> pull(identifier.x), data.y |> pull(identifier.y)),
+            value = coalesce_group(identifier.x |> first(), identifier.y, match_id, data.x, data.y, corrections),
             date = data.x$date,
-            match_id = as.character(match_id),
-            from.y = is.na(data.x |> pull(identifier.x)) & !is.na(data.y |> pull(identifier.y))
+            identifier = identifier.x |> first(),
+            original_value = is.na(value) | !is.na(pull(data.x, identifier.x |> first()))
         )
-    inner_join(merged_series, corrections, by = c("date", "match_id"), relationship = "one-to-one") |> mutate(value = if_else(from.y, value + correction, value))
+    # inner_join(merged_series, corrections, by = c("date", "match_id"), relationship = "one-to-one") |>
+    #     mutate(value = if_else(from.y, value + correction, value))
 }
 
 update_tables <- function(data1, id1, data2, id2) {
