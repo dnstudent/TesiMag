@@ -11,6 +11,8 @@
 *.parquet
 *.pdf
 *.geojson
+*.csv
+*.xlsx
 temp/
 cache/
 missing*/

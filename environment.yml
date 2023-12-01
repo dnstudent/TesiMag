@@ -1,0 +1,10 @@
+dependencies:
+  - requests
+  - notebook
+  - ipywidgets
+  - matplotlib
+  - seaborn
+  - pandas
+  - polars
+  - pyarrow
+  - black
