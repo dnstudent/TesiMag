@@ -1,6 +1,6 @@
 library(dplyr, warn.conflicts = FALSE)
 
-compute_ts <- function(date) {
+annual_index <- function(date) {
     2 * pi * yday(date) / yday(ceiling_date(date, unit = "year") - 1)
 }
 
@@ -30,7 +30,7 @@ monthly_corrections <- function(diffs_table) {
         summarise(across(everything(), ~ mean(., na.rm = TRUE))) |>
         index_by(mt = ~ month(.)) |>
         summarise(across(everything(), ~ mean(., na.rm = TRUE))) |>
-        mutate(t = compute_ts(date)) |>
+        mutate(t = annual_index(date)) |>
         as_tibble() |>
         select(-ymt, -mt)
 }
@@ -60,7 +60,7 @@ coalesce_group <- function(identifier.x, identifiers.y, match_ids, data.x, data.
 update_left <- function(match_table, data.x, data.y, ...) {
     data.x <- fill_gaps(data.x) |>
         as_tibble() |>
-        mutate(data.x, t = compute_ts(date)) |>
+        mutate(data.x, t = annual_index(date)) |>
         arrange(date)
     data.y <- fill_gaps(data.y) |>
         as_tibble() |>
