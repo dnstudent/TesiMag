@@ -5,7 +5,8 @@ library(stars, warn.conflicts = FALSE)
 
 source("src/pairing/analysis.R")
 
-matches_table <- function(metadata.x, metadata.y, dist_km = 5, dem = read_stars(file.path("temp", "dem", "dem30.tif"))) {
+
+match_table <- function(metadata.x, metadata.y, dist_km = 5, dem = read_stars(file.path("temp", "dem", "dem30.tif"))) {
     st_join(
         metadata.x |> prepare_metadata(dem),
         metadata.y |> prepare_metadata(dem),

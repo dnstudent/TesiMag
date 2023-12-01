@@ -1,7 +1,7 @@
 library(dplyr, warn.conflicts = FALSE)
 
 meaningful_columns <- function(table, ...) {
-    select(table, variable, identifier.x, starts_with("anagrafica"), distance, f0, starts_with("del"), ends_with("T"), minilap, valid_days_union, valid_days_inters, ...)
+    select(table, variable, starts_with("identifier"), starts_with("anagrafica"), distance, f0, starts_with("del"), ends_with("T"), minilap, valid_days_union, valid_days_inters, ...)
 }
 ana <- function(table, ...) {
     select(table, starts_with("anagr"), starts_with("identif"), ...)
