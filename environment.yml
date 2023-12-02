@@ -8,3 +8,5 @@ dependencies:
   - polars
   - pyarrow
   - black
+  - pip:
+    - adbc_driver_manager
