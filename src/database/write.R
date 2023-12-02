@@ -1,0 +1,71 @@
+library(arrow, warn.conflicts = FALSE)
+library(dplyr, warn.conflicts = FALSE)
+library(tibble, warn.conflicts = FALSE)
+library(assertr, warn.conflicts = FALSE)
+library(stringr, warn.conflicts = FALSE)
+
+data_schema <- schema(
+    series_id = utf8(),
+    date = date32(),
+    value = float(),
+    merged = bool()
+)
+station_schema <- schema(
+    station_id = utf8(),
+    station_name = utf8(),
+    network = utf8(),
+    lon = double(),
+    lat = double(),
+    elevation = double(),
+    dataset_id = utf8(),
+    original_id = utf8()
+)
+series_schema <- schema(
+    series_id = utf8(),
+    station_id = utf8(),
+    variable = utf8(),
+    qc_step = utf8(),
+    merged_from = list_of(utf8())
+)
+
+write_data <- function(data_table, dataset_id) {
+    table |>
+        assert(is_uniq(series_id, date)) |>
+        as_arrow_table(schema = data_schema) |>
+        write_parquet(file.path("db", "data", paste0(dataset_id, ".parquet")))
+}
+
+write_station_metadata <- function(station_table, dataset_id, additional_metadata_schema, auto_complete = TRUE) {
+    if (auto_complete) {
+        station_table <- station_table |>
+            mutate(
+                station_id = str_glue("/{dataset_id}/{network}/{station_name}/{original_id}"),
+                dataset_id = dataset_id
+            )
+    }
+    main_table <- select(station_table, all_of(metadata_schema$names)) |>
+        relocate(
+            all_of(schema$names)
+        ) |>
+        assert(is_uniq(station_id))
+    main_table |>
+        assert(is_uniq(station_id)) |>
+        as_arrow_table(schema = unify_schemas(metadata_schema, additional_metadata_schema)) |>
+        write_parquet(file.path("db", "metadata", "stations", paste0(dataset_id, ".parquet")))
+    extra_meta_table <- select(station_table, !all_of(metadata_schema$names)) |>
+        add_column(station_id = main_table$station_id)
+    extra_meta_table |>
+        write_parquet(file.path("db", "metadata", "extra", paste0(dataset_id, ".parquet")))
+}
+
+write_series_metadata <- function(series_table, dataset_id, auto_complete = TRUE) {
+    if (auto_complete) {
+        series_table <- series_table |>
+            mutate(
+                series_id = str_glue("/{dataset_id}/{station_id}/{qc_step}/{variable}")
+            )
+    }
+    series_table |>
+        assert(is_uniq(series_id)) |>
+        write_parquet(file.path("db", "metadata", "series", paste0(dataset_id, ".parquet")))
+}
