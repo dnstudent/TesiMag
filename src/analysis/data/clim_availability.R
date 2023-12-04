@@ -49,9 +49,13 @@ is_climatology_computable.logical <- function(monthly_availability, n_years_mini
 #' @param data The time series of recorded values for a given month. It must be a \code{tsibble} object without gaps (complete).
 #' @param variable The name of the variable to assess the availability of.
 #' @return A boolean \code{tsibble} representing whether the data at hand is usable to compute a climate normal or not
-is_climatology_computable.tbl_ts <- function(data, variable, .start = NULL, .end = NULL, max_na_days = 10, max_consecutive_nas = 4, n_years_minimum = 10) {
-    data |>
-        is_month_usable.tbl_ts({{ variable }}, .start, .end, max_na_days, max_consecutive_nas, groups = "keep") |>
+is_climatology_computable.tbl_ts <- function(data, variable, .start = NULL, .end = NULL, max_na_days = 10, max_consecutive_nas = 4, n_years_minimum = 10, monthly_usabilities = NULL) {
+    if (is.null(monthly_usabilities)) {
+        monthly_usabilities <- data |>
+            is_month_usable.tbl_ts({{ variable }}, .start, .end, max_na_days, max_consecutive_nas, groups = "keep")
+    }
+    monthly_usabilities |>
+        group_by_key() |>
         index_by(month = ~ month(., label = TRUE)) |>
         summarise(clim_available = is_climatology_computable.logical(available, n_years_minimum))
 }
