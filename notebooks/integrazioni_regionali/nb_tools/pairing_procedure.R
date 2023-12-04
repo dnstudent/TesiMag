@@ -90,24 +90,24 @@ merged_data <- function(matchlist, data.x.tmin, data.x.tmax, data.y.tmin, data.y
 }
 
 arpa_schema <- schema(
-    identifier.x = string(),
-    db.x = string(),
+    identifier.x = utf8(),
+    db.x = utf8(),
     date = date32(),
     value = float(),
     from.y = bool(),
-    variable = string(),
-    reference = string(),
+    variable = utf8(),
+    reference = utf8(),
 )
 merged_ds_schema <- schema(
-    identifier.x = string(),
-    identifier.y = string(),
-    db.x = string(),
-    db.y = string(),
+    identifier.x = utf8(),
+    identifier.y = utf8(),
+    db.x = utf8(),
+    db.y = utf8(),
     date = date32(),
     value = float(),
     from.y = bool(),
-    variable = string(),
-    reference = string(),
+    variable = utf8(),
+    reference = utf8(),
 )
 
 write_arpa_for_merge <- function(data, reference) {
