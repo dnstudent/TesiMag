@@ -3,11 +3,19 @@ library(dplyr, warn.conflicts = FALSE)
 library(arrow, warn.conflicts = FALSE)
 library(stars, warn.conflicts = FALSE)
 
-source("src/pairing/analysis.R")
+source("src/pairing/metadata.R")
 
 
-match_table <- function(metadata.x, metadata.y, dist_km = 5, dem = read_stars(file.path("temp", "dem", "dem30.tif"))) {
-    st_join(
+match_table <- function(metadata.x, metadata.y, dist_km = 5, dem = read_stars(file.path("temp", "dem", "dem30.tif")), asymmetric = FALSE) {
+    if (asymmetric) {
+        metadata.x <- metadata.x |>
+            arrange(identifier) |>
+            mutate(proxy_ident_ = row_number())
+        metadata.y <- metadata.y |>
+            arrange(identifier) |>
+            mutate(proxy_ident_ = row_number())
+    }
+    matches <- st_join(
         metadata.x |> prepare_metadata(dem),
         metadata.y |> prepare_metadata(dem),
         left = FALSE,
@@ -21,9 +29,16 @@ match_table <- function(metadata.x, metadata.y, dist_km = 5, dem = read_stars(fi
         select(-variable.y) |>
         add_distances(metadata.x, metadata.y) |>
         mutate(across(starts_with("identifier"), as.character), match_id = as.character(row_number()))
+    if (asymmetric) {
+        matches |>
+            filter((last_date.x >= last_date.y) & (identifier.x != identifier.y)) |>
+            select(!starts_with("proxy_ident_"))
+    } else {
+        matches
+    }
 }
 
-widen_split_data <- function(data_ds, matches, identifier_var, first_date = as.Date("2000-01-01"), last_date = as.Date("2022-12-31")) {
+widen_split_data <- function(data_ds, matches, identifier_var, first_date, last_date) {
     identifier_dtype <- schema(data_ds)$identifier$type
     semi_join(data_ds |> filter(first_date <= date, date <= last_date),
         matches |>
