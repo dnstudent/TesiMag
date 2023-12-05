@@ -42,17 +42,17 @@ load_scia_data <- function(metadata) {
         semi_join(metadata, by = c("variable", "identifier"))
 }
 
-build_analysis <- function(matches, data.x.tmin, data.x.tmax, data.y.tmin, data.y.tmax) {
+build_analysis <- function(matches, data.x, data.y) {
     bind_rows(
         T_MIN = analyze_matches(
             matches |> filter(variable == "T_MIN"),
-            data.x.tmin,
-            data.y.tmin
+            data.x[[2]],
+            data.y[[2]]
         ),
         T_MAX = analyze_matches(
             matches |> filter(variable == "T_MAX"),
-            data.x.tmax,
-            data.y.tmax
+            data.x[[1]],
+            data.y[[1]]
         ),
         .id = "variable"
     )

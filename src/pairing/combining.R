@@ -88,7 +88,8 @@ update_left <- function(match_table, data.x, data.y, ...) {
             value = coalesce_group(identifier.x |> first(), identifier.y, match_id, data.x, data.y, corrections),
             date = data.x$date,
             identifier = identifier.x |> first(),
-            original_value = is.na(value) | !is.na(pull(data.x, identifier.x |> first()))
+            original_value = is.na(value) | !is.na(pull(data.x, identifier.x |> first())),
+            merged_from = list(identifier.y)
         )
     # inner_join(merged_series, corrections, by = c("date", "match_id"), relationship = "one-to-one") |>
     #     mutate(value = if_else(from.y, value + correction, value))

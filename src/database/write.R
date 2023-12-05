@@ -3,6 +3,7 @@ library(dplyr, warn.conflicts = FALSE)
 library(tibble, warn.conflicts = FALSE)
 library(assertr, warn.conflicts = FALSE)
 library(stringr, warn.conflicts = FALSE)
+library(rlang, warn.conflicts = FALSE)
 
 data_schema <- schema(
     series_id = utf8(),
@@ -31,8 +32,9 @@ series_schema <- schema(
 
 write_data <- function(data_table, dataset_id) {
     data_table |>
-        relocate(all_of(data_schema$names)) |>
         as_tibble() |>
+        select(all_of(data_schema$names)) |>
+        relocate(all_of(data_schema$names)) |>
         as_arrow_table(schema = data_schema) |>
         arrange(series_id, date) |>
         write_parquet(file.path("db", "data", paste0(dataset_id, ".parquet")))
@@ -52,7 +54,7 @@ write_station_metadata <- function(station_table, dataset_id, auto_complete = TR
         ) |>
         assert(is_uniq, station_id)
     main_table |>
-        as_tsibble() |>
+        as_tibble() |>
         as_arrow_table(schema = station_schema) |>
         write_parquet(file.path("db", "metadata", "stations", paste0(dataset_id, ".parquet")))
     extra_meta_table <- select(station_table, !all_of(station_schema$names)) |>
@@ -70,6 +72,7 @@ write_series_metadata <- function(series_table, dataset_id, auto_complete = TRUE
             )
     }
     series_table |>
+        select(all_of(series_schema$names)) |>
         relocate(
             all_of(series_schema$names)
         ) |>
