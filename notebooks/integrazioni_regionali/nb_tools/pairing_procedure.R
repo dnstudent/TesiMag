@@ -10,6 +10,8 @@ source("src/pairing/matching.R")
 source("src/pairing/plots.R")
 source("src/pairing/combining.R")
 source("src/pairing/displaying.R")
+source("src/database/open.R")
+source("src/database/write.R")
 
 plot_availabilities <- function(data.x, data.y) {
     plot_state_avail(bind_rows(
@@ -21,11 +23,21 @@ plot_availabilities <- function(data.x, data.y) {
 
 
 load_scia_metadata <- function(buffer, dem = read_stars("temp/dem/dem30.tif")) {
-    open.dataset("SCIA", "metadata") |>
+    if (is.character(buffer)) {
+        buffer <- load.italian_boundaries("state") |> filter(shapeName == buffer)
+    }
+    station_meta <- read_station_metadata("SCIA") |>
         collect() |>
         st_md_to_sf() |>
         st_filter(buffer, .predicate = st_within) |>
-        prepare_metadata(dem)
+        st_drop_geometry() |>
+        as_arrow_table(schema = station_schema)
+    list(
+        station_meta,
+        read_series_metadata("SCIA") |>
+            select(-merged_from) |>
+            semi_join(station_meta, by = "station_id")
+    )
 }
 
 load_dpc_metadata <- function(buffer, dem = read_stars("temp/dem/dem30.tif")) {
@@ -37,26 +49,11 @@ load_dpc_metadata <- function(buffer, dem = read_stars("temp/dem/dem30.tif")) {
         prepare_metadata(dem)
 }
 
-load_scia_data <- function(metadata) {
-    open.dataset("SCIA", "data") |>
-        semi_join(metadata, by = c("variable", "identifier"))
+load_scia_data <- function(series_metadata) {
+    open_data("SCIA") |>
+        semi_join(series_metadata, by = "series_id")
 }
 
-build_analysis <- function(matches, data.x, data.y) {
-    bind_rows(
-        T_MIN = analyze_matches(
-            matches |> filter(variable == "T_MIN"),
-            data.x[[2]],
-            data.y[[2]]
-        ),
-        T_MAX = analyze_matches(
-            matches |> filter(variable == "T_MAX"),
-            data.x[[1]],
-            data.y[[1]]
-        ),
-        .id = "variable"
-    )
-}
 
 plot_clim_availability <- function(clim_availablility, metadata) {
     clim_availablility |>

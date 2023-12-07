@@ -26,16 +26,20 @@ series_schema <- schema(
     series_id = utf8(),
     station_id = utf8(),
     variable = utf8(),
-    qc_step = utf8(),
-    merged_from = list_of(utf8())
+    qc_step = uint8(),
+    # merged_from = list_of(utf8())
 )
+
+as_arrow_table2 <- function(table, schema) {
+    table |>
+        as_tibble() |>
+        select(all_of(schema$names)) |>
+        as_arrow_table(schema = schema)
+}
 
 write_data <- function(data_table, dataset_id) {
     data_table |>
-        as_tibble() |>
-        select(all_of(data_schema$names)) |>
-        relocate(all_of(data_schema$names)) |>
-        as_arrow_table(schema = data_schema) |>
+        as_arrow_table2(schema = data_schema) |>
         arrange(series_id, date) |>
         write_parquet(file.path("db", "data", paste0(dataset_id, ".parquet")))
 }
@@ -48,19 +52,13 @@ write_station_metadata <- function(station_table, dataset_id, auto_complete = TR
                 dataset_id = dataset_id
             )
     }
-    main_table <- select(station_table, all_of(station_schema$names)) |>
-        relocate(
-            all_of(station_schema$names)
-        ) |>
-        assert(is_uniq, station_id)
     main_table |>
-        as_tibble() |>
-        as_arrow_table(schema = station_schema) |>
+        assert(is_uniq, station_id) |>
+        as_arrow_table2(schema = station_schema) |>
         write_parquet(file.path("db", "metadata", "stations", paste0(dataset_id, ".parquet")))
-    extra_meta_table <- select(station_table, !all_of(station_schema$names)) |>
-        add_column(station_id = main_table$station_id)
+    extra_meta_table <- select(station_table, !all_of(station_schema$names), station_id) |> as_tibble()
+    # add_column(station_id = main_table$station_id)
     extra_meta_table |>
-        as_tibble() |>
         write_parquet(file.path("db", "metadata", "extra", paste0(dataset_id, ".parquet")))
 }
 
@@ -72,12 +70,12 @@ write_series_metadata <- function(series_table, dataset_id, auto_complete = TRUE
             )
     }
     series_table |>
-        select(all_of(series_schema$names)) |>
-        relocate(
-            all_of(series_schema$names)
-        ) |>
         assert(is_uniq, series_id) |>
-        as_tibble() |>
-        as_arrow_table(schema = series_schema) |>
+        as_arrow_table2(schema = series_schema) |>
         write_parquet(file.path("db", "metadata", "series", paste0(dataset_id, ".parquet")))
 }
+
+# write_merged_data <- function(merged_data) {
+#     merged_data |>
+#         as_arrow_table2(schema = data_schema) |>
+# }

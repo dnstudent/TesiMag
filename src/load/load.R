@@ -89,6 +89,6 @@ open.dataset <- function(db, kind) {
   }
 }
 
-st_md_to_sf <- function(metadata) {
-  metadata |> st_as_sf(coords = c("lon", "lat"), crs = "EPSG:4326")
+st_md_to_sf <- function(metadata, remove = FALSE) {
+  metadata |> st_as_sf(coords = c("lon", "lat"), crs = "EPSG:4326", remove = remove)
 }
