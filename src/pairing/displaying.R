@@ -8,6 +8,6 @@ ana <- function(table, ...) {
 }
 clean_from <- function(analysis_table, matched) {
     analysis_table |>
-        anti_join(matched, by = c("variable", "identifier.x")) |>
-        anti_join(matched, by = c("variable", "identifier.y"))
+        anti_join(matched, by = c("variable", "series_id.x")) |>
+        anti_join(matched, by = c("variable", "series_id.y"))
 }

@@ -8,6 +8,7 @@ library(digest, warn.conflicts = FALSE)
 library(stringdist, warn.conflicts = FALSE)
 
 source("src/load/load.R")
+source("src/pairing/matching.R")
 
 normalize_name <- function(string) {
     string |>
@@ -53,12 +54,23 @@ Tinfo.numeric <- function(s1, s2) {
     ) |> select(-fplus)
 }
 
-add_distances <- function(match_table, metadata.x, metadata.y) {
-    bind_cols(
-        match_table,
+
+
+add_distance <- function(match_table, meta.x, meta.y) {
+    # p1 <- match_table |>
+    #     select(lon = lon.x, lat = lat.x) |>
+    #     st_md_to_sf() |>
+    #     st_geometry()
+    # p2 <- match_table |>
+    #     select(lon = lon.y, lat = lat.y) |>
+    #     st_md_to_sf() |>
+    #     st_geometry()
+    # distances <- st_distance(p1, p2, by_element = TRUE) |> units::drop_units()
+    # match_table |> add_column(distance = st_distance(p1, p2, by_element = TRUE) |> units::drop_units())
+    match_table |> mutate(
         distance = st_distance(
-            left_join(match_table, metadata.x, join_by(identifier.x == identifier, variable), relationship = "many-to-one") |> st_as_sf(),
-            left_join(match_table, metadata.y, join_by(identifier.y == identifier, variable), relationship = "many-to-one") |> st_as_sf(),
+            tibble(lon = lon.x, lat = lat.x) |> st_md_to_sf() |> st_geometry(),
+            tibble(lon = lon.y, lat = lat.y) |> st_md_to_sf() |> st_geometry(),
             by_element = TRUE
         ) |> units::drop_units()
     )
@@ -74,48 +86,57 @@ slope_diff <- function(s1, s2) {
 }
 
 
-analyze_matches <- function(matches, table.x, table.y, climats = FALSE, years_threshold = 10L) {
-    table.x.ymonthly <- table.x |>
-        index_by(ymt = ~ yearmonth(.)) |>
-        summarise(across(!where(is.Date), ~ mean(., na.rm = TRUE)))
-    table.y.ymonthly <- table.y |>
-        index_by(ymt = ~ yearmonth(.)) |>
-        summarise(across(!where(is.Date), ~ mean(., na.rm = TRUE)))
+analyze_matches <- function(match_table, table.x, table.y, meta.x, meta.y, climats = FALSE, years_threshold = 10L) {
+    ymonthly <- function(table) {
+        table |>
+            index_by(ymt = ~ yearmonth(.)) |>
+            summarise(across(!where(is.Date), ~ mean(., na.rm = TRUE)))
+    }
 
-    matches <- matches |>
-        semi_join(
-            table.y |> as_tibble() |> select(!where(is.Date)) |> colnames() |> as_tibble_col("identifier.y"),
-            by = "identifier.y"
-        )
+    table.x.ymonthly <- ymonthly(table.x)
+    table.y.ymonthly <- ymonthly(table.y)
+
+    # matches <- matches |>
+    #     semi_join(
+    #         table.y |> as_tibble() |> select(!where(is.Date)) |> colnames() |> as_tibble_col("identifier.y"),
+    #         by = "identifier.y"
+    #     )
     if (climats) {
-        table.x.climat <- table.x.ymonthly |>
-            index_by(month = ~ month(.)) |>
-            summarise(across(everything(), ~ mean(., na.rm = TRUE)))
-        table.y.climat <- table.y.ymonthly |>
-            index_by(month = ~ month(.)) |>
-            summarise(across(everything(), ~ mean(., na.rm = TRUE)))
-        matches <- matches |>
+        climat <- function(table) {
+            table |>
+                index_by(month = ~ month(.)) |>
+                summarise(across(everything(), ~ mean(., na.rm = TRUE)))
+        }
+        table.x.climat <- climat(table.x.ymonthly)
+        table.y.climat <- climat(table.y.ymonthly)
+        matches <- match_table |>
             rowwise() |>
             mutate(
                 climatcorT = cor(pull(table.x.climat, identifier.x), pull(table.y.climat, identifier.y), use = "na.or.complete"),
             )
     }
-    matches |>
+
+    ### METADATA
+    match_table <- three_way_join(meta.x, match_table, meta.y) |>
+        collect() |>
+        add_distance(meta.x, meta.y)
+
+    match_table |>
         mutate(
             delH = abs(elevation.x - elevation.y),
             delZ = abs(dem.x - dem.y),
-            strSym = stringsim(normalize_name(anagrafica.x), normalize_name(anagrafica.y), method = "jw")
+            strSym = stringsim(normalize_name(station_name.x), normalize_name(station_name.y), method = "jw")
         ) |>
         rowwise() |>
         mutate(
-            Tinfo = Tinfo.numeric(pull(table.x, identifier.x), pull(table.y, identifier.y)),
-            monthlyslopeT = slope_diff(pull(table.x.ymonthly, identifier.x), pull(table.y.ymonthly, identifier.y)),
-            monthlydelT = mean(pull(table.x.ymonthly, identifier.x) - pull(table.y.ymonthly, identifier.y), na.rm = TRUE),
-            monthlymae = mean(abs(pull(table.x.ymonthly, identifier.x) - pull(table.y.ymonthly, identifier.y)), na.rm = TRUE),
-            monthlysdT = sd(pull(table.x.ymonthly, identifier.x) - pull(table.y.ymonthly, identifier.y), na.rm = TRUE),
+            Tinfo = Tinfo.numeric(pull(table.x, series_id.x), pull(table.y, series_id.y)),
+            monthlyslopeT = slope_diff(pull(table.x.ymonthly, series_id.x), pull(table.y.ymonthly, series_id.y)),
+            monthlydelT = mean(pull(table.x.ymonthly, series_id.x) - pull(table.y.ymonthly, series_id.y), na.rm = TRUE),
+            monthlymae = mean(abs(pull(table.x.ymonthly, series_id.x) - pull(table.y.ymonthly, series_id.y)), na.rm = TRUE),
+            monthlysdT = sd(pull(table.x.ymonthly, series_id.x) - pull(table.y.ymonthly, series_id.y), na.rm = TRUE),
             climat_availability = is_climatology_computable.series(
-                pull(table.x, identifier.x),
-                pull(table.y, identifier.y), table.x$date,
+                pull(table.x, series_id.x),
+                pull(table.y, series_id.y), table.x$date,
                 n_years_minimum = years_threshold
             ) |> as_tibble() |> summarise(all_filter = all(clim_available), any_filter = any(clim_available))
         ) |>
