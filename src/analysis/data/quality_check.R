@@ -54,7 +54,7 @@ repeated_fraction_check.data.frame <- function(data) {
 repeated_fraction_check <- function(x, ...) UseMethod("repeated_fraction_check", x)
 
 integers_fraction_check.numeric <- function(x) {
-    mean(x == trunc(x), na.rm = TRUE)
+    mean(abs(x - trunc(x)) <= 1e-4, na.rm = TRUE)
 }
 
 integers_fraction_check.data.frame <- function(data) {
@@ -66,3 +66,19 @@ integers_fraction_check.data.frame <- function(data) {
 }
 
 integers_fraction_check <- function(x, ...) UseMethod("integers_fraction_check", x)
+
+integer_streak_check.numeric <- function(x, threshold) {
+    rles <- rle(abs(x - trunc(x)) <= 1e-4)
+    rles$values <- (rles$values & (rles$lengths >= threshold))
+    inverse.rle(rles)
+}
+
+integer_streak_check.data.frame <- function(data, threshold = 8) {
+    if (!is.grouped_df(data)) {
+        warning("The data provided is not grouped. Is this intentional?")
+    }
+    data |>
+        mutate(qc_int_streak = integer_streak_check.numeric(value, threshold))
+}
+
+integer_streak_check <- function(x, ...) UseMethod("integer_streak_check", x)
