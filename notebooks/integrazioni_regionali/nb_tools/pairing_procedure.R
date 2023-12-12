@@ -35,7 +35,6 @@ load_scia_metadata <- function(buffer, dem = read_stars("temp/dem/dem30.tif")) {
     list(
         station_meta,
         read_series_metadata("SCIA") |>
-            select(-merged_from) |>
             semi_join(station_meta, by = "station_id")
     )
 }

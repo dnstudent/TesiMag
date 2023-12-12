@@ -26,7 +26,7 @@ series_schema <- schema(
     series_id = utf8(),
     station_id = utf8(),
     variable = utf8(),
-    qc_step = uint8(),
+    qc_step = uint32(), # There's a bug when using uint8() here affecting concat_tables
     # merged_from = list_of(utf8())
 )
 
@@ -37,6 +37,20 @@ as_arrow_table2 <- function(table, schema) {
         as_arrow_table(schema = schema)
 }
 
+name_series <- function(full_table, dataset_id) {
+    full_table |>
+        mutate(
+            series_id = str_glue("/{dataset_id}/{station_id}/{qc_step}/{variable}") |> sapply(hash) |> unname()
+        )
+}
+
+split_data_metadata <- function(full_table) {
+    list(
+        select(full_table, all_of(data_schema$names)) |> as_arrow_table2(data_schema),
+        select(full_table, all_of(series_schema$names)) |> distinct() |> as_arrow_table2(series_schema)
+    )
+}
+
 write_data <- function(data_table, dataset_id) {
     data_table |>
         as_arrow_table2(schema = data_schema) |>
@@ -45,6 +59,7 @@ write_data <- function(data_table, dataset_id) {
 }
 
 write_station_metadata <- function(station_table, dataset_id, auto_complete = TRUE) {
+    station_table <- collect(station_table)
     if (auto_complete) {
         station_table <- station_table |>
             mutate(
@@ -52,7 +67,7 @@ write_station_metadata <- function(station_table, dataset_id, auto_complete = TR
                 dataset_id = dataset_id
             )
     }
-    main_table |>
+    station_table |>
         assert(is_uniq, station_id) |>
         as_arrow_table2(schema = station_schema) |>
         write_parquet(file.path("db", "metadata", "stations", paste0(dataset_id, ".parquet")))
@@ -63,11 +78,9 @@ write_station_metadata <- function(station_table, dataset_id, auto_complete = TR
 }
 
 write_series_metadata <- function(series_table, dataset_id, auto_complete = TRUE) {
+    series_table <- collect(series_table)
     if (auto_complete) {
-        series_table <- series_table |>
-            mutate(
-                series_id = str_glue("/{dataset_id}/{station_id}/{qc_step}/{variable}") |> sapply(hash) |> unname()
-            )
+        series_table <- name_series(series_table, dataset_id)
     }
     series_table |>
         assert(is_uniq, series_id) |>
