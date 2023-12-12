@@ -6,7 +6,7 @@ library(arrow, warn.conflicts = FALSE)
 source("src/analysis/metadata.R")
 
 
-match_table <- function(meta.x, meta.y, dist_km, asymmetric = FALSE) {
+match_list <- function(meta.x, meta.y, dist_km, asymmetric = FALSE) {
     meta.x <- meta.x |>
         collect() |>
         st_md_to_sf()
@@ -62,11 +62,26 @@ widen_split_data <- function(ds.x, ds.y, match_table, first_date, last_date) {
     )
 }
 
-three_way_join <- function(table.x, match_table, table.y) {
+filter_widen_data <- function(ds, match_list, first_date, last_date) {
+    all_ids <- concat_tables(
+        match_list |> select(series_id = series_id.x) |> compute(),
+        match_list |> select(series_id = series_id.y) |> compute()
+    )
+    ds |>
+        filter(first_date <= date & date <= last_date) |>
+        semi_join(all_ids, by = "series_id", relationship = "many-to-one") |>
+        collect() |>
+        pivot_wider(id_cols = date, names_from = series_id, values_from = value) |>
+        arrange(date) |>
+        as_tsibble(index = date) |>
+        fill_gaps(.start = first_date, .end = last_date)
+}
+
+bijoin <- function(match_list, metadata_list) {
     inner_join(
-        table.x |> rename(series_id.x = series_id) |> select(-variable),
-        table.y |> rename(series_id.y = series_id) |> left_join(
-            match_table |> select(starts_with("series_id."), match_id),
+        metadata_list |> rename(series_id.x = series_id) |> select(-variable),
+        metadata_list |> rename(series_id.y = series_id) |> left_join(
+            match_list |> select(starts_with("series_id."), match_id),
             by = "series_id.y"
         ),
         by = "series_id.x"

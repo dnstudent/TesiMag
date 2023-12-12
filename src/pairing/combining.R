@@ -1,6 +1,7 @@
 library(arrow, warn.conflicts = FALSE)
 library(dplyr, warn.conflicts = FALSE)
 library(stringi, warn.conflicts = FALSE)
+library(zeallot, warn.conflicts = FALSE)
 
 source("src/database/write.R")
 
@@ -10,15 +11,14 @@ annual_index <- function(date) {
 
 #' Computes a diffs table for a given match table, loading the data series from the given tables.
 #'
-#' @param match_table A match table, as returned by \code{\link{match_table}}, complete with two series identifer columns and a match_id column.
-#' @param data.x A table containing the data series for the first database, one per column, and a date index.
-#' @param data.y A table containing the data series for the second database, one per column. The index must be the same as data.x.
+#' @param match_list A match table, as returned by \code{\link{match_table}}, complete with two series identifer columns and a match_id column.
+#' @param data_table A table containing the data series for the first database, one per column, and a date index.
 #' @return A tsibble with a column for each match_id, containing the difference between the two series linked to the id.
-diffs_table <- function(match_table, data.x, data.y) {
-    match_table |>
+diffs_table <- function(match_list, data_table) {
+    match_list |>
         select(series_id.x, series_id.y, match_id) |>
         rowwise() |>
-        reframe(diffs = data.x |> pull(series_id.x) - data.y |> pull(series_id.y), date = data.x$date, match_id = match_id) |>
+        reframe(diffs = data_table |> pull(series_id.x) - data_table |> pull(series_id.y), date = data_table$date, match_id = match_id) |>
         pivot_wider(id_cols = date, values_from = diffs, names_from = match_id) |>
         as_tsibble(index = date) |>
         fill_gaps(.full = TRUE)
@@ -52,72 +52,62 @@ model_and_predict_corrections <- function(monthly_diffs, ts) {
     bind_cols(correction = predict(model, ts), date = ts$date)
 }
 
-coalesce_group <- function(series_id.x, series_ids.y, match_ids, data.x, data.y, corrections) {
-    replacement_values <- select(data.y, all_of(series_ids.y)) + select(corrections, all_of(match_ids))
-    coalesce(pull(data.x, series_id.x), !!!replacement_values)
+coalesce_group <- function(series_id.x, series_ids.y, match_ids, data_table, corrections) {
+    replacement_values <- select(data_table, all_of(series_ids.y)) + select(corrections, all_of(match_ids))
+    coalesce(pull(data_table, series_id.x), !!!replacement_values)
 }
 
-update_group <- function(match_table, data.x, data.y) {
-
-}
-
-# value_from <- function(identifier.x, identifiers.y, data.x, data.y) {
-#     integ_data <- select(data.y, identifiers.y)
-# }
-
-update_left <- function(match_table, data.x, data.y, ...) {
-    data.x <- fill_gaps(data.x) |>
+merge_data <- function(match_list, data_table, ...) {
+    data_table <- fill_gaps(data_table) |>
         as_tibble() |>
-        mutate(data.x, t = annual_index(date)) |>
-        arrange(date)
-    data.y <- fill_gaps(data.y) |>
-        as_tibble() |>
+        mutate(t = annual_index(date)) |>
         arrange(date)
     #  Computing a correction table for each match
-    corrections <- diffs_table(match_table, data.x, data.y) |>
+    corrections <- diffs_table(match_list, data_table) |>
         monthly_corrections() |>
         prepare_for_modeling() |>
         group_by(match_id) |>
-        group_modify(~ model_and_predict_corrections(., data.x |> select(t, date))) |>
+        group_modify(~ model_and_predict_corrections(., data_table |> select(t, date))) |>
         pivot_wider(id_cols = date, names_from = match_id, values_from = correction) |>
         arrange(date) |>
         select(-date)
-    match_table |>
+    match_list |>
         arrange(series_id.x, abs(delT), ...) |>
         group_by(series_id.x) |>
         reframe(
-            value = coalesce_group(series_id.x |> first(), series_id.y, match_id, data.x, data.y, corrections),
-            date = data.x$date,
-            merged = !(is.na(value) | !is.na(pull(data.x, series_id.x |> first()))),
-            # merged_from = list(c(series_id.x, series_id.y) |> as.list())
+            value = coalesce_group(series_id.x |> first(), series_id.y, match_id, data_table, corrections),
+            date = data_table$date,
+            merged = !(is.na(value) | !is.na(pull(data_table, series_id.x |> first()))),
         ) |>
         drop_na(value)
 }
 
-merged_tables <- function(updated_data, data.x, data.y, series.x, series.y, detected_matches) {
-    merged_metadata <- updated_data |>
-        distinct(series_id.x, merged_from) |>
-        mutate(series_id = merged_from |> sapply(stri_flatten) |> sapply(hash) |> unname()) |>
-        left_join(series.x |> select(series_id, station_id, variable) |> collect(), join_by(series_id.x == series_id)) |>
+filter_remaining_ <- function(target_list, control_list, match_list) {
+    target_list |>
+        anti_join(match_list, by = join_by(series_id == series_id.x)) |>
+        anti_join(match_list, by = join_by(series_id == series_id.y)) |>
+        semi_join(control_list, by = "series_id")
+}
+
+merged_tables <- function(merged_data, original_data_list, series_list, all_matches, dataset_id) {
+    c(merged_data, merged_series_metadata) %<-% (left_join(merged_data, series_list |> collect(), join_by(series_id.x == series_id)) |>
+        mutate(qc_step = 2L) |>
+        name_series(dataset_id) |>
+        split_data_metadata())
+
+    remaining_data <- filter_remaining_(original_data_list, series_list, all_matches)
+    remaining_series_metadata <- filter_remaining_(series_list, remaining_data, all_matches) |>
         mutate(qc_step = 2L)
 
-    merged_data <- updated_data |>
-        left_join(merged_metadata |> select(series_id.x, series_id), by = "series_id.x") |>
-        select(-series_id.x) |>
-        as_arrow_table2(schema = data_schema)
+    c(remaining_data, remaining_series_metadata) %<-% (left_join(remaining_data, remaining_series_metadata, by = "series_id") |>
+        collect() |>
+        name_series(dataset_id) |>
+        split_data_metadata())
 
-    remaining.x <- anti_join(data.x, detected_matches, by = join_by(series_id == series_id.x)) |> semi_join(series.x, by = "series_id")
-    metadata.x <- semi_join(series.x, remaining.x, by = "series_id") |> mutate(qc_step = 2L)
-    remaining.y <- anti_join(data.y, detected_matches, by = join_by(series_id == series_id.y)) |> semi_join(series.y, by = "series_id")
-    metadata.y <- semi_join(series.y, remaining.y, by = "series_id") |> mutate(qc_step = 2L)
-    merged_metadata <- merged_metadata |>
-        select(-series_id.x)
-    # as_arrow_table2(series_schema)
+    list(
+        concat_tables(merged_data, remaining_data, unify_schemas = FALSE),
+        concat_tables(merged_series_metadata, remaining_series_metadata, unify_schemas = FALSE)
+    )
 
-    list(merged_data, remaining.x, remaining.y, merged_metadata, metadata.x, metadata.y)
-
-    # list(
-    #     concat_tables(merged_data, remaining.x, remaining.y, unify_schemas = FALSE),
-    #     concat_tables(merged_metadata, metadata.x, metadata.y, unify_schemas = FALSE)
-    # )
+    # list(merged_data, remaining_data, merged_series_metadata, remaining_series_metadata)
 }
