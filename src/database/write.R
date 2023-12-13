@@ -5,6 +5,8 @@ library(assertr, warn.conflicts = FALSE)
 library(stringr, warn.conflicts = FALSE)
 library(rlang, warn.conflicts = FALSE)
 
+source("src/database/open.R")
+
 data_schema <- schema(
     series_id = utf8(),
     date = date32(),
@@ -44,6 +46,13 @@ name_series <- function(full_table, dataset_id) {
         )
 }
 
+name_stations <- function(station_table) {
+    station_table |>
+        mutate(
+            station_id = str_glue("/{dataset_id}/{original_id}") |> sapply(hash) |> unname(),
+        )
+}
+
 split_data_metadata <- function(full_table) {
     list(
         select(full_table, all_of(data_schema$names)) |> as_arrow_table2(data_schema),
@@ -51,33 +60,34 @@ split_data_metadata <- function(full_table) {
     )
 }
 
-write_data <- function(data_table, dataset_id) {
+
+write_data <- function(data_table, dataset_id, provisional) {
     data_table |>
         as_arrow_table2(schema = data_schema) |>
         arrange(series_id, date) |>
-        write_parquet(file.path("db", "data", paste0(dataset_id, ".parquet")))
+        write_parquet(file.path(base_path("data", provisional), paste0(dataset_id, ".parquet")))
 }
 
-write_station_metadata <- function(station_table, dataset_id, auto_complete = TRUE) {
+write_station_metadata <- function(station_table, dataset_id, auto_complete, provisional) {
     station_table <- collect(station_table)
     if (auto_complete) {
         station_table <- station_table |>
             mutate(
-                station_id = str_glue("/{dataset_id}/{original_id}") |> sapply(hash) |> unname(),
                 dataset_id = dataset_id
-            )
+            ) |>
+            name_stations()
     }
     station_table |>
         assert(is_uniq, station_id) |>
         as_arrow_table2(schema = station_schema) |>
-        write_parquet(file.path("db", "metadata", "stations", paste0(dataset_id, ".parquet")))
+        write_parquet(file.path(base_path("metadata", provisional), "stations", paste0(dataset_id, ".parquet")))
     extra_meta_table <- select(station_table, !all_of(station_schema$names), station_id) |> as_tibble()
     # add_column(station_id = main_table$station_id)
     extra_meta_table |>
-        write_parquet(file.path("db", "metadata", "extra", paste0(dataset_id, ".parquet")))
+        write_parquet(file.path(base_path("metadata", provisional), "extra", paste0(dataset_id, ".parquet")))
 }
 
-write_series_metadata <- function(series_table, dataset_id, auto_complete = TRUE) {
+write_series_metadata <- function(series_table, dataset_id, auto_complete, provisional) {
     series_table <- collect(series_table)
     if (auto_complete) {
         series_table <- name_series(series_table, dataset_id)
@@ -85,7 +95,7 @@ write_series_metadata <- function(series_table, dataset_id, auto_complete = TRUE
     series_table |>
         assert(is_uniq, series_id) |>
         as_arrow_table2(schema = series_schema) |>
-        write_parquet(file.path("db", "metadata", "series", paste0(dataset_id, ".parquet")))
+        write_parquet(file.path(base_path("metadata", provisional), "series", paste0(dataset_id, ".parquet")))
 }
 
 # write_merged_data <- function(merged_data) {

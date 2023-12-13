@@ -48,7 +48,8 @@ repeated_fraction_check.data.frame <- function(data) {
         warning("The data provided is not grouped. Is this intentional?")
     }
     data |>
-        summarise(qc_repeated_fraction = repeated_fraction_check.numeric(.data[["value"]] |> drop_na()))
+        drop_na() |>
+        summarise(qc_repeated_fraction = repeated_fraction_check.numeric(.data[["value"]]))
 }
 
 repeated_fraction_check <- function(x, ...) UseMethod("repeated_fraction_check", x)

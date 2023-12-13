@@ -28,7 +28,7 @@ match_list <- function(meta.x, meta.y, dist_km, asymmetric = FALSE) {
         mutate(match_id = as.character(row_number()))
     if (asymmetric) {
         matches <- matches |>
-            filter((last_date.x >= last_date.y) & (identifier.x != identifier.y))
+            filter((last_date.x >= last_date.y) & (series_id.x != series_id.y))
     }
     matches |>
         select(starts_with("series_id."), match_id, variable) |>
