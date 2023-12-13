@@ -7,7 +7,7 @@ source("src/analysis/data/clim_availability.R")
 
 plot_state_avail <- function(series, start_date = NULL, end_date = NULL) {
     series |>
-        as_tsibble(key = c(db, variable, identifier), index = date) |>
+        as_tsibble(key = c(db, variable, series_id), index = date) |>
         fill_gaps(.full = TRUE) |>
         is_month_usable(value, .start = start_date, .end = end_date) |>
         index_by(year_month) |>
