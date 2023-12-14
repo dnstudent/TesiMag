@@ -89,6 +89,8 @@ filter_remaining_ <- function(target_list, control_list, match_list) {
         semi_join(control_list, by = "series_id")
 }
 
+#'
+#' @param all_matches Must include also unusable matches
 merged_tables <- function(merged_data, original_data_list, series_list, all_matches, dataset_id) {
     c(merged_data, merged_series_metadata) %<-% (left_join(merged_data, series_list |> collect(), join_by(series_id.x == series_id)) |>
         mutate(qc_step = 2L) |>

@@ -49,12 +49,10 @@ Tinfo.numeric <- function(s1, s2) {
         valid_days_inters = sum(valid1 & valid2),
         valid_days_union = sum(valid1 | valid2),
         f0 = mean(abs(difference) <= 1e-4, na.rm = TRUE),
-        fplus = mean(abs(difference) > 1e-4, na.rm = TRUE),
+        fplus = mean(difference > 1e-4, na.rm = TRUE),
         fsemiside = max(fplus + f0, 1 - (fplus + f0))
     ) |> select(-fplus)
 }
-
-
 
 add_distance <- function(match_list) {
     match_list |> mutate(
@@ -76,7 +74,7 @@ slope_diff <- function(s1, s2) {
 }
 
 
-analyze_matches <- function(match_list, data_table, metadata_list, climats = FALSE, years_threshold = 10L) {
+analyze_matches.old <- function(match_list, data_table, metadata_list, climats = FALSE, years_threshold = 10L) {
     ymonthly <- function(table) {
         table |>
             index_by(ymt = ~ yearmonth(.)) |>
@@ -128,6 +126,61 @@ analyze_matches <- function(match_list, data_table, metadata_list, climats = FAL
         ) |>
         unnest(c(Tinfo, climat_availability))
 }
+
+analyze_matches <- function(data_table, match_list, metadata_list, climats = FALSE, years_threshold = 10L, dem = stars::read_stars("temp/dem/dem30.tif")) {
+    data_table.ymonthly <- data_table |>
+        index_by(ymt = ~ yearmonth(.)) |>
+        summarise(across(!where(is.Date), ~ mean(., na.rm = TRUE)))
+
+    ### METADATA
+    match_list <- bijoin(match_list |> collect(), metadata_list |> collect() |> add_dem_elevations(dem)) |>
+        add_distance() |>
+        mutate(
+            delH = abs(elevation.x - elevation.y),
+            delZ = abs(dem.x - dem.y),
+            strSym = stringsim(normalize_name(station_name.x), normalize_name(station_name.y), method = "jw")
+        )
+    match_list <- bind_rows(
+        T_MIN = match_list,
+        T_MAX = match_list,
+        .id = "variable"
+    )
+
+    # Impara la metaprogrammazione, bestia!
+    # pullx <- function() {
+    #     expr(pull(data_table, paste0(variable, "_", station_id.x)))
+    # }
+
+    # pullx.ymonthly <- function() {
+    #     expr(pull(data_table.ymonthly, paste0(variable, "_", station_id.x)))
+    # }
+
+    # pully <- function() {
+    #     expr(pull(!!data_table, paste0(!!variable, "_", !!station_id.y)))
+    # }
+
+    # pully.ymonthly <- function() {
+    #     expr(pull(data_table.ymonthly, paste0(variable, "_", station_id.y)))
+    # }
+
+    match_list |>
+        rowwise() |>
+        mutate(
+            Tinfo = Tinfo.numeric(pull(data_table, paste0(variable, "_", station_id.x)), pull(data_table, paste0(variable, "_", station_id.y))),
+            monthlyslopeT = slope_diff(pull(data_table.ymonthly, paste0(variable, "_", station_id.x)), pull(data_table.ymonthly, paste0(variable, "_", station_id.y))),
+            monthlydelT = mean(pull(data_table.ymonthly, paste0(variable, "_", station_id.x)) - pull(data_table.ymonthly, paste0(variable, "_", station_id.y)), na.rm = TRUE),
+            monthlymae = mean(abs(pull(data_table.ymonthly, paste0(variable, "_", station_id.x)) - pull(data_table.ymonthly, paste0(variable, "_", station_id.y))), na.rm = TRUE),
+            monthlysdT = sd(pull(data_table.ymonthly, paste0(variable, "_", station_id.x)) - pull(data_table.ymonthly, paste0(variable, "_", station_id.y)), na.rm = TRUE),
+            climat_availability = is_climatology_computable.series(
+                pull(data_table, paste0(variable, "_", station_id.x)),
+                pull(data_table, paste0(variable, "_", station_id.y)),
+                data_table$date,
+                n_years_minimum = years_threshold
+            ) |> as_tibble() |> summarise(all_filter = all(clim_available), any_filter = any(clim_available))
+        ) |>
+        unnest(c(Tinfo, climat_availability))
+}
+
 
 # compute_diffs <- function(matches, table.x, table.y) {
 #     matches |>

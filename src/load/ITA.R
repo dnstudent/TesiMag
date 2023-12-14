@@ -1,5 +1,3 @@
-library(terra, warn.conflicts = FALSE)
-
 source("src/paths/paths.R")
 
 load.DEM.COP30 <- function(cached = TRUE) {
@@ -7,8 +5,8 @@ load.DEM.COP30 <- function(cached = TRUE) {
         rast(path.cached.COP30)
     } else {
         ls.COP30() |>
-            sprc() |>
-            merge()
+            terra::sprc() |>
+            terra::merge()
     }
 }
 
@@ -68,6 +66,6 @@ build.DEM.COP30.sea_mask <- function() {
     sea
 }
 
-load.italian_boundaries <- function(level) {
-    st_read(path.boundaries.italy(level))
+load.italian_boundaries <- function(level, ...) {
+    st_read(path.boundaries.italy(level), quiet = TRUE, ...)
 }

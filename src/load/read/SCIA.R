@@ -6,7 +6,7 @@ library(tibble, warn.conflicts = FALSE)
 source("src/paths/paths.R")
 
 read.SCIA.series <- function(tvar) {
-    read_parquet(path.datafile("SCIA", tvar), as_data_frame = TRUE) |>
+    read_parquet(path.datafile("SCIA", tvar), as_data_frame = FALSE) |>
         rename_with(\(x) tvar, starts_with("Temperatura")) |>
         rename(identifier = internal_id)
 }

@@ -1,16 +1,14 @@
 library(tsibble, warn.conflicts = FALSE)
 library(dplyr, warn.conflicts = FALSE)
-library(stars, warn.conflicts = FALSE)
 
-source("src/load/load.R")
 source("src/analysis/data/clim_availability.R")
 source("src/database/write.R")
 
 add_dem_elevations <- function(metadata, dem) {
-    metadata |> mutate(dem = st_extract(dem, as.matrix(bind_cols(lon = lon, lat = lat))) |> pull(1))
+    metadata |> mutate(dem = stars::st_extract(dem, as.matrix(bind_cols(lon = lon, lat = lat))) |> pull(1))
 }
 
-join_metas <- function(station_meta, series_meta, dem = read_stars("temp/dem/dem30.tif")) {
+join_metas <- function(station_meta, series_meta, dem = stars::read_stars("temp/dem/dem30.tif")) {
     series_meta |>
         select(-any_of("merged_from")) |>
         left_join(station_meta, by = "station_id", relationship = "many-to-one") |>

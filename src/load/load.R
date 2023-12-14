@@ -2,8 +2,6 @@ library(arrow, warn.conflicts = FALSE)
 library(dplyr, warn.conflicts = FALSE)
 library(tidyr, warn.conflicts = FALSE)
 library(lubridate, warn.conflicts = FALSE)
-library(sf, warn.conflicts = FALSE)
-library(purrr, warn.conflicts = FALSE)
 library(tsibble, warn.conflicts = FALSE)
 
 source("src/paths/paths.R")
@@ -13,8 +11,8 @@ source("src/load/read/SCIA.R")
 source("src/load/ITA.R")
 source("src/load/load_utils.R")
 
-read.series <- compose(\(t) as_tsibble(t, key = identifier, index = date), read.data("series"))
-load.series <- compose(\(t) as_tsibble(t, key = identifier, index = date), load.data("series"))
+read.series <- purrr::compose(\(t) as_tsibble(t, key = identifier, index = date), read.data("series"))
+load.series <- purrr::compose(\(t) as_tsibble(t, key = identifier, index = date), load.data("series"))
 
 read.series.single <- function(db, tvar, id, ...) {
   do.call(paste("read", db, "series.single", sep = "."), list(tvar, id, ...)) |> as_tsibble(index = date)
@@ -53,7 +51,7 @@ read.series.bunch <- function(db, tvar, ids, ...) {
 # }
 
 read.metadata <- read.data("metadata")
-load.metadata <- compose(\(data) st_as_sf(data, coords = c("lon", "lat"), crs = "EPSG:4326"), load.data("metadata"))
+load.metadata <- purrr::compose(\(data) st_as_sf(data, coords = c("lon", "lat"), crs = "EPSG:4326"), load.data("metadata"))
 
 load.metadata.allvars <- function(db, ..., .cache_kwargs = list()) {
   bind_rows(
@@ -85,10 +83,6 @@ open.dataset <- function(db, kind) {
   if (!is.null(res)) {
     res
   } else {
-    open_dataset(file.path("db", kind, stringr::str_to_lower(db)), format = "feather")
+    open_dataset(file.path("db.old", kind, stringr::str_to_lower(db)), format = "feather")
   }
-}
-
-st_md_to_sf <- function(metadata, remove = FALSE) {
-  metadata |> st_as_sf(coords = c("lon", "lat"), crs = "EPSG:4326", remove = remove)
 }
