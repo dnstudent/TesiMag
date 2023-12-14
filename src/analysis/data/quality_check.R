@@ -1,3 +1,5 @@
+library(dplyr, warn.conflicts = FALSE)
+
 # Quality check functions for data.
 # Assumption is that data is a tsibble, with temperatures in Celsius in the 'value' column.
 
@@ -48,8 +50,8 @@ repeated_fraction_check.data.frame <- function(data) {
         warning("The data provided is not grouped. Is this intentional?")
     }
     data |>
-        drop_na() |>
-        summarise(qc_repeated_fraction = repeated_fraction_check.numeric(.data[["value"]]))
+        drop_na(value) |>
+        summarise(qc_repeated_fraction = repeated_fraction_check.numeric(value))
 }
 
 repeated_fraction_check <- function(x, ...) UseMethod("repeated_fraction_check", x)
@@ -63,7 +65,7 @@ integers_fraction_check.data.frame <- function(data) {
         warning("The data provided is not grouped. Is this intentional?")
     }
     data |>
-        summarise(qc_integer_fraction = integers_fraction_check.numeric(.data[["value"]]))
+        summarise(qc_integer_fraction = integers_fraction_check.numeric(value))
 }
 
 integers_fraction_check <- function(x, ...) UseMethod("integers_fraction_check", x)
@@ -74,7 +76,7 @@ integer_streak_check.numeric <- function(x, threshold) {
     inverse.rle(rles)
 }
 
-integer_streak_check.data.frame <- function(data, threshold = 8) {
+integer_streak_check.data.frame <- function(data, threshold = 8L) {
     if (!is.grouped_df(data)) {
         warning("The data provided is not grouped. Is this intentional?")
     }

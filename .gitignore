@@ -12,12 +12,12 @@
 *.pdf
 *.geojson
 *.csv
-*.xlsx
 *.duckdb*
 temp/
 cache/
 missing*/
 db/
+db.old/
 .env
 .Renviron
 .DS_Store
