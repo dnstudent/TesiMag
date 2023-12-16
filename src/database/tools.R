@@ -51,14 +51,6 @@ as_arrow_table2.arrow_dplyr_query <- function(table, schema) {
 
 as_arrow_table2 <- function(x, ...) UseMethod("as_arrow_table2", x)
 
-
-# name_series <- function(full_table, dataset_id) {
-#     full_table |>
-#         mutate(
-#             series_id = str_glue("/{dataset_id}/{station_id}/{qc_step}/{variable}") |> sapply(hash) |> unname()
-#         )
-# }
-
 #' Gives a unique id to each station in the table.
 #'
 #' @param station_table An dataframe/Table containing the stations metadata.
@@ -72,13 +64,6 @@ name_stations <- function(station_table) {
         )
 }
 
-# split_data_metadata <- function(full_table) {
-#     list(
-#         select(full_table, all_of(data_schema$names)) |> as_arrow_table2(data_schema),
-#         select(full_table, all_of(series_schema$names)) |> distinct() |> as_arrow_table2(series_schema)
-#     )
-# }
-
 split_data_metadata <- function(full_table) {
     list(
         select(full_table, all_of(data_schema$names)) |> as_arrow_table2(data_schema),
@@ -88,7 +73,7 @@ split_data_metadata <- function(full_table) {
 
 split_station_metadata <- function(full_station_list) {
     base_meta <- select(full_station_list, all_of(station_schema$names)) |> as_arrow_table2(station_schema)
-    extra_meta <- select(full_station_list, !all_of(station_schema$names), station_id)
+    extra_meta <- select(full_station_list, !all_of(station_schema$names), station_id) |> as_arrow_table()
     list("base" = base_meta, "extra" = extra_meta)
 }
 
@@ -99,3 +84,28 @@ base_path <- function(section, provisional) {
     }
     path
 }
+
+as_database.data.frame <- function(meta, data) {
+    list(
+        "meta" = as_arrow_table2(meta, station_schema),
+        "data" = if ("Dataset" %in% class(data) || "arrow_dplyr_query" %in% class(data)) {
+            data
+        } else {
+            as_arrow_table2(data, data_schema)
+        }
+    )
+}
+
+as_database.ArrowTabular <- function(meta, data) {
+    as_database.data.frame(meta, data)
+}
+
+as_database.list <- function(database) {
+    if ("Table" %in% class(database$meta) && "ArrowObject" %in% class(database$data)) {
+        database
+    } else {
+        as_database.ArrowTabular(database$meta, database$data)
+    }
+}
+
+as_database <- function(x, ...) UseMethod("as_database", x)
