@@ -132,7 +132,7 @@ spatial_availabilities <- function(ymonthly_avail, stations, map, ...) {
                 summarise(global_availability = all(clim_available)) |>
                 left_join(stations |> select(station_id, lon, lat) |> collect(), by = "station_id") |>
                 st_md_to_sf(),
-            aes(color = global_availability)
+            aes(color = dataset_id, shape = global_availability)
         )
     list("plot" = p, "data" = spatav)
 }
@@ -167,14 +167,21 @@ spatial_availabilities <- function(ymonthly_avail, stations, map, ...) {
 #' @param ... Additional arguments
 #'
 #' @return The result of the analysis as a list containing the analysis table, the data table and the full concatenated database.
-perform_analysis <- function(database.x, database.y, dist_km, first_date, last_date, section, match_taggers, same_table = FALSE, ...) {
+perform_analysis <- function(database.x, database.y, dist_km, first_date, last_date, section, same_table = FALSE, ...) {
     candidate_matches <- match_list(database.x$meta, database.y$meta, dist_km, same_table)
     database <- concat_databases(database.x, database.y)
     data_table <- filter_widen_data(database, candidate_matches, first_date, last_date)
     cat("Data prepared. Launching analysis...")
     analysis <- analyze_matches(data_table, candidate_matches, database$meta)
     write_xslx_analysis(analysis, file.path("notebooks", "integrazioni_regionali", section, "analysis.xlsx"), ...)
-    list("analysis" = analysis |> match_taggers$same_station() |> match_taggers$unusable(), "data_table" = data_table, "full_database" = database)
+    list("analysis" = analysis, "data_table" = data_table, "full_database" = database)
+}
+
+tag_analysis <- function(analysis_results, match_taggers) {
+    analysis_results$analysis <- analysis_results$analysis |>
+        match_taggers$same_station() |>
+        match_taggers$unusable()
+    analysis_results
 }
 
 #' Build a combined database
