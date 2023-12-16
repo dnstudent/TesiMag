@@ -41,10 +41,10 @@ write_xslx_analysis <- function(analysis_list, to, ...) {
     writeDataTable(wb, 1, analysis_list)
 
     integer_style <- createStyle(numFmt = "0")
-    addStyle(wb, 1, integer_style, rows = 1:1000, cols = 7:9, gridExpand = TRUE)
+    addStyle(wb, 1, integer_style, rows = 1:5000, cols = 7:9, gridExpand = TRUE)
 
     prec2_style <- createStyle(numFmt = "0.00")
-    addStyle(wb, 1, prec2_style, rows = 1:1000, cols = 12:15, gridExpand = TRUE)
+    addStyle(wb, 1, prec2_style, rows = 1:5000, cols = 12:15, gridExpand = TRUE)
 
     saveWorkbook(wb, to, overwrite = TRUE)
 }

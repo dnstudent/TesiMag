@@ -19,18 +19,14 @@ match_list <- function(meta.x, meta.y, dist_km, asymmetric = FALSE) {
         join = sf::st_is_within_distance,
         dist = units::set_units(dist_km, "km")
     ) |>
-        sf::st_drop_geometry() |>
-        # filter(variable.x == variable.y) |>
-        # select(-variable.x) |>
-        # rename(variable = variable.y) |>
-        mutate(match_id = as.character(row_number()))
+        sf::st_drop_geometry()
     if (asymmetric) {
         matches <- matches |>
             filter((last_date.x >= last_date.y) & (series_id.x != series_id.y))
     }
     matches |>
-        select(station_id.x, station_id.y, match_id) |>
-        as_arrow_table(schema = schema(station_id.x = utf8(), station_id.y = utf8(), match_id = utf8()))
+        select(station_id.x, station_id.y) |>
+        as_arrow_table(schema = schema(station_id.x = utf8(), station_id.y = utf8()))
 }
 
 widen_split_data.single <- function(data_ds, match_table, which_identifier, first_date, last_date) {

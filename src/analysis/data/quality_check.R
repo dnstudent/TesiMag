@@ -1,7 +1,18 @@
 library(dplyr, warn.conflicts = FALSE)
 
-# Quality check functions for data.
-# Assumption is that data is a tsibble, with temperatures in Celsius in the 'value' column.
+# Tests for single series errors in data.
+
+
+# Function: gross_errors_check.numeric
+# Description: This function checks for gross errors in numeric values.
+# Parameters:
+#   - value: The numeric value to be checked.
+#   - thresh: The threshold value for identifying gross errors (default = 50).
+# Returns:
+#   TRUE if the value is considered a gross error, FALSE otherwise.
+gross_errors_check.numeric <- function(value, thresh = 50) {
+    abs(value) >= thresh
+}
 
 gross_errors_check.arrow_dplyr_query <- function(query, value_col, thresh = 50) {
     mutate(query, qc_gross = abs({{ value_col }}) >= thresh)
@@ -11,20 +22,50 @@ gross_errors_check.ArrowObject <- function(query, value_col, thresh = 50) {
     mutate(query, qc_gross = abs({{ value_col }}) >= thresh)
 }
 
-gross_errors_check.numeric <- function(value, thresh = 50) {
-    abs(value) >= thresh
-}
 
-#' Test for gross errors in data.
+#' Check for Gross Errors in a Data Frame
+#'
+#' This function checks for gross errors in a data frame by comparing the values
+#' against a threshold. Any values that exceed the threshold are considered as
+#' gross errors.
+#'
+#' @param data The data frame to be checked.
+#' @param thresh The threshold value for identifying gross errors. Default is 50.
+#'
+#' @return A logical vector indicating whether each value in the data frame is a
+#'         gross error or not.
+#'
+#' @examples
+#' data <- data.frame(x = c(10, 20, 30, 100, 40), y = c(50, 60, 70, 80, 90))
+#' gross_errors_check.data.frame(data, thresh = 50)
+#'
+#' @export
 gross_errors_check.data.frame <- function(data, thresh = 50) {
     data |> mutate(qc_gross = gross_errors_check.numeric(value, thresh))
 }
 
 gross_errors_check <- function(x, ...) UseMethod("gross_errors_check", x)
 
-repeated_values_check.numeric <- function(x, n) {
+
+#' Check for repeated values in numeric data
+#'
+#' This function checks for repeated values in a numeric vector.
+#'
+#' @param x A numeric vector.
+#' @param threshold The maximum number of allowed repeated values.
+#'
+#' @return TRUE if the number of repeated values is less than or equal to the threshold, FALSE otherwise.
+#'
+#' @examples
+#' repeated_values_check.numeric(c(1, 2, 3, 3, 4), 2)
+#' # Output: FALSE
+#'
+#' repeated_values_check.numeric(c(1, 2, 3, 3, 4), 3)
+#' # Output: TRUE
+#'
+repeated_values_check.numeric <- function(x, threshold) {
     rles <- rle(x)
-    rles$values <- rles$lengths >= n
+    rles$values <- rles$lengths >= threshold
     inverse.rle(rles)
 }
 

@@ -144,24 +144,7 @@ analyze_matches <- function(data_table, match_list, metadata_list, climats = FAL
         T_MIN = match_list,
         T_MAX = match_list,
         .id = "variable"
-    )
-
-    # Impara la metaprogrammazione, bestia!
-    # pullx <- function() {
-    #     expr(pull(data_table, paste0(variable, "_", station_id.x)))
-    # }
-
-    # pullx.ymonthly <- function() {
-    #     expr(pull(data_table.ymonthly, paste0(variable, "_", station_id.x)))
-    # }
-
-    # pully <- function() {
-    #     expr(pull(!!data_table, paste0(!!variable, "_", !!station_id.y)))
-    # }
-
-    # pully.ymonthly <- function() {
-    #     expr(pull(data_table.ymonthly, paste0(variable, "_", station_id.y)))
-    # }
+    ) |> mutate(match_id = as.character(row_number()))
 
     match_list |>
         rowwise() |>
@@ -180,13 +163,3 @@ analyze_matches <- function(data_table, match_list, metadata_list, climats = FAL
         ) |>
         unnest(c(Tinfo, climat_availability))
 }
-
-
-# compute_diffs <- function(matches, table.x, table.y) {
-#     matches |>
-#         select(starts_with("identifier")) |>
-#         rowwise() |>
-#         reframe(
-#             date = pull(table.x, date), value.x = pull(table.x, identifier.x), value.y = pull(table.y, identifier.y), diffs = value.x - value.y, identifier.x = identifier.x, identifier.y = identifier.y
-#         )
-# }

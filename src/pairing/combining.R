@@ -16,10 +16,15 @@ annual_index <- function(date) {
 #' @return A tsibble with a column for each match_id, containing the difference between the two series linked to the id.
 diffs_table <- function(match_list, data_table) {
     match_list |>
-        select(series_id.x, series_id.y, match_id) |>
+        select(variable, station_id.x, station_id.y, match_id) |>
         rowwise() |>
-        reframe(diffs = data_table |> pull(series_id.x) - data_table |> pull(series_id.y), date = data_table$date, match_id = match_id) |>
+        reframe(
+            diffs = data_table |> pull(paste0(variable, "_", station_id.x)) - data_table |> pull(paste0(variable, "_", station_id.y)),
+            date = data_table$date,
+            match_id = match_id
+        ) |>
         pivot_wider(id_cols = date, values_from = diffs, names_from = match_id) |>
+        arrange(date) |>
         as_tsibble(index = date) |>
         fill_gaps(.full = TRUE)
 }
@@ -52,12 +57,12 @@ model_and_predict_corrections <- function(monthly_diffs, ts) {
     bind_cols(correction = predict(model, ts), date = ts$date)
 }
 
-coalesce_group <- function(series_id.x, series_ids.y, match_ids, data_table, corrections) {
-    replacement_values <- select(data_table, all_of(series_ids.y)) + select(corrections, all_of(match_ids))
-    coalesce(pull(data_table, series_id.x), !!!replacement_values)
+coalesce_group <- function(id.x, ids.y, match_ids, data_table, corrections) {
+    replacement_values <- select(data_table, all_of(ids.y)) + select(corrections, all_of(match_ids))
+    coalesce(pull(data_table, id.x), !!!replacement_values)
 }
 
-merge_data <- function(match_list, data_table, ...) {
+merge_database_by <- function(match_list, data_table, ...) {
     data_table <- fill_gaps(data_table) |>
         as_tibble() |>
         mutate(t = annual_index(date)) |>
@@ -72,44 +77,55 @@ merge_data <- function(match_list, data_table, ...) {
         arrange(date) |>
         select(-date)
     match_list |>
-        arrange(series_id.x, abs(delT), ...) |>
-        group_by(series_id.x) |>
+        arrange(station_id.x, desc(f0), abs(monthlydelT), desc(valid_days_inters), ...) |>
+        group_by(variable, station_id.x) |>
         reframe(
-            value = coalesce_group(series_id.x |> first(), series_id.y, match_id, data_table, corrections),
+            value = coalesce_group(paste0(first(variable), "_", first(station_id.x)), paste0(variable, "_", station_id.y), match_id, data_table, corrections),
             date = data_table$date,
-            merged = !(is.na(value) | !is.na(pull(data_table, series_id.x |> first()))),
+            merged = !(is.na(value) | !is.na(pull(data_table, paste0(first(variable), "_", first(station_id.x))))),
         ) |>
-        drop_na(value)
+        drop_na(value) |>
+        rename(station_id = station_id.x)
 }
 
 filter_remaining_ <- function(target_list, control_list, match_list) {
     target_list |>
-        anti_join(match_list, by = join_by(series_id == series_id.x)) |>
-        anti_join(match_list, by = join_by(series_id == series_id.y)) |>
-        semi_join(control_list, by = "series_id")
+        anti_join(match_list, by = join_by(station_id == station_id.x)) |>
+        anti_join(match_list, by = join_by(station_id == station_id.y)) |>
+        semi_join(control_list, by = "station_id")
 }
 
+#' Combines the data and metadata of merged and not merged series.
 #'
-#' @param all_matches Must include also unusable matches
-merged_tables <- function(merged_data, original_data_list, series_list, all_matches, dataset_id) {
-    c(merged_data, merged_series_metadata) %<-% (left_join(merged_data, series_list |> collect(), join_by(series_id.x == series_id)) |>
-        mutate(qc_step = 2L) |>
-        name_series(dataset_id) |>
-        split_data_metadata())
+#' Replaces the data and metadata of the ancestors of the merged series with the merged data and metadata.
+#'
+#' @param merged_data A dataframe/Table containing the merged series data.
+#' @param whole_database A database containing the data and metadata of the whole database.
+#' @param approved_match_list A match table, as returned by \code{\link{match_table}}, complete with two `station_id` and a `variable` columns.
+#' @param check_consistency Whether to check the consistency of the resulting database.
+#'
+#' @return A database containing the data and metadata of the merged dataset.
+concat_merged_and_unmerged <- function(merged_data, whole_database, approved_match_list, check_consistency = TRUE) {
+    # Only station metadata from the left (.x) database is kept for merged series.
+    merged_meta <- whole_database$meta |>
+        semi_join(approved_match_list, join_by(station_id == station_id.x))
 
-    remaining_data <- filter_remaining_(original_data_list, series_list, all_matches)
-    remaining_series_metadata <- filter_remaining_(series_list, remaining_data, all_matches) |>
-        mutate(qc_step = 2L)
+    # Must pay attention to properly manage the "variable"-"station_id" key.
+    nonmerged_data <- whole_database$data |>
+        anti_join(approved_match_list, join_by(station_id == station_id.x, variable)) |>
+        anti_join(approved_match_list, join_by(station_id == station_id.y, variable))
 
-    c(remaining_data, remaining_series_metadata) %<-% (left_join(remaining_data, remaining_series_metadata, by = "series_id") |>
-        collect() |>
-        name_series(dataset_id) |>
-        split_data_metadata())
+    concat_data <- concat_tables(merged_data |> compute(), nonmerged_data |> compute(), unify_schemas = FALSE)
+    concat_meta <- whole_database$meta |> semi_join(concat_data, by = "station_id")
 
-    list(
-        concat_tables(merged_data, remaining_data, unify_schemas = FALSE),
-        concat_tables(merged_series_metadata, remaining_series_metadata, unify_schemas = FALSE)
-    )
+    if (check_consistency) {
+        if (concat_data |> collect() |> duplicates(key = c(station_id, variable), index = date) |> nrow() > 0) {
+            stop("Duplicates were found in the concatenated data")
+        }
+        concat_meta |>
+            collect() |>
+            assert(is_uniq, station_id)
+    }
 
-    # list(merged_data, remaining_data, merged_series_metadata, remaining_series_metadata)
+    as_database.ArrowTabular(concat_meta, concat_data)
 }
