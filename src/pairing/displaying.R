@@ -23,6 +23,7 @@ write_xslx_analysis <- function(analysis_list, to, ...) {
         distance,
         f0,
         fsemiside,
+        fsameint,
         delT,
         maeT,
         monthlydelT,
@@ -35,6 +36,7 @@ write_xslx_analysis <- function(analysis_list, to, ...) {
     class(analysis_list$strSym) <- "percentage"
     class(analysis_list$f0) <- "percentage"
     class(analysis_list$fsemiside) <- "percentage"
+    class(analysis_list$fsameint) <- "percentage"
     class(analysis_list$minilap) <- "percentage"
     wb <- createWorkbook()
     addWorksheet(wb, "data")
@@ -44,7 +46,7 @@ write_xslx_analysis <- function(analysis_list, to, ...) {
     addStyle(wb, 1, integer_style, rows = 1:5000, cols = 7:9, gridExpand = TRUE)
 
     prec2_style <- createStyle(numFmt = "0.00")
-    addStyle(wb, 1, prec2_style, rows = 1:5000, cols = 12:15, gridExpand = TRUE)
+    addStyle(wb, 1, prec2_style, rows = 1:5000, cols = 13:16, gridExpand = TRUE)
 
     saveWorkbook(wb, to, overwrite = TRUE)
 }
