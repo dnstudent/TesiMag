@@ -5,6 +5,9 @@ source("src/load/tools.R")
 source("src/database/tools.R")
 
 filter_checkpoint_inside <- function(database, region) {
+    if (is.null(region)) {
+        return(database)
+    }
     meta <- database$meta |>
         collect() |>
         st_md_to_sf(remove = FALSE) |>
