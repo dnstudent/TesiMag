@@ -1,6 +1,7 @@
 library(arrow, warn.conflicts = FALSE)
 library(tibble, warn.conflicts = FALSE)
 library(dplyr, warn.conflicts = FALSE)
+library(rlang, warn.conflicts = FALSE)
 
 data_schema <- schema(
     station_id = utf8(),
