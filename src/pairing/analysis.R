@@ -50,7 +50,8 @@ Tinfo.numeric <- function(s1, s2) {
         valid_days_union = sum(valid1 | valid2),
         f0 = mean(abs(difference) <= 1e-4, na.rm = TRUE),
         fplus = mean(difference > 1e-4, na.rm = TRUE),
-        fsemiside = max(fplus + f0, 1 - (fplus + f0))
+        fsemiside = max(fplus + f0, 1 - (fplus + f0)),
+        fsameint = mean(abs(trunc(s1) - trunc(s2)) < 0.5, na.rm = TRUE)
     ) |> select(-fplus)
 }
 
