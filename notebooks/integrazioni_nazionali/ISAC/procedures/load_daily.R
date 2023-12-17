@@ -2,9 +2,9 @@ source("src/load/read/BRUN.R")
 source("src/database/tools.R")
 
 load_work_metadata <- function() {
-    tmin <- read.BRUN.metadata("T_MIN", "qc_era5") |>
+    tmin <- read.BRUN.metadata("T_MIN", "raw") |>
         mutate(identifier = as.character(identifier), original_id = str_replace(identifier, regex("^(TMND_)|(TN_)"), ""))
-    tmax <- read.BRUN.metadata("T_MAX", "qc_era5") |>
+    tmax <- read.BRUN.metadata("T_MAX", "raw") |>
         mutate(identifier = as.character(identifier), original_id = str_replace(identifier, regex("^(TMXD_)|(TX_)"), ""))
 
     bind_rows(
@@ -18,12 +18,12 @@ load_work_metadata <- function() {
 }
 
 load_data <- function(meta) {
-    tmin <- read.BRUN.series("T_MIN", "qc_era5") |>
+    tmin <- read.BRUN.series("T_MIN", "raw") |>
         mutate(identifier = as.character(identifier)) |>
         semi_join(meta, join_by(identifier == true_original_id)) |>
         rename(value = T_MIN)
 
-    tmax <- read.BRUN.series("T_MAX", "qc_era5") |>
+    tmax <- read.BRUN.series("T_MAX", "raw") |>
         mutate(identifier = as.character(identifier)) |>
         semi_join(meta, join_by(identifier == true_original_id)) |>
         rename(value = T_MAX)
