@@ -110,3 +110,14 @@ as_database.list <- function(database) {
 }
 
 as_database <- function(x, ...) UseMethod("as_database", x)
+
+gap_fill_database <- function(database, start_date, stop_date) {
+    database$data <- database$data |>
+        collect() |>
+        as_tsibble(key = c(station_id, variable), index = date) |>
+        fill_gaps(.full = TRUE, .start = start_date, .end = stop_date) |>
+        as_tibble() |>
+        arrange(station_id, variable, date) |>
+        as_arrow_table2(data_schema)
+    database
+}
