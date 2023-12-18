@@ -29,6 +29,31 @@ match_list <- function(meta.x, meta.y, dist_km, asymmetric = FALSE) {
         as_arrow_table(schema = schema(station_id.x = utf8(), station_id.y = utf8()))
 }
 
+match_list2 <- function(meta, dist_km, dataset_priority) {
+    meta <- meta |>
+        collect() |>
+        mutate(
+            ds_priority = case_match(
+                dataset_id,
+                !!!dataset_priority
+            ),
+        ) |>
+        st_md_to_sf(remove = FALSE)
+    matches <- sf::st_join(
+        meta,
+        meta,
+        left = FALSE,
+        suffix = c(".x", ".y"),
+        join = sf::st_is_within_distance,
+        dist = units::set_units(dist_km, "km")
+    ) |>
+        sf::st_drop_geometry() |>
+        filter((station_id.x != station_id.y) & (ds_priority.x >= ds_priority.y)) |> # It is still not completely filtered! Next step should be done with valid_days
+        filter() |>
+        select(station_id.x, station_id.y) |>
+        as_arrow_table(schema = schema(station_id.x = utf8(), station_id.y = utf8()))
+}
+
 widen_split_data.single <- function(data_ds, match_table, which_identifier, first_date, last_date) {
     # stations <- match_table |>
     #     select(station_id = all_of(paste0("station_id.", which)))

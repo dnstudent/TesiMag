@@ -6,7 +6,7 @@ library(zeallot, warn.conflicts = FALSE)
 source("src/database/write.R")
 
 annual_index <- function(date) {
-    2 * pi * yday(date) / yday(ceiling_date(date, unit = "year") - 1)
+    2 * pi * yday(date) / yday(ceiling_date(date, unit = "year") - as.difftime(1, units = "days"))
 }
 
 #' Computes a diffs table for a given match table, loading the data series from the given tables.
@@ -44,17 +44,22 @@ monthly_corrections <- function(diffs_table) {
         select(-ymt, -mt)
 }
 
-#' Pivots the data to long form and filters out columns with all NA values
 prepare_for_modeling <- function(monthly_corrections) {
     monthly_corrections |>
-        # select(where(~ !all(is.na(.)))) |>
         pivot_longer(cols = !c(date, t), names_to = "match_id", values_to = "diffs") |>
         arrange(match_id, t)
 }
 
-model_and_predict_corrections <- function(monthly_diffs, ts) {
-    model <- lm(diffs ~ sin(t) + sin(2 * t) + cos(t) + cos(2 * t), data = monthly_diffs)
-    bind_cols(correction = predict(model, ts), date = ts$date)
+model_and_predict_corrections <- function(monthly_diffs, t, orig_t) {
+    n_data <- length(monthly_diffs |> na.omit())
+    if (n_data >= 8) {
+        model <- lm(monthly_diffs ~ sin(t / 2) + sin(t) + sin(3 * t / 2))
+        predict(model, newdata = orig_t) |> unname()
+    } else if (n_data > 2) {
+        rep(mean(monthly_diffs, na.rm = TRUE), times = nrow(orig_t))
+    } else {
+        rep(0, times = nrow(orig_t))
+    }
 }
 
 coalesce_group <- function(id.x, ids.y, match_ids, data_table, corrections) {
@@ -62,7 +67,7 @@ coalesce_group <- function(id.x, ids.y, match_ids, data_table, corrections) {
     coalesce(pull(data_table, id.x), !!!replacement_values)
 }
 
-merge_database_by <- function(match_list, data_table, ...) {
+merge_database_by <- function(match_list, data_table, .test_bounds = NULL, ...) {
     data_table <- fill_gaps(data_table) |>
         as_tibble() |>
         mutate(t = annual_index(date)) |>
@@ -70,12 +75,19 @@ merge_database_by <- function(match_list, data_table, ...) {
     #  Computing a correction table for each match
     corrections <- diffs_table(match_list, data_table) |>
         monthly_corrections() |>
-        prepare_for_modeling() |>
-        group_by(match_id) |>
-        group_modify(~ model_and_predict_corrections(., data_table |> select(t, date))) |>
-        pivot_wider(id_cols = date, names_from = match_id, values_from = correction) |>
-        arrange(date) |>
-        select(-date)
+        reframe(
+            across(!c(date, t), ~ model_and_predict_corrections(., t, data_table)),
+            t = data_table$t
+        )
+    if (!is.null(.test_bounds)) {
+        # Asserting that the corrections are reasonable in absolute value
+        corrections |>
+            assertr::assert(
+                assertr::within_bounds(-.test_bounds, .test_bounds),
+                -t
+            )
+    }
+
     match_list |>
         arrange(station_id.x, desc(f0), abs(monthlydelT), desc(valid_days_inters), ...) |>
         group_by(variable, station_id.x) |>

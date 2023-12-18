@@ -170,6 +170,16 @@ spatial_availabilities <- function(ymonthly_avail, stations, map, ...) {
 perform_analysis <- function(database.x, database.y, dist_km, first_date, last_date, section, same_table = FALSE, ...) {
     candidate_matches <- match_list(database.x$meta, database.y$meta, dist_km, same_table)
     database <- concat_databases(database.x, database.y)
+    cat("Data prepared. Launching analysis...")
+    analysis <- analyze_matches.hmm(candidate_matches, database, first_date, last_date)
+    write_xslx_analysis(analysis, file.path("notebooks", "integrazioni_regionali", section, "analysis.xlsx"), ...)
+    data_table <- filter_widen_data(database, candidate_matches, first_date, last_date)
+    list("analysis" = analysis, "data_table" = data_table, "full_database" = database)
+}
+
+
+perform_analysis2 <- function(database, dist_km, first_date, last_date, section, dataset_priority, ...) {
+    candidate_matches <- match_list2(database$meta, dist_km, dataset_priority)
     data_table <- filter_widen_data(database, candidate_matches, first_date, last_date)
     cat("Data prepared. Launching analysis...")
     analysis <- analyze_matches(data_table, candidate_matches, database$meta)
@@ -190,10 +200,12 @@ tag_analysis <- function(analysis_results, match_taggers) {
 #'
 #' @param analysis_results The analysis results to be combined.
 #' @param checks A logical value indicating whether to perform additional checks during the combination process.
+#' @param test_bounds Test that corrections (in absolute value) are less than this.
+#' @param ... Additional arguments to be passed to merge_database_by for match prioritization.
 #' @return The combined database and the (filtered) match list that produced it.
-build_combined_database <- function(analysis_results, checks = TRUE) {
+build_combined_database <- function(analysis_results, checks = TRUE, test_bounds = NULL, ...) {
     match_list <- analysis_results$analysis |> filter(same_station & !unusable)
-    merged_data <- merge_database_by(match_list, analysis_results$data_table) |> as_arrow_table2(data_schema)
+    merged_data <- merge_database_by(match_list, analysis_results$data_table, .test_bounds = test_bounds, ...) |> as_arrow_table2(data_schema)
     combined_database <- concat_merged_and_unmerged(
         merged_data,
         analysis_results$full_database,
