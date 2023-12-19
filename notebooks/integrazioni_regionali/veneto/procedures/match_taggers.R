@@ -45,3 +45,20 @@ tag_pairable <- function(analysis) {
         )
     )
 }
+
+tag_same_station_internal <- function(analysis) {
+    analysis |> mutate(
+        same_station = (
+            (is.na(f0) & distance < 200) |
+                (!is.na(f0) & (f0 > 0.1 | distance < 800 | fsameint > 0.45))
+        )
+    )
+}
+
+tag_unusable_internal <- function(analysis) {
+    analysis |> mutate(
+        unusable = (
+            !is.na(monthlydelT) & abs(monthlydelT) > 1
+        )
+    )
+}
