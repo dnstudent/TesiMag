@@ -108,7 +108,7 @@ analyze_matches <- function(data_table, match_list, metadata_list, same_db = FAL
         summarise(across(!where(is.Date), ~ mean(., na.rm = TRUE)))
 
     ### METADATA
-    match_list <- bijoin(match_list |> collect(), metadata_list |> collect() |> add_dem_elevations(dem)) |>
+    match_list <- bijoin_metadata_on_matchlist(match_list |> collect(), metadata_list |> collect() |> add_dem_elevations(dem)) |>
         add_distance() |>
         mutate(
             H = elevation.x,
@@ -196,12 +196,11 @@ paired_records_analysis <- function(paired_data) {
             maeT = mean(abs(difference), na.rm = TRUE),
             delT = mean(difference, na.rm = TRUE),
             sdT = sd(difference, na.rm = TRUE),
-            # minilap = sum(!(valid.x | valid.y)) / min(sum(valid.x), sum(valid.y)),
+            valid_days.x = sum(valid.x),
+            valid_days.y = sum(valid.y),
             valid_days_inters = sum(valid.x & valid.y),
             valid_days_union = sum(valid.x | valid.y),
             f0 = mean(abs(difference) <= 1e-4, na.rm = TRUE),
-            # fplus = mean(difference > 1e-4, na.rm = TRUE),
-            # fsemiside = max(fplus + f0, 1 - (fplus + f0)),
             fsameint = mean(abs(trunc(value.y) - trunc(value.x)) < 0.5, na.rm = TRUE),
             .groups = "drop"
         )

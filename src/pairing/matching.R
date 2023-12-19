@@ -4,7 +4,7 @@ library(arrow, warn.conflicts = FALSE)
 source("src/load/tools.R")
 source("src/analysis/metadata.R")
 
-match_list <- function(meta.x, meta.y, dist_km, asymmetric = FALSE) {
+match_list <- function(meta.x, meta.y, dist_km) {
     meta.x <- meta.x |>
         collect() |>
         st_md_to_sf(remove = FALSE)
@@ -19,33 +19,15 @@ match_list <- function(meta.x, meta.y, dist_km, asymmetric = FALSE) {
         join = sf::st_is_within_distance,
         dist = units::set_units(dist_km, "km")
     ) |>
-        sf::st_drop_geometry()
-    if (asymmetric) {
-        matches <- matches |>
-            filter((last_date.x >= last_date.y) & (series_id.x != series_id.y))
-    }
-    matches |>
+        sf::st_drop_geometry() |>
         select(station_id.x, station_id.y) |>
         as_arrow_table(schema = schema(station_id.x = utf8(), station_id.y = utf8()))
 }
 
-match_list_single <- function(meta, dist_km, match_priority_criterion) {
-    meta <- meta |>
-        collect() |>
-        st_md_to_sf(remove = FALSE)
-    matches <- sf::st_join(
-        meta,
-        meta,
-        left = FALSE,
-        suffix = c(".x", ".y"),
-        join = sf::st_is_within_distance,
-        dist = units::set_units(dist_km, "km")
-    ) |>
-        sf::st_drop_geometry() |>
+match_list_single <- function(meta, dist_km) {
+    match_list(meta, meta, dist_km) |>
         filter((station_id.x != station_id.y)) |> # It is still not completely filtered! Next step should be done with valid_days
-        match_priority_criterion() |>
-        select(station_id.x, station_id.y) |>
-        as_arrow_table(schema = schema(station_id.x = utf8(), station_id.y = utf8()))
+        compute()
 }
 
 widen_split_data.single <- function(data_ds, match_table, which_identifier, first_date, last_date) {
@@ -106,9 +88,26 @@ filter_widen_data <- function(database, match_list, first_date, last_date) {
         fill_gaps(.start = first_date, .end = last_date)
 }
 
-bijoin <- function(match_list, metadata_list) {
-    right_join(metadata_list, match_list, join_by(station_id == station_id.x)) |>
-        rename(station_id.x = station_id) |>
-        left_join(metadata_list, join_by(station_id.y == station_id)) |>
-        assertr::assert(not_na, starts_with("original_id"))
+join_data_on_matchlist <- function(table.x, match_list, table.y) {
+    if ("variable" %in% colnames(match_list)) {
+        match_keys <- c("station_id.x", "variable")
+    } else {
+        match_keys <- c("station_id.x")
+    }
+    match_list |>
+        left_join(table.x |> rename(station_id.x = station_id), by = match_keys, relationship = "many-to-many") |>
+        left_join(table.y, join_by(station_id.y == station_id, variable, date), relationship = "one-to-one")
+}
+
+bijoin_data_on_matchlist <- function(match_list, table) {
+    join_data_on_matchlist(table, match_list, table)
+}
+
+bijoin_metadata_on_matchlist <- function(match_list, metadata_list) {
+    match_list |>
+        left_join(metadata_list, join_by(station_id.x == station_id), relationship = "one-to-one") |>
+        left_join(metadata_list, join_by(station_id.y == station_id), relationship = "one-to-one")
+    # right_join(metadata_list, match_list, join_by(station_id == station_id.x)) |>
+    #     rename(station_id.x = station_id) |>
+    #     left_join(metadata_list, join_by(station_id.y == station_id))
 }

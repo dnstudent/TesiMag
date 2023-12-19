@@ -54,6 +54,7 @@ qc1 <- function(database, minimum_exc = 0.05, maximum_exc = 50, stop_on_error = 
     original_length <- nrow(database$data)
 
     qc_data <- database$data |>
+        arrange(station_id, variable, date) |>
         gross_errors_check(value) |>
         group_by(station_id, variable) |>
         collect() |>
@@ -151,8 +152,8 @@ spatial_availabilities <- function(ymonthly_avail, stations, map, ...) {
 #' @param ... Additional arguments to be passed to write_xslx_analysis.
 #'
 #' @return A list containing the analysis table, the data table and the full database (with the data of the two databases simply concatenated)
-perform_analysis <- function(database.x, database.y, dist_km, first_date, last_date, section, same_table = FALSE, ...) {
-    candidate_matches <- match_list(database.x$meta, database.y$meta, dist_km, same_table)
+perform_analysis <- function(database.x, database.y, dist_km, first_date, last_date, section, ...) {
+    candidate_matches <- match_list(database.x$meta, database.y$meta, dist_km)
     database <- concat_databases(database.x, database.y)
     cat("Data prepared. Launching analysis...")
     analysis <- analyze_matches.hmm(candidate_matches, database, first_date, last_date)
@@ -162,8 +163,8 @@ perform_analysis <- function(database.x, database.y, dist_km, first_date, last_d
 }
 
 
-perform_analysis_single <- function(database, dist_km, first_date, last_date, analysis_file, match_priority_criterion, ...) {
-    candidate_matches <- match_list_single(database$meta, dist_km, match_priority_criterion)
+perform_analysis_single <- function(database, dist_km, first_date, last_date, analysis_file, ...) {
+    candidate_matches <- match_list_single(database$meta, dist_km)
     cat("Data prepared. Launching analysis...")
     analysis <- analyze_matches.hmm(candidate_matches, database, first_date, last_date)
     write_xslx_analysis(analysis, file.path("notebooks", "integrazioni_regionali", analysis_file), ...)
@@ -183,13 +184,15 @@ tag_analysis <- function(analysis_results, match_taggers) {
 #' This function takes the analysis results and combines them into a single database.
 #'
 #' @param analysis_results The analysis results to be combined.
+#' @param use_corrections Whether it performs corrections on the .y series when merging.
 #' @param checks A logical value indicating whether to perform additional checks during the combination process.
 #' @param test_bounds Test that corrections (in absolute value) are less than this.
+#' @param match_selector A function that takes a match list and returns a subset of it. Its intended use it to exclude duplicate matches.
 #' @param ... Additional arguments to be passed to merge_database_by for match prioritization.
 #' @return The combined database and the (filtered) match list that produced it.
-build_combined_database <- function(analysis_results, checks = TRUE, test_bounds = NULL, ...) {
+build_combined_database <- function(analysis_results, use_corrections, checks, test_bounds, match_selectors, ...) {
     match_list <- analysis_results$analysis |> filter(same_station & !unusable)
-    merged_data <- merge_database_by(match_list, analysis_results$data_table, .test_bounds = test_bounds, ...) |> as_arrow_table2(data_schema)
+    merged_data <- merge_database_by(match_list, analysis_results$data_table, .test_bounds = test_bounds, match_selectors, use_corrections, ...) |> as_arrow_table2(data_schema)
     combined_database <- concat_merged_and_unmerged(
         merged_data,
         analysis_results$full_database,
