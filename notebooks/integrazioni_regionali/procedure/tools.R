@@ -11,7 +11,7 @@ filter_checkpoint_inside <- function(database, region) {
     meta <- database$meta |>
         collect() |>
         st_md_to_sf(remove = FALSE) |>
-        sf::st_filter(region, .predicate = st_within) |>
+        sf::st_filter(region, .predicate = sf::st_within) |>
         sf::st_drop_geometry() |>
         as_arrow_table2(station_schema)
     list(

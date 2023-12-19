@@ -3,6 +3,7 @@ library(assertr, warn.conflicts = FALSE)
 library(zeallot, warn.conflicts = FALSE)
 
 source("src/database/tools.R")
+source("src/database/test.R")
 source("src/analysis/data/quality_check.R")
 source("src/analysis/data/clim_availability.R")
 source("src/pairing/matching.R")
@@ -28,7 +29,7 @@ prepare_daily_data <- function(data_pack, .start, .end) {
 
     c(base_metadata, extra_metadata) %<-% split_station_metadata(semi_join(data_pack$meta, data_pack$data, by = "station_id"))
 
-    list("database" = as_database(base_metadata, data_pack$data), "extra_meta" = extra_metadata)
+    list("database" = as_database(base_metadata, data_pack$data) |> assert_data_uniqueness() |> assert_metadata_uniqueness(), "extra_meta" = extra_metadata)
 }
 
 #' Performs quality checks on the data and returns a list containing the data and the metadata.
@@ -161,12 +162,12 @@ perform_analysis <- function(database.x, database.y, dist_km, first_date, last_d
 }
 
 
-perform_analysis2 <- function(database, dist_km, first_date, last_date, section, dataset_priority, ...) {
-    candidate_matches <- match_list2(database$meta, dist_km, dataset_priority)
-    data_table <- filter_widen_data(database, candidate_matches, first_date, last_date)
+perform_analysis_single <- function(database, dist_km, first_date, last_date, analysis_file, match_priority_criterion, ...) {
+    candidate_matches <- match_list_single(database$meta, dist_km, match_priority_criterion)
     cat("Data prepared. Launching analysis...")
-    analysis <- analyze_matches(data_table, candidate_matches, database$meta)
-    write_xslx_analysis(analysis, file.path("notebooks", "integrazioni_regionali", section, "analysis.xlsx"), ...)
+    analysis <- analyze_matches.hmm(candidate_matches, database, first_date, last_date)
+    write_xslx_analysis(analysis, file.path("notebooks", "integrazioni_regionali", analysis_file), ...)
+    data_table <- filter_widen_data(database, candidate_matches, first_date, last_date)
     list("analysis" = analysis, "data_table" = data_table, "full_database" = database)
 }
 
