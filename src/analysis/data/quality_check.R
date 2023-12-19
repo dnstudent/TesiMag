@@ -76,6 +76,7 @@ repeated_values_check.data.frame <- function(data) {
     }
     data |>
         drop_na(value) |>
+        arrange(date, .by_group = TRUE) |>
         mutate(qc_repeated = repeated_values_check.numeric(value, 7))
 }
 

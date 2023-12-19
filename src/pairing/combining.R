@@ -63,17 +63,16 @@ model_and_predict_corrections <- function(monthly_diffs, t, orig_t) {
 }
 
 coalesce_group <- function(id.x, ids.y, match_ids, data_table, corrections) {
-    replacement_values <- select(data_table, all_of(ids.y)) + select(corrections, all_of(match_ids))
+    if (!is.null(corrections)) {
+        replacement_values <- select(data_table, all_of(ids.y)) + select(corrections, all_of(match_ids))
+    } else {
+        replacement_values <- select(data_table, all_of(ids.y))
+    }
     coalesce(pull(data_table, id.x), !!!replacement_values)
 }
 
-merge_database_by <- function(match_list, data_table, .test_bounds = NULL, ...) {
-    data_table <- fill_gaps(data_table) |>
-        as_tibble() |>
-        mutate(t = annual_index(date)) |>
-        arrange(date)
-    #  Computing a correction table for each match
-    corrections <- diffs_table(match_list, data_table) |>
+prepare_corrections_ <- function(analyzed_matches, data_table, .test_bounds, ...) {
+    corrections <- diffs_table(analyzed_matches, data_table) |>
         monthly_corrections() |>
         reframe(
             across(!c(date, t), ~ model_and_predict_corrections(., t, data_table)),
@@ -87,8 +86,35 @@ merge_database_by <- function(match_list, data_table, .test_bounds = NULL, ...) 
                 -t
             )
     }
+    corrections
+}
 
-    match_list |>
+# merge_without_corrections_ <- function(analyzed_matches, data_table) {
+#     paired_data <- bijoin_data_on_matchlist(
+#         analyzed_matches |> select(station_id.x, station_id.y, variable) |> as_arrow_table(),
+#         data
+#     ) |> arrange(station_id.x, station_id.y, variable, date)
+#     paired_data |> group_by()
+# }
+
+merge_database_by <- function(analyzed_matches, data_table, .test_bounds, match_selector, use_corrections, ...) {
+    data_table <- fill_gaps(data_table) |>
+        as_tibble() |>
+        mutate(t = annual_index(date)) |>
+        arrange(date)
+
+    if (!is.null(match_selector)) {
+        analyzed_matches <- match_selector(analyzed_matches)
+    }
+
+    #  Computing a correction table for each match
+    if (use_corrections) {
+        corrections <- prepare_corrections_(analyzed_matches, data_table, .test_bounds)
+    } else {
+        corrections <- NULL
+    }
+
+    analyzed_matches |>
         arrange(station_id.x, desc(f0), abs(monthlydelT), desc(valid_days_inters), ...) |>
         group_by(variable, station_id.x) |>
         reframe(
