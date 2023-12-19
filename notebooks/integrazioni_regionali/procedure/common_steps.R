@@ -132,7 +132,7 @@ spatial_availabilities <- function(ymonthly_avail, stations, map, ...) {
                 summarise(global_availability = all(clim_available)) |>
                 left_join(stations |> select(station_id, lon, lat) |> collect(), by = "station_id") |>
                 st_md_to_sf(),
-            aes(color = dataset_id, shape = global_availability)
+            aes(color = global_availability, shape = dataset_id)
         )
     list("plot" = p, "data" = spatav)
 }
@@ -150,23 +150,6 @@ spatial_availabilities <- function(ymonthly_avail, stations, map, ...) {
 #' @param ... Additional arguments to be passed to write_xslx_analysis.
 #'
 #' @return A list containing the analysis table, the data table and the full database (with the data of the two databases simply concatenated)
-#' Perform analysis on two databases
-#'
-#' This function performs analysis on two databases, using the specified parameters.
-#' It calculates the distance in kilometers, selects the date range, and applies the analysis to the specified section.
-#' Additionally, it allows for matching taggers and specifying whether the databases are the same table.
-#'
-#' @param database.x The first database
-#' @param database.y The second database
-#' @param dist_km The distance in kilometers
-#' @param first_date The first date of the date range
-#' @param last_date The last date of the date range
-#' @param section The section to analyze
-#' @param match_taggers Boolean indicating whether to match taggers
-#' @param same_table Boolean indicating whether the databases are the same table
-#' @param ... Additional arguments
-#'
-#' @return The result of the analysis as a list containing the analysis table, the data table and the full concatenated database.
 perform_analysis <- function(database.x, database.y, dist_km, first_date, last_date, section, same_table = FALSE, ...) {
     candidate_matches <- match_list(database.x$meta, database.y$meta, dist_km, same_table)
     database <- concat_databases(database.x, database.y)

@@ -94,5 +94,5 @@ launch_leaflet <- function(database) {
             )
         )
     }
-    map
+    map |> leaflet.extras::addSearchOSM()
 }
