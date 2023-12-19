@@ -139,6 +139,14 @@ spatial_availabilities <- function(ymonthly_avail, stations, map, ...) {
     list("plot" = p, "data" = spatav)
 }
 
+
+perform_analysis_common_ <- function(candidate_matches, database, first_date, last_date, output_path, ...) {
+    analysis <- analyze_matches.hmm(candidate_matches, database, first_date, last_date)
+    write_xslx_analysis(analysis, file.path("notebooks", "integrazioni_regionali", output_path), ...)
+    data_table <- filter_widen_data(database, candidate_matches, first_date, last_date)
+    list("analysis" = analysis, "data_table" = data_table, "full_database" = database)
+}
+
 #' Performs the analysis of the station matches between two databases.
 #'
 #' @param database.x The first database.
@@ -156,20 +164,22 @@ perform_analysis <- function(database.x, database.y, dist_km, first_date, last_d
     candidate_matches <- match_list(database.x$meta, database.y$meta, dist_km)
     database <- concat_databases(database.x, database.y)
     cat("Data prepared. Launching analysis...")
-    analysis <- analyze_matches.hmm(candidate_matches, database, first_date, last_date)
-    write_xslx_analysis(analysis, file.path("notebooks", "integrazioni_regionali", section, "analysis.xlsx"), ...)
-    data_table <- filter_widen_data(database, candidate_matches, first_date, last_date)
-    list("analysis" = analysis, "data_table" = data_table, "full_database" = database)
+    perform_analysis_common_(candidate_matches, database, first_date, last_date, file.path(section, "analysis.xlsx"), ...)
+    # analysis <- analyze_matches.hmm(candidate_matches, database, first_date, last_date)
+    # write_xslx_analysis(analysis, file.path("notebooks", "integrazioni_regionali", section, "analysis.xlsx"), ...)
+    # data_table <- filter_widen_data(database, candidate_matches, first_date, last_date)
+    # list("analysis" = analysis, "data_table" = data_table, "full_database" = database)
 }
 
 
 perform_analysis_single <- function(database, dist_km, first_date, last_date, analysis_file, ...) {
     candidate_matches <- match_list_single(database$meta, dist_km)
     cat("Data prepared. Launching analysis...")
-    analysis <- analyze_matches.hmm(candidate_matches, database, first_date, last_date)
-    write_xslx_analysis(analysis, file.path("notebooks", "integrazioni_regionali", analysis_file), ...)
-    data_table <- filter_widen_data(database, candidate_matches, first_date, last_date)
-    list("analysis" = analysis, "data_table" = data_table, "full_database" = database)
+    perform_analysis_common_(candidate_matches, database, first_date, last_date, analysis_file, ...)
+    # analysis <- analyze_matches.hmm(candidate_matches, database, first_date, last_date)
+    # write_xslx_analysis(analysis, file.path("notebooks", "integrazioni_regionali", analysis_file), ...)
+    # data_table <- filter_widen_data(database, candidate_matches, first_date, last_date)
+    # list("analysis" = analysis, "data_table" = data_table, "full_database" = database)
 }
 
 tag_analysis <- function(analysis_results, match_taggers) {
