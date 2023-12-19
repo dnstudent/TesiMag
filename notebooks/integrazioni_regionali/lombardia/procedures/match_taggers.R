@@ -10,24 +10,31 @@ tag_same_station <- function(analysis) {
         mutate(
             same_station = (
                 (network.y != "Sinottica") &
-                    (valid_days_inters > 365) &
                     (
                         distance < 1500 |
-                            f0 >= 0.095 |
-                            (f0 >= 0.02 & (1500 <= distance & distance < 2000) & abs(monthlydelT < 0.5)) |
-                            ((2000 <= distance & distance < 3000) &
-                                ((f0 > 0.03 & strSym > 0.8) | f0 > 0.085))
-                    )) | tag_manual(station_id.x, station_id.y)
+                            valid_days_inters > 365 &
+                                (
+                                    (f0 >= 0.095) |
+                                        (f0 >= 0.02 & (1500 <= distance & distance < 2000) & abs(monthlydelT) < 0.5) |
+                                        (
+                                            (2000 <= distance & distance < 3000) &
+                                                ((f0 > 0.03 & strSym > 0.8) | f0 > 0.085)
+                                        ) |
+                                        (maeT <= 0.48)
+                                )
+                    )
+            ) | tag_manual(station_id.x, station_id.y)
         ) |>
         group_by(station_id.x, station_id.y) |>
         mutate(
             same_station = any(same_station)
-        )
+        ) |>
+        ungroup()
 }
 
 tag_unusable <- function(analysis) {
     analysis |> mutate(
-        unusable = abs(monthlydelT) >= 0.51
+        unusable = !is.na(monthlydelT) & abs(monthlydelT) >= 0.51
     )
 }
 
