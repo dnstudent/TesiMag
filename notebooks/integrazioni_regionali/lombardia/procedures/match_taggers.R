@@ -41,3 +41,20 @@ tag_unusable <- function(analysis) {
 tag_pairable <- function(analysis) {
     stop("Not implemented yet")
 }
+
+tag_same_station_internal <- function(analysis) {
+    analysis |> mutate(
+        same_station = (
+            is.na(f0) & ((strSym > 0.75 & distance < 2000 & delH < 20) | distance < 500) |
+                !is.na(f0) & (f0 > 0.2 | strSym > 0.6 | distance < 500 | strSym > 0.91)
+        )
+    )
+}
+
+tag_unusable_internal <- function(analysis) {
+    analysis |> mutate(
+        unusable = (
+            (!is.na(monthlymaeT) & monthlymaeT > 2)
+        )
+    )
+}
