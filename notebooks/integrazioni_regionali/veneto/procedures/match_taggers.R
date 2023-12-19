@@ -20,9 +20,16 @@ tag_unusable <- function(analysis) {
 tag_same_station <- function(analysis) {
     analysis |>
         mutate(
-            same_station = !is.na(f0) & (
-                (f0 >= 0.1 & valid_days_inters * f0 > 30)
-            )
+            same_station = (
+                !is.na(f0) & (
+                    (f0 >= 0.1 & valid_days_inters * f0 > 30) |
+                        strSym > 0.82 |
+                        distance < 500
+                )
+            ) |
+                is.na(f0) & (
+                    strSym > 0.78
+                )
         ) |>
         group_by(station_id.x, station_id.y) |>
         mutate(same_station = all(same_station)) |>
