@@ -4,10 +4,14 @@ library(dplyr, warn.conflicts = FALSE)
 source("src/database/tools.R")
 source("src/database/write.R")
 source("src/database/open.R")
+source("src/database/test.R")
 source("src/load/tools.R")
 
 checkpoint_database <- function(database, dataset_id, tag) {
     database$data <- arrange(database$data, station_id, variable, date)
+    database |>
+        assert_data_uniqueness() |>
+        assert_metadata_uniqueness()
     write_data(database$data, dataset_id, tag, provisional = TRUE)
     write_data(database$data, dataset_id, "last", provisional = TRUE)
     write_metadata(database$meta, dataset_id, tag, provisional = TRUE)

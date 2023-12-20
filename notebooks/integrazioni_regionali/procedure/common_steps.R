@@ -10,6 +10,7 @@ source("src/pairing/matching.R")
 source("src/pairing/analysis.R")
 source("src/pairing/displaying.R")
 source("src/pairing/combining.R")
+source("src/pairing/tools.R")
 source("notebooks/integrazioni_regionali/procedure/checkpoint.R")
 source("notebooks/integrazioni_regionali/procedure/plots.R")
 source("notebooks/integrazioni_regionali/procedure/tools.R")
@@ -140,8 +141,7 @@ spatial_availabilities <- function(ymonthly_avail, stations, map, ...) {
 }
 
 
-perform_analysis_common_ <- function(candidate_matches, database, first_date, last_date, output_path, ...) {
-    analysis <- analyze_matches.hmm(candidate_matches, database, first_date, last_date)
+perform_analysis_common_ <- function(analysis, candidate_matches, database, first_date, last_date, output_path, ...) {
     write_xslx_analysis(analysis, file.path("notebooks", "integrazioni_regionali", output_path), ...)
     data_table <- filter_widen_data(database, candidate_matches, first_date, last_date)
     list("analysis" = analysis, "data_table" = data_table, "full_database" = database)
@@ -164,22 +164,31 @@ perform_analysis <- function(database.x, database.y, dist_km, first_date, last_d
     candidate_matches <- match_list(database.x$meta, database.y$meta, dist_km)
     database <- concat_databases(database.x, database.y)
     cat("Data prepared. Launching analysis...")
-    perform_analysis_common_(candidate_matches, database, first_date, last_date, file.path(section, "analysis.xlsx"), ...)
-    # analysis <- analyze_matches.hmm(candidate_matches, database, first_date, last_date)
-    # write_xslx_analysis(analysis, file.path("notebooks", "integrazioni_regionali", section, "analysis.xlsx"), ...)
-    # data_table <- filter_widen_data(database, candidate_matches, first_date, last_date)
-    # list("analysis" = analysis, "data_table" = data_table, "full_database" = database)
+    analysis <- analyze_matches(candidate_matches, database, first_date, last_date, symmetric = FALSE, checks = TRUE)
+    perform_analysis_common_(analysis, candidate_matches, database, first_date, last_date, file.path(section, "analysis.xlsx"), ...)
 }
 
 
-perform_analysis_single <- function(database, dist_km, first_date, last_date, analysis_file, ...) {
-    candidate_matches <- match_list_single(database$meta, dist_km)
+perform_analysis_symmetric <- function(database, dist_km, first_date, last_date, analysis_file, filter_symmetric, priority_table, ...) {
+    candidate_matches <- match_list_single(database$meta, dist_km, priority_table)
     cat("Data prepared. Launching analysis...")
-    perform_analysis_common_(candidate_matches, database, first_date, last_date, analysis_file, ...)
-    # analysis <- analyze_matches.hmm(candidate_matches, database, first_date, last_date)
-    # write_xslx_analysis(analysis, file.path("notebooks", "integrazioni_regionali", analysis_file), ...)
-    # data_table <- filter_widen_data(database, candidate_matches, first_date, last_date)
-    # list("analysis" = analysis, "data_table" = data_table, "full_database" = database)
+    analysis <- analyze_matches(candidate_matches, database, first_date, last_date, symmetric = TRUE, checks = TRUE)
+    if (!is.null(filter_symmetric)) {
+        # Check
+        original_ids <- tibble(station_id = c(analysis$station_id.x, analysis$station_id.y) |> unique())
+        analysis <- filter_symmetric(analysis)
+        remaining_ids <- tibble(station_id = c(analysis$station_id.x, analysis$station_id.y) |> unique())
+        eventually_left_out <- anti_join(original_ids, remaining_ids, by = "station_id")
+        if (nrow(eventually_left_out) > 0) {
+            print("There was a problem in the match filtering:")
+            print(eventually_left_out)
+            stop()
+        }
+        if (contains_symmetric_duplicates(analysis, "station_id.x", "station_id.y")) {
+            warn("There was a problem in the symmetric duplicates filtering")
+        }
+    }
+    perform_analysis_common_(analysis, candidate_matches, database, first_date, last_date, analysis_file, ...)
 }
 
 tag_analysis <- function(analysis_results, match_taggers) {
@@ -200,9 +209,9 @@ tag_analysis <- function(analysis_results, match_taggers) {
 #' @param match_selector A function that takes a match list and returns a subset of it. Its intended use it to exclude duplicate matches.
 #' @param ... Additional arguments to be passed to merge_database_by for match prioritization.
 #' @return The combined database and the (filtered) match list that produced it.
-build_combined_database <- function(analysis_results, use_corrections, checks, test_bounds, match_selectors, ...) {
+build_combined_database <- function(analysis_results, use_corrections, checks, test_bounds, ...) {
     match_list <- analysis_results$analysis |> filter(same_station & !unusable)
-    merged_data <- merge_database_by(match_list, analysis_results$data_table, .test_bounds = test_bounds, match_selectors, use_corrections, ...) |> as_arrow_table2(data_schema)
+    merged_data <- merge_database_by(match_list, analysis_results$data_table, .test_bounds = test_bounds, use_corrections, ...) |> as_arrow_table2(data_schema)
     combined_database <- concat_merged_and_unmerged(
         merged_data,
         analysis_results$full_database,

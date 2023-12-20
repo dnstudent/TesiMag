@@ -17,7 +17,7 @@ clean_from <- function(analysis_table, matched) {
 write_xslx_analysis <- function(analysis_list, to, ...) {
     analysis_list <- analysis_list |> select(
         variable,
-        offset,
+        offset_days,
         # starts_with("station_id"),
         starts_with("station_name"),
         starts_with("network"),
