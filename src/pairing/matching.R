@@ -4,7 +4,7 @@ library(arrow, warn.conflicts = FALSE)
 source("src/load/tools.R")
 source("src/analysis/metadata.R")
 
-match_list <- function(meta.x, meta.y, dist_km) {
+match_list <- function(meta.x, meta.y, dist_km, ...) {
     meta.x <- meta.x |>
         collect() |>
         st_md_to_sf(remove = FALSE)
@@ -20,13 +20,19 @@ match_list <- function(meta.x, meta.y, dist_km) {
         dist = units::set_units(dist_km, "km")
     ) |>
         sf::st_drop_geometry() |>
-        select(station_id.x, station_id.y) |>
-        as_arrow_table(schema = schema(station_id.x = utf8(), station_id.y = utf8()))
+        select(station_id.x, station_id.y, ...) |>
+        as_arrow_table()
 }
 
-match_list_single <- function(meta, dist_km) {
-    match_list(meta, meta, dist_km) |>
-        filter((station_id.x != station_id.y)) |> # It is still not completely filtered! Next step should be done with valid_days
+match_list_single <- function(meta, dist_km, priority_table) {
+    if (!is.null(priority_table)) {
+        meta <- left_join(meta, priority_table, by = colnames(priority_table |> select(-priority)))
+        matches <- match_list(meta, meta, dist_km, priority.x, priority.y)
+    } else {
+        matches <- match_list(meta, meta, dist_km)
+    }
+    matches |>
+        filter((station_id.x != station_id.y)) |> # It is still not completely filtered!
         compute()
 }
 
@@ -48,13 +54,6 @@ widen_split_data.single <- function(data_ds, match_table, which_identifier, firs
     # group_by(variable) |>
     # group_map(
     # )
-}
-
-widen_split_data <- function(ds.x, ds.y, match_table, first_date, last_date) {
-    list(
-        widen_split_data.single(ds.x, match_table, series_id.x, first_date, last_date),
-        widen_split_data.single(ds.y, match_table, series_id.y, first_date, last_date)
-    )
 }
 
 filter_widen_data.old <- function(ds, match_list, first_date, last_date) {
@@ -88,15 +87,15 @@ filter_widen_data <- function(database, match_list, first_date, last_date) {
         fill_gaps(.start = first_date, .end = last_date)
 }
 
-join_data_on_matchlist <- function(table.x, match_list, table.y) {
+join_data_on_matchlist <- function(table.x, match_list, table.y, join_kind) {
     if ("variable" %in% colnames(match_list)) {
         match_keys <- c("station_id.x", "variable")
     } else {
         match_keys <- c("station_id.x")
     }
     match_list |>
-        left_join(table.x |> rename(station_id.x = station_id), by = match_keys, relationship = "many-to-many") |>
-        left_join(table.y, join_by(station_id.y == station_id, variable, date), relationship = "one-to-one")
+        left_join(table.x |> rename(station_id.x = station_id), by = match_keys, relationship = "one-to-many") |>
+        join_kind(table.y, join_by(station_id.y == station_id, variable, date), relationship = "one-to-one")
 }
 
 bijoin_data_on_matchlist <- function(match_list, table) {
