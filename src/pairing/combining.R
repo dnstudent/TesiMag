@@ -99,25 +99,28 @@ days_merge_left_if <- expr(
 )
 
 default_symmetric_filter <- function(analysis) {
-    if (("priority.x" %in% colnames(analysis)) && ("priority.y" %in% colnames(analysis))) {
-        analysis |> filter((priority.x < priority.y) | ((priority.x == priority.y) & (!!T_merge_left_if | !!days_merge_left_if)))
-    } else {
-        analysis |> filter(!!T_merge_left_if | !!days_merge_left_if)
-    }
+    # if (("priority.x" %in% colnames(analysis)) && ("priority.y" %in% colnames(analysis))) {
+    analysis |> filter(
+        (priority.x < priority.y) |
+            ((priority.x == priority.y) &
+                (valid_days.x > valid_days.y |
+                    (valid_days.x == valid_days.y & station_id.x > station_id.y)
+                )
+            )
+    )
+    # } else {
+    #     analysis |> filter(!!T_merge_left_if | !!days_merge_left_if)
+    # }
 }
 
-merge_database_by <- function(analyzed_matches, data_table, .test_bounds, use_corrections, ...) {
+merge_database_by <- function(analyzed_matches, data_table, .test_bounds, ...) {
     data_table <- fill_gaps(data_table) |>
         as_tibble() |>
         mutate(t = annual_index(date)) |>
         arrange(date)
 
     #  Computing a correction table for each match
-    if (use_corrections) {
-        corrections <- prepare_corrections_(analyzed_matches, data_table, .test_bounds)
-    } else {
-        corrections <- NULL
-    }
+    corrections <- prepare_corrections_(analyzed_matches, data_table, .test_bounds)
 
     analyzed_matches |>
         arrange(station_id.x, desc(f0), abs(monthlydelT), desc(valid_days_inters), ...) |>
