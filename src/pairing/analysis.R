@@ -369,7 +369,7 @@ analyze_matches <- function(match_list, database, first_date, last_date, symmetr
         # Ugly patch to avoid matches with empty (or too short) series
         filter(valid_days.y > 30 & valid_days.x > 30)
 
-    # Checking that the match list still lists the original matches
+    # Checking that the match list still contains the original matches
     if (checks &&
         (
             original_matchlist |>
