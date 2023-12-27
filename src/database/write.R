@@ -5,7 +5,9 @@ library(assertr, warn.conflicts = FALSE)
 library(stringr, warn.conflicts = FALSE)
 library(rlang, warn.conflicts = FALSE)
 library(fs, warn.conflicts = FALSE)
+library(DBI, warn.conflicts = FALSE)
 
+source("src/database/definitions.R")
 source("src/database/tools.R")
 
 # data_schema <- schema(
@@ -22,7 +24,7 @@ write_data <- function(data_table, dataset_id, tag, provisional) {
     }
     data_table |>
         as_arrow_table2(schema = data_schema) |>
-        arrange(station_id, variable, date) |>
+        arrange(dataset, station_id, variable, date) |>
         write_parquet(table_path)
 }
 
@@ -36,13 +38,26 @@ write_metadata <- function(metadata_table, dataset_id, tag, provisional) {
         write_parquet(table_path)
 }
 
-write_extra_metadata <- function(extra_table, dataset_id, provisional) {
-    table_path <- file.path(base_path("metadata", provisional), dataset_id, paste0("extra.parquet"))
-    if (!dir.exists(dirname(table_path))) {
-        dir.create(dirname(table_path), recursive = TRUE)
-    }
-    extra_table |>
-        write_parquet(table_path)
+push_metadata <- function(conn, metadata_ds) {
+    state_boundaries <- st_read(conn, query = "SELECT name AS state, geom FROM boundary WHERE kind = 'state'", geometry_column = "geom")
+    stations <- metadata_ds |>
+        select(all_of(station_cols_topush)) |>
+        collect()
+    stations <- mutate(stations, state = coalesce(state, st_join(stations |> st_md_to_sf() |> select(geometry), state_boundaries, join = st_within, left = TRUE)$state))
+    dbAppendTable(conn, "station", stations)
+}
+
+# write_extra_metadata <- function(extra_table, dataset_id, provisional) {
+#     table_path <- file.path(base_path("metadata", provisional), dataset_id, paste0("extra.parquet"))
+#     if (!dir.exists(dirname(table_path))) {
+#         dir.create(dirname(table_path), recursive = TRUE)
+#     }
+#     extra_table |>
+#         write_parquet(table_path)
+# }
+
+write_extra_metadata <- function(extra_table, dataset_name, conn) {
+    dbWriteTable(conn, paste0("extra_", dataset_name), extra_table, overwrite = TRUE)
 }
 
 # write_station_metadata <- function(station_table, dataset_id, auto_complete, provisional) {

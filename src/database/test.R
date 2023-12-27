@@ -4,7 +4,7 @@ library(arrow, warn.conflicts = FALSE)
 
 assert_data_uniqueness <- function(database) {
     if (database$data |>
-        group_by(station_id, variable, date) |>
+        group_by(dataset, station_id, variable, date) |>
         tally() |>
         filter(n > 1L) |>
         compute() |>
@@ -16,7 +16,7 @@ assert_data_uniqueness <- function(database) {
 
 assert_metadata_uniqueness <- function(database) {
     if (database$meta |>
-        group_by(station_id) |>
+        group_by(dataset, id) |>
         tally() |>
         filter(n > 1L) |>
         compute() |>

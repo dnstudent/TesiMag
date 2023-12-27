@@ -8,7 +8,7 @@ source("src/database/test.R")
 source("src/load/tools.R")
 
 checkpoint_database <- function(database, dataset_id, tag) {
-    database$data <- arrange(database$data, station_id, variable, date)
+    database$data <- arrange(database$data, dataset, station_id, variable, date)
     database |>
         assert_data_uniqueness() |>
         assert_metadata_uniqueness()

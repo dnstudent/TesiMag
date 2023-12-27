@@ -1,31 +1,35 @@
 source("src/load/read/BRUN.R")
 source("src/database/tools.R")
+source("src/database/definitions.R")
+
+dataset_spec <- function() {
+    list(
+        "ISAC",
+        "locale",
+        "national"
+    )
+}
 
 load_work_metadata <- function() {
     tmin <- read.BRUN.metadata("T_MIN", "raw") |>
-        mutate(identifier = as.character(identifier), original_id = str_replace(identifier, regex("^(TMND_)|(TN_)"), ""))
+        mutate(identifier = as.character(identifier), id = str_replace(identifier, regex("^(TMND_)|(TN_)"), ""))
     tmax <- read.BRUN.metadata("T_MAX", "raw") |>
-        mutate(identifier = as.character(identifier), original_id = str_replace(identifier, regex("^(TMXD_)|(TX_)"), ""))
+        mutate(identifier = as.character(identifier), id = str_replace(identifier, regex("^(TMXD_)|(TX_)"), ""))
 
     bind_rows(
         tmin,
         tmax
     ) |>
         filter(lat > 42) |>
-        mutate(across(c(region_, country, province), as.character), dataset_id = "ISAC", network = "ISAC") |>
-        rename(station_name = anagrafica, true_original_id = identifier) |>
-        name_stations()
+        mutate(across(c(region_, country, province), as.character), dataset = "ISAC", network = "ISAC") |>
+        rename(name = anagrafica, actual_original_id = identifier)
 }
 
-load_data <- function(meta) {
+load_data <- function(meta, first_date, last_date) {
     tmin <- read.BRUN.series("T_MIN", "raw") |>
-        mutate(identifier = as.character(identifier)) |>
-        semi_join(meta, join_by(identifier == true_original_id)) |>
         rename(value = T_MIN)
 
     tmax <- read.BRUN.series("T_MAX", "raw") |>
-        mutate(identifier = as.character(identifier)) |>
-        semi_join(meta, join_by(identifier == true_original_id)) |>
         rename(value = T_MAX)
 
     bind_rows(
@@ -33,14 +37,31 @@ load_data <- function(meta) {
         T_MAX = tmax,
         .id = "variable"
     ) |>
-        left_join(select(meta, true_original_id, station_id), join_by(identifier == true_original_id)) |>
-        mutate(merged = FALSE) |>
-        select(-identifier)
+        drop_na(value) |>
+        as_arrow_table() |>
+        #     write_dataset("db.old/tmp/ISAC")
+        # open_dataset("db.old/tmp/ISAC") |>
+        rename(actual_original_id = identifier) |>
+        filter(first_date <= date & date <= last_date) |>
+        mutate(actual_original_id = cast(actual_original_id, utf8()), dataset = "ISAC") |>
+        inner_join(
+            meta |> select(actual_original_id, id) |> as_arrow_table(),
+            by = "actual_original_id",
+            relationship = "many-to-one"
+        ) |>
+        rename(station_id = id) |>
+        as_arrow_table()
 }
 
-load_daily_data.isac <- function() {
-    work_meta <- load_work_metadata()
-    work_data <- load_data(work_meta)
+load_daily_data.isac <- function(first_date, last_date) {
+    meta <- load_work_metadata()
+    data <- load_data(meta, first_date, last_date)
 
-    list("meta" = work_meta |> distinct(station_id, .keep_all = TRUE) |> as_arrow_table(), "data" = work_data |> as_arrow_table2(data_schema))
+    meta <- meta |>
+        distinct(dataset, id, .keep_all = TRUE) |>
+        as_arrow_table() |>
+        semi_join(data, join_by(dataset, id == station_id)) |>
+        compute()
+
+    list("meta" = meta, "data" = data)
 }
