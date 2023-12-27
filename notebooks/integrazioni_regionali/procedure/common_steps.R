@@ -4,6 +4,7 @@ library(zeallot, warn.conflicts = FALSE)
 
 source("src/database/tools.R")
 source("src/database/test.R")
+source("src/database/definitions.R")
 source("src/analysis/data/quality_check.R")
 source("src/analysis/data/clim_availability.R")
 source("src/pairing/matching.R")
@@ -15,6 +16,19 @@ source("notebooks/integrazioni_regionali/procedure/checkpoint.R")
 source("notebooks/integrazioni_regionali/procedure/plots.R")
 source("notebooks/integrazioni_regionali/procedure/tools.R")
 
+new_numeric_ids <- function(data_pack, new_dataset) {
+    data_pack$meta <- data_pack$meta |>
+        collect() |>
+        mutate(previous_id = as.character(id), id = row_number(), previous_dataset = dataset, dataset = new_dataset) |>
+        as_arrow_table()
+    data_pack$data <- data_pack$data |>
+        mutate(station_id = as.character(station_id)) |>
+        rename(previous_id = station_id, previous_dataset = dataset) |>
+        left_join(data_pack$meta |> select(station_id = id, previous_id, dataset, previous_dataset), by = c("previous_dataset", "previous_id")) |>
+        as_arrow_table2(data_schema)
+    data_pack
+}
+
 #' Keeps only the data relevant to the specified time period. Filters out stations that do not have data in the specified time period.
 #' Splits base station metadata and extra station metadata.
 #'
@@ -23,12 +37,28 @@ source("notebooks/integrazioni_regionali/procedure/tools.R")
 #' @param .end The end date of the period to be kept (inclusive).
 #'
 #' @return A database containing only the data relevant to the specified time period and the extra metadata table.
-prepare_daily_data <- function(data_pack, .start, .end) {
-    data_pack$data <- filter(data_pack$data, .start <= date & date <= .end) |>
-        arrange(station_id, variable, date) |>
-        as_arrow_table2(data_schema)
+prepare_daily_data <- function(data_pack, dataset_name) {
+    data_pack <- new_numeric_ids(data_pack, dataset_name)
 
-    c(base_metadata, extra_metadata) %<-% split_station_metadata(semi_join(data_pack$meta, data_pack$data, by = "station_id"))
+    data_pack$data <- data_pack$data |>
+        arrange(dataset, station_id, variable, date) |>
+        compute()
+
+    date_stats <- data_pack$data |>
+        group_by(dataset, station_id) |>
+        summarize(
+            first_registration = min(date),
+            last_registration = max(date),
+            valid_days = as.integer(sum(!is.na(value)) / 2L),
+            .groups = "drop"
+        )
+
+    data_pack$meta <- data_pack$meta |>
+        semi_join(data_pack$data, join_by(dataset, id == station_id)) |>
+        left_join(date_stats, join_by(dataset, id == station_id), relationship = "one-to-one") |>
+        compute()
+
+    c(base_metadata, extra_metadata) %<-% split_station_metadata(data_pack$meta)
 
     list("database" = as_database(base_metadata, data_pack$data) |> assert_data_uniqueness() |> assert_metadata_uniqueness(), "extra_meta" = extra_metadata)
 }
@@ -44,7 +74,7 @@ qc1 <- function(database, minimum_exc = 0.05, maximum_exc = 50, stop_on_error = 
     database$data <- database$data |> compute()
 
     database$data |>
-        group_by(station_id, variable, date) |>
+        group_by(dataset, station_id, variable, date) |>
         tally() |>
         collect() |>
         verify(n == 1L)
@@ -55,15 +85,15 @@ qc1 <- function(database, minimum_exc = 0.05, maximum_exc = 50, stop_on_error = 
     original_length <- nrow(database$data)
 
     qc_data <- database$data |>
-        arrange(station_id, variable, date) |>
+        arrange(dataset, station_id, variable, date) |>
         gross_errors_check(value) |>
-        group_by(station_id, variable) |>
+        group_by(dataset, station_id, variable) |>
         collect() |>
         repeated_values_check() |>
         integer_streak_check(threshold = 8L) |>
         filter(!(qc_gross | qc_repeated | qc_int_streak)) |>
         select(!starts_with("qc_")) |>
-        pivot_wider(id_cols = c(station_id, date), names_from = variable, values_from = value) |>
+        pivot_wider(id_cols = c(dataset, station_id, date), names_from = variable, values_from = value) |>
         filter(minimum_exc < (T_MAX - T_MIN) & (T_MAX - T_MIN) < maximum_exc) |>
         pivot_longer(cols = c(T_MIN, T_MAX), names_to = "variable", values_to = "value") |>
         mutate(merged = FALSE) |>
@@ -79,8 +109,8 @@ qc1 <- function(database, minimum_exc = 0.05, maximum_exc = 50, stop_on_error = 
     }
 
     qc_stations <- database$meta |>
-        semi_join(qc_data, by = "station_id", relationship = "one-to-many") |>
-        assert(is_uniq, station_id) |>
+        semi_join(qc_data, join_by(id == station_id), relationship = "one-to-many") |>
+        assert(is_uniq, id) |>
         as_arrow_table2(station_schema)
 
     as_database(qc_stations, qc_data)
