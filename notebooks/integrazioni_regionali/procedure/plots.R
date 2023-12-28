@@ -6,16 +6,16 @@ source("src/analysis/data/clim_availability.R")
 
 plot_state_avail <- function(metadata, data, start_date = NULL, end_date = NULL, ...) {
     ymonthly_availabilities <- data |>
-        left_join(metadata |> select(station_id, dataset_id), by = "station_id") |>
+        left_join(metadata |> select(dataset, id), join_by(dataset, station_id == id)) |>
         collect() |>
-        as_tsibble(key = c(dataset_id, station_id, variable), index = date) |>
+        as_tsibble(key = c(dataset, station_id, variable), index = date) |>
         is_month_usable(value, .start = start_date, .end = end_date, groups = "drop", ...)
     p <- ymonthly_availabilities |>
-        arrange(dataset_id, variable, year_month) |>
-        group_by(dataset_id, variable) |>
+        arrange(dataset, variable, year_month) |>
+        group_by(dataset, variable) |>
         index_by(year_month) |>
         summarise(n_available_series = sum(available)) |>
-        ggplot(aes(year_month, n_available_series, color = dataset_id)) +
+        ggplot(aes(year_month, n_available_series, color = dataset)) +
         geom_line() +
         facet_grid(variable ~ .)
     list("plot" = p, "data" = ymonthly_availabilities)

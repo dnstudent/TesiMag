@@ -16,11 +16,11 @@ filter_checkpoint_inside <- function(database, region) {
         as_arrow_table2(station_schema)
     list(
         "meta" = meta,
-        "data" = database$data |> semi_join(meta, by = "station_id")
+        "data" = database$data |> semi_join(meta, join_by(dataset, station_id == id)) |> compute()
     )
 }
 
-concat_databases <- function(database.x, database.y, check = TRUE) {
+concat_databases <- function(database.x, database.y, check = FALSE) {
     meta <- concat_tables(database.x$meta |> compute(), database.y$meta |> compute(), unify_schemas = FALSE)
     data <- concat_tables(database.x$data |> compute(), database.y$data |> compute(), unify_schemas = FALSE)
     if (check) {
