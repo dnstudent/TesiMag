@@ -29,6 +29,10 @@ open_last_checkpoint <- function(dataset_id) {
     open_checkpoint(dataset_id, "last")
 }
 
+query_from_checkpoint <- function(datasets, tag) {
+    open_data(datasets, tag, provisional = TRUE) |> to_duckdb(table_name = "data_tmp")
+}
+
 #' Writes a match table to disk.
 save_match_list <- function(match_list, dataset_id, tag) {
     table_path <- file.path(base_path("matches", FALSE), dataset_id, paste0(tag, ".parquet"))
