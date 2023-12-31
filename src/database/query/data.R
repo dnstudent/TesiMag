@@ -16,10 +16,6 @@ query_from_connection <- function(stations, data_table_name, dataconn) {
     )
 }
 
-query_from_datasets <- function(datasets, tag) {
-    open_data(datasets, tag, provisional = TRUE) |> to_duckdb(table_name = "data_tmp")
-}
-
 #' Dplyr semi_join where the left table is a duckdb table and the tight table is not.
 #'
 #' @param x A duckdb table
@@ -28,10 +24,10 @@ query_from_datasets <- function(datasets, tag) {
 #' @param .table_name The name of the temporary table to create
 #'
 #' @return The semi_join of x and y
-semi_join.ddb <- function(x, y, ..., .table_name = "station_tmp") {
+semi_join.ddb <- function(x, y, ...) {
     y_tbl <- y |>
         as_arrow_table() |>
-        to_duckdb(con = x$src$con, table_name = .table_name)
+        to_duckdb(con = x$src$con, table_name = "station_tmp", auto_disconnect = FALSE)
 
     x |> semi_join(y_tbl, ...)
 }

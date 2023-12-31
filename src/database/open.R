@@ -21,6 +21,10 @@ open_data <- function(dataset_id, tag, provisional) {
     open_dataset(file.path(base_path("data", provisional), dataset_id, paste0(tag, ".parquet")))
 }
 
+query_checkpoint_data <- function(datasets, tag) {
+    open_data(datasets, tag, provisional = TRUE) |> to_duckdb(table_name = "data_tmp")
+}
+
 open_metadata <- function(dataset_id, tag, provisional) {
     open_dataset(file.path(base_path("metadata", provisional), dataset_id, paste0(tag, ".parquet")))
 }
