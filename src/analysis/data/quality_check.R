@@ -18,6 +18,10 @@ gross_errors_check.arrow_dplyr_query <- function(query, value_col, thresh = 50) 
     mutate(query, qc_gross = abs({{ value_col }}) >= thresh)
 }
 
+gross_errors_check.tbl_lazy <- function(query, value_col, thresh = 50) {
+    mutate(query, qc_gross = abs({{ value_col }}) >= thresh)
+}
+
 gross_errors_check.ArrowObject <- function(query, value_col, thresh = 50) {
     mutate(query, qc_gross = abs({{ value_col }}) >= thresh)
 }
@@ -80,6 +84,10 @@ repeated_values_check.data.frame <- function(data) {
         mutate(qc_repeated = repeated_values_check.numeric(value, 7))
 }
 
+repeated_values_check.tbl_sql <- function(conn, table_name) {
+    query <- readr::read_file("src/database/query/n_consecutive.sql") |> glue::glue_sql(.con = conn)
+}
+
 repeated_values_check <- function(x, ...) UseMethod("repeated_values_check", x)
 
 repeated_fraction_check.numeric <- function(x) {
@@ -93,6 +101,12 @@ repeated_fraction_check.data.frame <- function(data) {
     }
     data |>
         drop_na(value) |>
+        summarise(qc_repeated_fraction = repeated_fraction_check.numeric(value))
+}
+
+repeated_fraction_check.tbl_lazy <- function(data) {
+    data |>
+        filter(!is.na(value)) |>
         summarise(qc_repeated_fraction = repeated_fraction_check.numeric(value))
 }
 
@@ -122,6 +136,11 @@ integer_streak_check.data.frame <- function(data, threshold = 8L) {
     if (!is.grouped_df(data)) {
         warning("The data provided is not grouped. Is this intentional?")
     }
+    data |>
+        mutate(qc_int_streak = integer_streak_check.numeric(value, threshold))
+}
+
+integer_streak_check.tbl_lazy <- function(data, threshold = 8L) {
     data |>
         mutate(qc_int_streak = integer_streak_check.numeric(value, threshold))
 }

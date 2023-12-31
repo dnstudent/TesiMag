@@ -21,6 +21,22 @@ plot_state_avail <- function(metadata, data, start_date = NULL, end_date = NULL,
     list("plot" = p, "data" = ymonthly_availabilities)
 }
 
+plot_state_avail.tbl <- function(data, ...) {
+    ymonthly <- monthly_availabilities(data, ...) |> compute()
+
+    p <- ymonthly |>
+        group_by(dataset, variable, year, month) |>
+        summarise(available_series = sum(if_else(qc_month_available, 1L, 0L), na.rm = TRUE), .groups = "drop") |>
+        arrange(year, month) |>
+        collect() |>
+        mutate(yearmonth = make_yearmonth(year, month)) |>
+        as_tsibble(key = c(variable, dataset), index = yearmonth) |>
+        ggplot() +
+        geom_line(aes(yearmonth, available_series, color = dataset)) +
+        facet_grid(variable ~ .)
+    list("plot" = p, "data" = ymonthly)
+}
+
 climats_availabilities.arrow <- function(data, series_meta, station_meta, state, start_date, end_date) {
     state_boundaries <- load.italian_boundaries("state") |> filter(shapeName == state)
     climats_comp <- is_climatology_computable(

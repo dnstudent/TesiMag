@@ -11,7 +11,8 @@ add_ds_info <- function(infos) {
     name <- infos[[1]]
     source <- infos[[2]]
     kind <- infos[[3]]
-    dbExecute(conn, str_glue("INSERT INTO dataset (name, source, kind) VALUES ('{name}', '{source}', '{kind}') ON CONFLICT (name) DO NOTHING"))
+    description <- infos[[4]]
+    dbExecute(conn, str_glue("INSERT INTO dataset (name, source, kind, description) VALUES ('{name}', '{source}', '{kind}', '{description}') ON CONFLICT (name) DO NOTHING"))
     dbDisconnect(conn)
 }
 

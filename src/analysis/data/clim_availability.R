@@ -35,6 +35,15 @@ is_month_usable.tbl_ts <- function(data, variable, .start = NULL, .end = NULL, m
 
 is_month_usable <- function(x, ...) UseMethod("is_month_usable", x)
 
+monthly_availabilities.tbl <- function(table, minimum_valid_days = 20L, maximum_consecutive_missing_days = 4L) {
+    table |>
+        filter(!is.na(value)) |>
+        group_by(dataset, station_id, variable, month = as.integer(month(date)), year = as.integer(year(date))) |>
+        mutate(datediff = (as.integer(date - lag(date, order_by = date))) |> coalesce(1L)) |>
+        summarise(qc_month_available = (n() >= minimum_valid_days & max(datediff, na.rm = TRUE) <= maximum_consecutive_missing_days), .groups = "drop")
+}
+
+monthly_availabilities <- function(x, ...) UseMethod("monthly_availabilities", x)
 
 #' Assess the usability of a complete series of monthly availabilities (as returned by \code{is.month.usable}) for climate normal computation according to WMO standards
 #'
@@ -68,3 +77,12 @@ is_climatology_computable.series <- function(s1, s2, dates, max_na_days = 10, ma
 }
 
 is_climatology_computable <- function(x, ...) UseMethod("is_climatology_computable", x)
+
+clim_availability.tbl <- function(monthly_availabilities, n_years_threshold = 10L) {
+    monthly_availabilities |>
+        group_by(dataset, station_id, variable, month) |>
+        summarise(qc_clim_available = sum(if_else(qc_month_available, 1L, 0L), na.rm = TRUE) >= n_years_threshold, .groups = "drop_last") |>
+        summarise(qc_clim_available = all(qc_clim_available, na.rm = TRUE), .groups = "drop")
+}
+
+clim_availability <- function(x, ...) UseMethod("clim_availability", x)
