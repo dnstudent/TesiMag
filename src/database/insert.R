@@ -6,12 +6,11 @@ library(sf, warn.conflicts = FALSE)
 
 source("src/load/tools.R")
 
-add_ds_info <- function(infos) {
+add_ds_info <- function(name, infos) {
     conn <- dbConnect(Postgres(), dbname = "georefs")
-    name <- infos[[1]]
-    source <- infos[[2]]
-    kind <- infos[[3]]
-    description <- infos[[4]]
+    source <- infos[[1]]
+    kind <- infos[[2]]
+    description <- infos[[3]]
     dbExecute(conn, str_glue("INSERT INTO dataset (name, source, kind, description) VALUES ('{name}', '{source}', '{kind}', '{description}') ON CONFLICT (name) DO NOTHING"))
     dbDisconnect(conn)
 }

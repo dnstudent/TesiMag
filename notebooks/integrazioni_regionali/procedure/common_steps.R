@@ -120,33 +120,15 @@ qc1 <- function(database, minimum_exc = 0.05, maximum_exc = 50, stop_on_error = 
 }
 
 #' Produces the plot of year-monthly series availabilities (the number of available and usable series per year/month) and the table used to compute them.
+#' The plot is faceted by variable.
 #'
-#' @param station_list An Arrow Table containing the list of stations to be considered.
-#' @param daily_data_long An Arrow Table containing the data to be considered in standard data format.
-#' @param against An optional list containing either:
-#'  - the name of the dataset to be compared against (must have been processed with the standard approach);
-#'  - the stations and data to be compared against;
-#'  - NULL, in which case the function will only plot the availability of the specified data.
-#' @param inside An optional sf object containing the boundaries of the area to be considered.
-#' @param start_date The start date of the period to be considered (inclusive).
-#' @param end_date The end date of the period to be considered (inclusive).
-#' @param ... Additional arguments to be passed to is_month_usable.
+#' @param data The data to be used in standard data format.
+#' @param ... Additional arguments to be passed to monthly_availabilities (the availability thresholds).
 #'
 #' @return A list containing the plot and the data.
-ymonthly_availabilities <- function(database, against = NULL, region = NULL, chkp_id = "last", ...) {
-    if (is.character(against)) {
-        against <- open_checkpoint(against, chkp_id) |> filter_checkpoint_inside(region)
-    } else if (is.null(against)) {
-        return(
-            plot_state_avail.tbl(
-                database$data |> to_duckdb(),
-                ...
-            )
-        )
-    }
-    full_db <- concat_databases(database, against)$data |> to_duckdb()
+ymonthly_availabilities <- function(data, ...) {
     plot_state_avail.tbl(
-        full_db, ...
+        data, ...
     )
 }
 

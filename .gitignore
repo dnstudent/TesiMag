@@ -18,7 +18,7 @@ cache/
 missing*/
 db/
 db.old/
-stationsdb/*
+stationsdb/
 .env
 .Renviron
 .DS_Store

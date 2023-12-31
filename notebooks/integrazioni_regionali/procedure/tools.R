@@ -4,6 +4,16 @@ library(dplyr, warn.conflicts = FALSE)
 source("src/load/tools.R")
 source("src/database/tools.R")
 
+filter_inside <- function(metadata, boundaries) {
+    metadata |>
+        collect() |>
+        st_md_to_sf() |>
+        sf::st_filter(boundaries, .predicate = sf::st_within) |>
+        st::st_drop_geometry() |>
+        select(dataset, id) |>
+        as_arrow_table()
+}
+
 filter_checkpoint_inside <- function(database, region) {
     if (is.null(region)) {
         return(database)
