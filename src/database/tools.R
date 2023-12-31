@@ -97,3 +97,11 @@ gap_fill_database <- function(database, start_date, stop_date) {
         as_arrow_table2(data_schema)
     database
 }
+
+filter_inside <- function(metadata, shape) {
+    metadata |>
+        collect() |>
+        st_md_to_sf(remove = FALSE) |>
+        st_filter(shape, .predicate = st_within) |>
+        st_drop_geometry()
+}

@@ -1,4 +1,7 @@
 library(dplyr, warn.conflicts = FALSE)
+library(dbplyr, warn.conflicts = FALSE)
+library(arrow, warn.conflicts = FALSE)
+library(tidyr, warn.conflicts = FALSE)
 library(assertr, warn.conflicts = FALSE)
 library(zeallot, warn.conflicts = FALSE)
 
@@ -71,7 +74,7 @@ prepare_daily_data <- function(data_pack, dataset_name) {
 #'
 #' @return A database containing the quality checked data and the remaining stations metadata in standard database format.
 qc1 <- function(database, minimum_exc = 0.05, maximum_exc = 50, stop_on_error = TRUE) {
-    database$data <- database$data |> compute()
+    database$data <- database$data |> to_duckdb()
 
     database$data |>
         group_by(dataset, station_id, variable, date) |>
@@ -80,7 +83,8 @@ qc1 <- function(database, minimum_exc = 0.05, maximum_exc = 50, stop_on_error = 
         verify(n == 1L)
 
     database$meta |>
-        assert(is_uniq, station_id)
+        collect() |>
+        assert(is_uniq, id)
 
     original_length <- nrow(database$data)
 
@@ -88,7 +92,7 @@ qc1 <- function(database, minimum_exc = 0.05, maximum_exc = 50, stop_on_error = 
         arrange(dataset, station_id, variable, date) |>
         gross_errors_check(value) |>
         group_by(dataset, station_id, variable) |>
-        collect() |>
+        # collect() |>
         repeated_values_check() |>
         integer_streak_check(threshold = 8L) |>
         filter(!(qc_gross | qc_repeated | qc_int_streak)) |>
@@ -96,7 +100,7 @@ qc1 <- function(database, minimum_exc = 0.05, maximum_exc = 50, stop_on_error = 
         pivot_wider(id_cols = c(dataset, station_id, date), names_from = variable, values_from = value) |>
         filter(minimum_exc < (T_MAX - T_MIN) & (T_MAX - T_MIN) < maximum_exc) |>
         pivot_longer(cols = c(T_MIN, T_MAX), names_to = "variable", values_to = "value") |>
-        mutate(merged = FALSE) |>
+        to_arrow() |>
         as_arrow_table2(data_schema)
 
     if ((nrow(qc_data) / original_length) < 0.9) {
@@ -109,8 +113,7 @@ qc1 <- function(database, minimum_exc = 0.05, maximum_exc = 50, stop_on_error = 
     }
 
     qc_stations <- database$meta |>
-        semi_join(qc_data, join_by(id == station_id), relationship = "one-to-many") |>
-        assert(is_uniq, id) |>
+        semi_join(qc_data, join_by(dataset, id == station_id), relationship = "one-to-many") |>
         as_arrow_table2(station_schema)
 
     as_database(qc_stations, qc_data)
@@ -130,42 +133,35 @@ qc1 <- function(database, minimum_exc = 0.05, maximum_exc = 50, stop_on_error = 
 #' @param ... Additional arguments to be passed to is_month_usable.
 #'
 #' @return A list containing the plot and the data.
-ymonthly_availabilities <- function(database, against = NULL, region = NULL, chkp_id = "last", start_date = NULL, end_date = NULL, ...) {
+ymonthly_availabilities <- function(database, against = NULL, region = NULL, chkp_id = "last", ...) {
     if (is.character(against)) {
         against <- open_checkpoint(against, chkp_id) |> filter_checkpoint_inside(region)
     } else if (is.null(against)) {
         return(
-            plot_state_avail(
-                database$meta,
-                database$data,
-                start_date,
-                end_date
+            plot_state_avail.tbl(
+                database$data |> to_duckdb(),
+                ...
             )
         )
     }
-    full_db <- concat_databases(database, against)
-    plot_state_avail(
-        full_db$meta,
-        full_db$data,
-        start_date,
-        end_date
+    full_db <- concat_databases(database, against)$data |> to_duckdb()
+    plot_state_avail.tbl(
+        full_db, ...
     )
 }
 
 #' Produces the table and plot of spatial series availabilities.
 spatial_availabilities <- function(ymonthly_avail, stations, map, ...) {
-    spatav <- ymonthly_avail |>
-        is_climatology_computable(available, .start = start_date, .end = end_date, monthly_usabilities = TRUE, ...) |>
-        ungroup()
+    spatav <- clim_availability(ymonthly_avail, ...) |>
+        collect()
+
     p <- ggplot() +
         geom_sf(data = map) +
         geom_sf(
             data = spatav |>
-                group_by_key() |>
-                summarise(global_availability = all(clim_available)) |>
-                left_join(stations |> select(station_id, lon, lat) |> collect(), by = "station_id") |>
+                left_join(stations |> select(dataset, id, lon, lat) |> collect(), join_by(dataset, station_id == id)) |>
                 st_md_to_sf(),
-            aes(color = global_availability, shape = dataset_id)
+            aes(color = qc_clim_available, shape = dataset)
         )
     list("plot" = p, "data" = spatav)
 }

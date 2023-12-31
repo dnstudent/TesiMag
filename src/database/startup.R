@@ -60,18 +60,18 @@ library(RPostgres, warn.conflicts = FALSE)
 # }
 
 load_dbs <- function() {
-    connquack <- dbConnect(duckdb(), "db/tesidb.duckdb")
-    dbExecute(
-        connquack,
-        "
-        INSTALL spatial;
-        LOAD spatial;
-        INSTALL arrow;
-        LOAD arrow;
-        "
-    )
+    # connquack <- dbConnect(duckdb(), "db/tesidb.duckdb")
+    # dbExecute(
+    #     connquack,
+    #     "
+    #     INSTALL spatial;
+    #     LOAD spatial;
+    #     INSTALL arrow;
+    #     LOAD arrow;
+    #     "
+    # )
     connpost <- dbConnect(Postgres(), dbname = "georefs", user = "davidenicoli", host = "localhost")
-    list(stations = connpost, data = connquack)
+    list(stations = connpost, data = NULL)
 }
 
 close_dbs <- function(conns) {
