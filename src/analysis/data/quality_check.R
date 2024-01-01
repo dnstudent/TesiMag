@@ -1,6 +1,6 @@
 library(dplyr, warn.conflicts = FALSE)
 
-# Tests for single series errors in data.
+# Tests for single series errors in data. A result of FALSE means that the value is an error.
 
 
 # Function: gross_errors_check.numeric
@@ -11,19 +11,19 @@ library(dplyr, warn.conflicts = FALSE)
 # Returns:
 #   TRUE if the value is considered a gross error, FALSE otherwise.
 gross_errors_check.numeric <- function(value, thresh = 50) {
-    abs(value) >= thresh
+    abs(value) < thresh
 }
 
 gross_errors_check.arrow_dplyr_query <- function(query, value_col, thresh = 50) {
-    mutate(query, qc_gross = abs({{ value_col }}) >= thresh)
+    mutate(query, qc_gross = abs({{ value_col }}) < thresh)
 }
 
 gross_errors_check.tbl_lazy <- function(query, value_col, thresh = 50) {
-    mutate(query, qc_gross = abs({{ value_col }}) >= thresh)
+    mutate(query, qc_gross = abs({{ value_col }}) < thresh)
 }
 
 gross_errors_check.ArrowObject <- function(query, value_col, thresh = 50) {
-    mutate(query, qc_gross = abs({{ value_col }}) >= thresh)
+    mutate(query, qc_gross = abs({{ value_col }}) < thresh)
 }
 
 
@@ -69,7 +69,7 @@ gross_errors_check <- function(x, ...) UseMethod("gross_errors_check", x)
 #'
 repeated_values_check.numeric <- function(x, threshold) {
     rles <- rle(x)
-    rles$values <- rles$lengths >= threshold
+    rles$values <- rles$lengths < threshold
     inverse.rle(rles)
 }
 
@@ -82,10 +82,6 @@ repeated_values_check.data.frame <- function(data) {
         drop_na(value) |>
         arrange(date, .by_group = TRUE) |>
         mutate(qc_repeated = repeated_values_check.numeric(value, 7))
-}
-
-repeated_values_check.tbl_sql <- function(conn, table_name) {
-    query <- readr::read_file("src/database/query/n_consecutive.sql") |> glue::glue_sql(.con = conn)
 }
 
 repeated_values_check <- function(x, ...) UseMethod("repeated_values_check", x)
@@ -128,7 +124,7 @@ integers_fraction_check <- function(x, ...) UseMethod("integers_fraction_check",
 
 integer_streak_check.numeric <- function(x, threshold) {
     rles <- rle(abs(x - trunc(x)) <= 1e-4)
-    rles$values <- (rles$values & (rles$lengths >= threshold))
+    rles$values <- (rles$values & (rles$lengths < threshold))
     inverse.rle(rles)
 }
 
