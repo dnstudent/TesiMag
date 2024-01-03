@@ -7,6 +7,14 @@ library(tidyr, warn.conflicts = FALSE)
 source("src/paths/paths.R")
 source("src/database/tools.R")
 
+dataset_spec <- function() {
+    list(
+        "https://www.osmer.fvg.it/archivio.php?ln=&p=dati",
+        "regional",
+        "Dataset di ARPA Friuli. Aggregazioni a passo giornaliero."
+    )
+}
+
 path.base <- file.path(path.ds, "ARPA", "FVG")
 
 load_metadata <- function() {
@@ -21,34 +29,33 @@ load_metadata <- function() {
             elevation = "d"
         )
     ) |>
-        rename(original_id = station_code) |>
-        mutate(dataset_id = "ARPAFVG", state = "Friuli-Venezia Giulia", network = "ARPAFVG") |>
-        mutate(station_id = as.character(row_number())) |>
-        name_stations()
+        as_tibble() |>
+        rename(id = station_code, name = station_name) |>
+        mutate(dataset = "ARPAFVG", state = "Friuli-Venezia Giulia", network = "ARPAFVG")
 }
 
-load_data <- function() {
+load_data <- function(first_date, last_date) {
     path.data <- file.path(path.base, "dataset")
     # Ho valutato se pescare anche la T media per fare delle correzioni, ma meglio evitare mischiotti
     open_dataset(path.data) |>
-        rename(original_id = stazione, T_MIN = `Temp. min gradi C`, T_MAX = `Temp. max gradi C`) |>
-        select(T_MIN, T_MAX, original_id, date) |>
-        mutate(original_id = cast(original_id, utf8())) |>
-        filter(!(is.na(T_MIN) & is.na(T_MAX))) |>
-        collect() |>
+        rename(station_id = stazione, T_MIN = `Temp. min gradi C`, T_MAX = `Temp. max gradi C`) |>
+        select(T_MIN, T_MAX, station_id, date) |>
+        mutate(station_id = cast(station_id, utf8())) |>
+        to_duckdb() |>
         pivot_longer(cols = c(T_MIN, T_MAX), names_to = "variable", values_to = "value") |>
-        mutate(merged = FALSE)
+        filter(!is.na(value), first_date <= date & date <= last_date) |>
+        mutate(dataset = "ARPAFVG") |>
+        to_arrow() |>
+        compute()
 }
 
-load_daily_data.arpafvg <- function() {
+load_daily_data.arpafvg <- function(first_date, last_date) {
     meta <- load_metadata()
-    data <- load_data() |>
-        left_join(meta |> select(original_id, station_id), by = "original_id") |>
-        select(-original_id)
+    data <- load_data(first_date, last_date)
 
-    if (data |> duplicates(key = c(station_id, variable), index = date) |> nrow() > 0) {
+    if (data |> group_by(station_id, variable, date) |> tally() |> filter(n > 1L) |> compute() |> nrow() > 0) {
         stop("Duplicated values")
     }
 
-    list("meta" = meta |> as_arrow_table(), "data" = data |> as_arrow_table2(data_schema))
+    list("meta" = meta |> as_arrow_table(), "data" = data)
 }
