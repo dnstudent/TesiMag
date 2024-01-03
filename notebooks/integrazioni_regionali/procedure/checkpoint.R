@@ -20,7 +20,7 @@ checkpoint_database <- function(database, dataset_id, tag) {
 
 open_checkpoint <- function(dataset_id, tag) {
     list(
-        "meta" = read_metadata(dataset_id, tag, provisional = TRUE),
+        "meta" = open_metadata(dataset_id, tag, provisional = TRUE),
         "data" = open_data(dataset_id, tag, provisional = TRUE)
     ) |> as_database()
 }

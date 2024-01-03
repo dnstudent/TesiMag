@@ -9,7 +9,7 @@ assert_data_uniqueness <- function(database) {
         filter(n > 1L) |>
         compute() |>
         nrow() > 0L) {
-        stop("Database entries are not unique")
+        stop("Data entries are not unique")
     }
     database
 }
@@ -21,7 +21,7 @@ assert_metadata_uniqueness <- function(database) {
         filter(n > 1L) |>
         compute() |>
         nrow() > 0L) {
-        stop("Database entries are not unique")
+        stop("Metadata entries are not unique")
     }
     database
 }

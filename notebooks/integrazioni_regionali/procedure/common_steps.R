@@ -27,7 +27,7 @@ new_numeric_ids <- function(data_pack, new_dataset) {
     data_pack$data <- data_pack$data |>
         mutate(station_id = as.character(station_id)) |>
         rename(previous_id = station_id, previous_dataset = dataset) |>
-        left_join(data_pack$meta |> select(station_id = id, previous_id, dataset, previous_dataset), by = c("previous_dataset", "previous_id")) |>
+        left_join(data_pack$meta |> select(station_id = id, previous_id, dataset, previous_dataset), by = c("previous_id")) |>
         as_arrow_table2(data_schema)
     data_pack
 }
@@ -44,6 +44,7 @@ prepare_daily_data <- function(data_pack, dataset_name) {
     data_pack <- new_numeric_ids(data_pack, dataset_name)
 
     data_pack$data <- data_pack$data |>
+        filter(!is.na(value)) |>
         arrange(dataset, station_id, variable, date) |>
         compute()
 

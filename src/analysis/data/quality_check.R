@@ -74,17 +74,43 @@ repeated_values_check.numeric <- function(x, threshold) {
 }
 
 #' Tests for repeated or missing values in data: if 'value' is constant or missing for seven consecutive days, it is flagged. WATCH OUT: GAPS SHOULD NOT BE FILLED
-repeated_values_check.data.frame <- function(data) {
+repeated_values_check.data.frame <- function(data, threshold = 8L) {
     if (!is.grouped_df(data)) {
         warning("The data provided is not grouped. Is this intentional?")
     }
     data |>
         drop_na(value) |>
         arrange(date, .by_group = TRUE) |>
-        mutate(qc_repeated = repeated_values_check.numeric(value, 7))
+        mutate(qc_repeated = repeated_values_check.numeric(value, threshold))
 }
 
 repeated_values_check <- function(x, ...) UseMethod("repeated_values_check", x)
+
+integer_streak_check.numeric <- function(x, threshold) {
+    rles <- rle(abs(x - trunc(x)) <= 1e-4)
+    rles$values <- !(rles$values & (rles$lengths >= threshold))
+    inverse.rle(rles)
+}
+
+integer_streak_check.data.frame <- function(data, threshold = 8L) {
+    if (!is.grouped_df(data)) {
+        warning("The data provided is not grouped. Is this intentional?")
+    }
+    data |>
+        drop_na(value) |>
+        mutate(qc_int_streak = integer_streak_check.numeric(value, threshold))
+}
+
+integer_streak_check.tbl_lazy <- function(data, threshold = 8L) {
+    data |>
+        filter(!is.na(value)) |>
+        mutate(qc_int_streak = integer_streak_check.numeric(value, threshold))
+}
+
+integer_streak_check <- function(x, ...) UseMethod("integer_streak_check", x)
+
+
+# QC as summaries
 
 repeated_fraction_check.numeric <- function(x) {
     rles <- rle(x)
@@ -121,24 +147,3 @@ integers_fraction_check.data.frame <- function(data) {
 }
 
 integers_fraction_check <- function(x, ...) UseMethod("integers_fraction_check", x)
-
-integer_streak_check.numeric <- function(x, threshold) {
-    rles <- rle(abs(x - trunc(x)) <= 1e-4)
-    rles$values <- (rles$values & (rles$lengths < threshold))
-    inverse.rle(rles)
-}
-
-integer_streak_check.data.frame <- function(data, threshold = 8L) {
-    if (!is.grouped_df(data)) {
-        warning("The data provided is not grouped. Is this intentional?")
-    }
-    data |>
-        mutate(qc_int_streak = integer_streak_check.numeric(value, threshold))
-}
-
-integer_streak_check.tbl_lazy <- function(data, threshold = 8L) {
-    data |>
-        mutate(qc_int_streak = integer_streak_check.numeric(value, threshold))
-}
-
-integer_streak_check <- function(x, ...) UseMethod("integer_streak_check", x)
