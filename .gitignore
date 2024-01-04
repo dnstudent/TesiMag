@@ -16,6 +16,7 @@ temp/
 cache/
 missing*/
 db/
+!init_db.ipynb
 db.old/
 stationsdb/
 .env
