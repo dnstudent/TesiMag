@@ -1,22 +1,23 @@
+CREATE TABLE qc1 AS
 WITH
 excursion_checked AS (
     UNPIVOT(
         SELECT *,
-            (tmax - tmin) IS NULL OR (0 < tmax - tmin AND tmax - tmin < 50) AS qc_excursion
+            (T_MAX - T_MIN) IS NULL OR (0 < T_MAX - T_MIN AND T_MAX - T_MIN < 50) AS qc_excursion
         FROM (
             PIVOT {`table_name`}
             ON variable
-            USING 'value'
+            USING first(value)
         )
     )
-    ON tmin, tmax
+    ON T_MIN, T_MAX
     INTO
-        NAME variable,
-        VALUE "value"
+        NAME variable
+        VALUE value
 ),
 with_integers AS (
     SELECT *,
-        abs("value" - trunc("value")) < 0.0001 AS is_integer
+        abs(value - trunc(value)) < 0.0001 AS is_integer
     FROM excursion_checked
 ),
 with_changed_group AS (
@@ -24,7 +25,7 @@ with_changed_group AS (
         COALESCE(
             CASE
                 WHEN
-                abs("value" - LAG("value") OVER same_series) < 0.0001
+                abs(value - LAG(value) OVER same_series) < 0.0001
                 THEN 0
                 ELSE 1
             END,
@@ -41,10 +42,10 @@ with_changed_group AS (
         ) AS is_not_consecutive_int,
     FROM with_integers
     WINDOW same_series AS (
-        PARTITION BY dataset,
+        PARTITION BY
         station_id,
         variable
-        ORDER BY "date"
+        ORDER BY date
     )
 ),
 group_id AS (
@@ -53,18 +54,23 @@ group_id AS (
         SUM(is_not_consecutive_int) OVER same_series as consecutive_int_gid
     FROM with_changed_group
     WINDOW same_series AS (
-        PARTITION BY dataset,
+        PARTITION BY
         station_id,
         variable
         ORDER BY "date"
     )
 )
-SELECT * EXCLUDE (consecutive_val_gid, consecutive_int_gid),
-    ABS("value") < ? AS qc_gross_error,
-    COUNT(*) OVER (PARTITION BY dataset, station_id, variable, consecutive_val_gid) < ? AS qc_consecutive_value,
-    COUNT(*) OVER (PARTITION BY dataset, station_id, variable, consecutive_int_gid) < ? AS qc_consecutive_int,
-FROM group_id
-ORDER BY dataset,
+SELECT
     station_id,
     variable,
-    "date"
+    date,
+    value,
+    ABS(value) < ? AS qc_gross_error,
+    qc_excursion,
+    COUNT(*) OVER (PARTITION BY station_id, variable, consecutive_val_gid) < ? AS qc_consecutive_value,
+    COUNT(*) OVER (PARTITION BY station_id, variable, consecutive_int_gid) < ? AS qc_consecutive_int,
+FROM group_id
+ORDER BY 
+    station_id,
+    variable,
+    date
