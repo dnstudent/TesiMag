@@ -74,51 +74,51 @@ prepare_daily_data <- function(data_pack, dataset_name) {
 #' @param maximum_exc The maximum temperature excursions to be considered. The default value was chosen based on SCIA's data. It could be improved.
 #'
 #' @return A database containing the quality checked data and the remaining stations metadata in standard database format.
-qc1 <- function(database, minimum_exc = 0.05, maximum_exc = 50, stop_on_error = TRUE) {
-    database$data <- database$data |> to_duckdb()
-
-    database$data |>
-        group_by(dataset, station_id, variable, date) |>
-        tally() |>
-        collect() |>
-        verify(n == 1L)
-
-    database$meta |>
-        collect() |>
-        assert(is_uniq, id)
-
-    original_length <- nrow(database$data)
-
-    qc_data <- database$data |>
-        arrange(dataset, station_id, variable, date) |>
-        gross_errors_check(value) |>
-        group_by(dataset, station_id, variable) |>
-        # collect() |>
-        repeated_values_check() |>
-        integer_streak_check(threshold = 8L) |>
-        filter(!(qc_gross | qc_repeated | qc_int_streak)) |>
-        select(!starts_with("qc_")) |>
-        pivot_wider(id_cols = c(dataset, station_id, date), names_from = variable, values_from = value) |>
-        filter(minimum_exc < (T_MAX - T_MIN) & (T_MAX - T_MIN) < maximum_exc) |>
-        pivot_longer(cols = c(T_MIN, T_MAX), names_to = "variable", values_to = "value") |>
-        to_arrow() |>
-        as_arrow_table2(data_schema)
-
-    if ((nrow(qc_data) / original_length) < 0.9) {
-        if (stop_on_error) {
-            fn <- stop
-        } else {
-            fn <- warn
-        }
-        fn("The resulting dataset has an unusually small number of elements wrt to the original")
-    }
-
-    qc_stations <- database$meta |>
-        semi_join(qc_data, join_by(dataset, id == station_id), relationship = "one-to-many") |>
-        as_arrow_table2(station_schema)
-
-    as_database(qc_stations, qc_data)
-}
+# qc1 <- function(database, minimum_exc = 0.05, maximum_exc = 50, stop_on_error = TRUE) {
+#     database$data <- database$data |> to_duckdb()
+#
+#     database$data |>
+#         group_by(dataset, station_id, variable, date) |>
+#         tally() |>
+#         collect() |>
+#         verify(n == 1L)
+#
+#     database$meta |>
+#         collect() |>
+#         assert(is_uniq, id)
+#
+#     original_length <- nrow(database$data)
+#
+#     qc_data <- database$data |>
+#         arrange(dataset, station_id, variable, date) |>
+#         gross_errors_check(value) |>
+#         group_by(dataset, station_id, variable) |>
+#         # collect() |>
+#         repeated_values_check() |>
+#         integer_streak_check(threshold = 8L) |>
+#         filter(!(qc_gross | qc_repeated | qc_int_streak)) |>
+#         select(!starts_with("qc_")) |>
+#         pivot_wider(id_cols = c(dataset, station_id, date), names_from = variable, values_from = value) |>
+#         filter(minimum_exc < (T_MAX - T_MIN) & (T_MAX - T_MIN) < maximum_exc) |>
+#         pivot_longer(cols = c(T_MIN, T_MAX), names_to = "variable", values_to = "value") |>
+#         to_arrow() |>
+#         as_arrow_table2(data_schema)
+#
+#     if ((nrow(qc_data) / original_length) < 0.9) {
+#         if (stop_on_error) {
+#             fn <- stop
+#         } else {
+#             fn <- warn
+#         }
+#         fn("The resulting dataset has an unusually small number of elements wrt to the original")
+#     }
+#
+#     qc_stations <- database$meta |>
+#         semi_join(qc_data, join_by(dataset, id == station_id), relationship = "one-to-many") |>
+#         as_arrow_table2(station_schema)
+#
+#     as_database(qc_stations, qc_data)
+# }
 
 #' Produces the plot of year-monthly series availabilities (the number of available and usable series per year/month) and the table used to compute them.
 #' The plot is faceted by variable.

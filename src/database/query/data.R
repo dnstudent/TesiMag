@@ -31,3 +31,21 @@ semi_join.ddb <- function(x, y, ...) {
 
     x |> semi_join(y_tbl, ...)
 }
+
+valid_data <- function(dataconn) {
+    tbl(conns$data, "qc1") |>
+        filter(qc_gross_error & qc_excursion & qc_consecutive_value & qc_consecutive_int) |>
+        select(!starts_with("qc_"))
+}
+
+valid_series <- function(valid_data) {
+    valid_data |> distinct(station_id, variable)
+}
+
+series_matches <- function(valid_series, station_matches, asymmetric = TRUE) {
+    station_matches |>
+        cross_join(tibble(variable = c("T_MIN", "T_MAX")), copy = TRUE) |>
+        semi_join(valid_series, by = c("id_x" = "station_id", "variable")) |>
+        semi_join(valid_series, by = c("id_y" = "station_id", "variable")) |>
+        filter((id_x < id_y & asymmetric) | !asymmetric)
+}

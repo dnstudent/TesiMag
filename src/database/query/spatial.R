@@ -6,7 +6,7 @@ query_boundary <- function(conn, name, kind) {
     st_read(conn, query = stringr::str_glue("SELECT * FROM boundary WHERE name = '{name}' AND kind = '{kind}'"), geometry_column = "geom")
 }
 
-query_stations_inside <- function(statconn, shape_name) {
+query_stations_inside <- function(statconn, shape_name, buffer = 0) {
     query <- glue::glue_sql(
         "SELECT dataset, id
         FROM station s
