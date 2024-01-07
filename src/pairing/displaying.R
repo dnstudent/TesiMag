@@ -14,50 +14,45 @@ clean_from <- function(analysis_table, matched) {
         anti_join(matched, by = c("variable", "series_id.x")) |>
         anti_join(matched, by = c("variable", "series_id.y"))
 }
-write_xslx_analysis <- function(analysis_list, to, ...) {
-    analysis_list <- analysis_list |> select(
+write_xslx_analysis <- function(analysis, to, ...) {
+    analysis <- analysis |> select(
         variable,
         offset_days,
-        # starts_with("station_id"),
-        starts_with("station_name"),
+        starts_with("id"),
+        starts_with("name"),
         starts_with("network"),
         strSym,
-        H,
+        H = elevation_x,
         delH,
-        delZ,
+        delZm,
+        delZsec,
         distance,
         f0,
-        # fsemiside,
         fsameint,
         delT,
-        # maem1,
         maeT,
-        # maep1,
         monthlydelT,
         monthlymaeT,
-        # minilap,
         valid_days_union,
         valid_days_inters,
-        all_filter, ...
+        qc_clim_available, ...
     )
-    class(analysis_list$strSym) <- "percentage"
-    class(analysis_list$f0) <- "percentage"
-    # class(analysis_list$fsemiside) <- "percentage"
-    class(analysis_list$fsameint) <- "percentage"
-    # class(analysis_list$minilap) <- "percentage"
+    class(analysis$strSym) <- "percentage"
+    class(analysis$f0) <- "percentage"
+    class(analysis$fsameint) <- "percentage"
     wb <- createWorkbook()
     addWorksheet(wb, "data")
-    writeDataTable(wb, 1, analysis_list)
+    writeDataTable(wb, 1, analysis)
 
     integer_style <- createStyle(numFmt = "0")
-    addStyle(wb, 1, integer_style, rows = 1:5000, cols = 8:11, gridExpand = TRUE)
+    addStyle(wb, 1, integer_style, rows = 1:5000, cols = 10:14, gridExpand = TRUE)
 
     prec2_style <- createStyle(numFmt = "0.00")
-    addStyle(wb, 1, prec2_style, rows = 1:5000, cols = 14:17, gridExpand = TRUE)
+    addStyle(wb, 1, prec2_style, rows = 1:5000, cols = 17:20, gridExpand = TRUE)
 
     outTStyle <- createStyle(fontColour = "#9C0006", bgFill = "#FFC7CE")
-    conditionalFormatting(wb, 1, cols = c(14, 17), rows = 1:5000, rule = "<-0.5", style = outTStyle)
-    conditionalFormatting(wb, 1, cols = c(14, 17), rows = 1:5000, rule = ">0.5", style = outTStyle)
+    conditionalFormatting(wb, 1, cols = c(17, 20), rows = 1:5000, rule = "<-0.5", style = outTStyle)
+    conditionalFormatting(wb, 1, cols = c(17, 20), rows = 1:5000, rule = ">0.5", style = outTStyle)
 
     saveWorkbook(wb, to, overwrite = TRUE)
 }
