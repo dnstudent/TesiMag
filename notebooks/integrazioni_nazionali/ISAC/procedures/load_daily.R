@@ -4,16 +4,16 @@ source("src/database/definitions.R")
 
 dataset_spec <- function() {
     list(
-        "ISAC",
         "locale",
-        "national"
+        "national",
+        "Dataset DPC+? fornito da Michele Brunetti. Utilizzo la versione qc con era5. Probabilmente per varie regioni registra gli estremi delle medie orarie, invece che gli estremi giornalieri."
     )
 }
 
 load_work_metadata <- function() {
-    tmin <- read.BRUN.metadata("T_MIN", "raw") |>
+    tmin <- read.BRUN.metadata("T_MIN", "qc_era5") |>
         mutate(identifier = as.character(identifier), id = str_replace(identifier, regex("^(TMND_)|(TN_)"), ""))
-    tmax <- read.BRUN.metadata("T_MAX", "raw") |>
+    tmax <- read.BRUN.metadata("T_MAX", "qc_era5") |>
         mutate(identifier = as.character(identifier), id = str_replace(identifier, regex("^(TMXD_)|(TX_)"), ""))
 
     bind_rows(
@@ -26,10 +26,10 @@ load_work_metadata <- function() {
 }
 
 load_data <- function(meta, first_date, last_date) {
-    tmin <- read.BRUN.series("T_MIN", "raw") |>
+    tmin <- read.BRUN.series("T_MIN", "qc_era5") |>
         rename(value = T_MIN)
 
-    tmax <- read.BRUN.series("T_MAX", "raw") |>
+    tmax <- read.BRUN.series("T_MAX", "qc_era5") |>
         rename(value = T_MAX)
 
     bind_rows(

@@ -62,9 +62,9 @@ prepare_daily_data <- function(data_pack, dataset_name) {
         left_join(date_stats, join_by(dataset, id == station_id), relationship = "one-to-one") |>
         compute()
 
-    c(base_metadata, extra_metadata) %<-% split_station_metadata(data_pack$meta)
+    split <- split_station_metadata(data_pack$meta)
 
-    list("database" = as_database(base_metadata, data_pack$data) |> assert_data_uniqueness() |> assert_metadata_uniqueness(), "extra_meta" = extra_metadata)
+    list("database" = as_database(split[[1]], data_pack$data) |> assert_data_uniqueness() |> assert_metadata_uniqueness(), "extra_meta" = split[[2]])
 }
 
 #' Performs quality checks on the data and returns a list containing the data and the metadata.
