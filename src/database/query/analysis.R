@@ -26,7 +26,7 @@ source("src/database/query/pairing.R")
 # - date: the date of the measurement
 # - value: the value of the measurement
 
-climatology_statistics <- function(paired_series, minimum_valid_days = 20L, maximum_consecutive_missing_days = 4L, n_years_threshold = 10L) {
+climatology_avail_statistics <- function(paired_series, minimum_valid_days = 20L, maximum_consecutive_missing_days = 4L, n_years_threshold = 10L) {
     paired_series |>
         mutate(value = na_if(!is.na(value_x) | !is.na(value_y), FALSE)) |>
         select(id_x, id_y, variable, date, value) |>
@@ -34,6 +34,20 @@ climatology_statistics <- function(paired_series, minimum_valid_days = 20L, maxi
         monthly_availabilities.grouped(minimum_valid_days, maximum_consecutive_missing_days) |>
         group_by(id_x, id_y, variable, month) |>
         clim_availability.grouped(n_years_threshold)
+}
+
+climatic_statistics <- function(paired_series) {
+    paired_series |>
+        group_by(id_x, id_y, variable, month = month(date)) |>
+        summarise(value_x = mean(value_x, na.rm = TRUE), value_y = mean(value_y, na.rm = TRUE), .groups = "drop") |>
+        mutate(difference = value_y - value_x) |>
+        group_by(id_x, id_y, variable) |>
+        summarise(
+            climaticdelT = mean(difference, na.rm = TRUE),
+            climaticmaeT = mean(abs(difference), na.rm = TRUE),
+            climaticsdT = sd(difference, na.rm = TRUE),
+            .groups = "drop"
+        )
 }
 
 yearmonthly_statistics <- function(paired_series) {
@@ -87,7 +101,8 @@ metadata_analysis <- function(series_matches, metadata) {
 
 series_matches_analysis <- function(series_matches, data, metadata, ...) {
     dbExecute(data$src$con, "DROP TABLE IF EXISTS paired_series")
-    matches_offsets <- lag_analysis(data, series_matches, c(-1L, 0L, 1L)) |> left_join(series_matches, by = c("id_x", "id_y", "variable"))
+    matches_offsets <- lag_analysis(data, series_matches, c(-1L, 0L, 1L)) |>
+        left_join(series_matches, by = c("id_x", "id_y", "variable"), relationship = "one-to-one")
     matches_offsets <- copy_to(data$src$con, matches_offsets, overwrite = TRUE)
     # matches_offsets <- duckdb::duckdb_register(data$src$con, "matches_offsets", matches_offsets)
     paired_series <- pair_full_series(data, matches_offsets) |>
@@ -97,12 +112,15 @@ series_matches_analysis <- function(series_matches, data, metadata, ...) {
 
     ds <- daily_statistics(paired_series)
     ys <- yearmonthly_statistics(paired_series)
-    cs <- climatology_statistics(paired_series, ...)
+    cs <- climatic_statistics(paired_series)
+    csa <- climatology_avail_statistics(paired_series, ...)
     md <- metadata_analysis(matches_offsets, metadata)
+
 
     analysis <- ds |>
         full_join(ys, by = c("id_x", "id_y", "variable")) |>
         full_join(cs, by = c("id_x", "id_y", "variable")) |>
+        full_join(csa, by = c("id_x", "id_y", "variable")) |>
         full_join(md, by = c("id_x", "id_y", "variable")) |>
         collect()
 

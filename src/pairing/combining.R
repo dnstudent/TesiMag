@@ -2,6 +2,7 @@ library(arrow, warn.conflicts = FALSE)
 library(dplyr, warn.conflicts = FALSE)
 library(stringi, warn.conflicts = FALSE)
 library(zeallot, warn.conflicts = FALSE)
+library(igraph, warn.conflicts = FALSE)
 
 source("src/database/write.R")
 
@@ -174,4 +175,41 @@ concat_merged_and_unmerged <- function(merged_data, whole_database, approved_mat
     }
 
     as_database.ArrowTabular(concat_meta, concat_data)
+}
+
+vertices_groups <- function(graph) {
+    mmb <- components(g, mode = "weak")$membership
+    tibble(id = names(mmb), gid = unname(mmb))
+}
+
+graph_from_isedge <- function(matches, is_edge_variable) {
+    matches |>
+        filter({{ is_edge_variable }}) |>
+        select(id_x, id_y) |>
+        mutate(across(everything(), as.character)) |>
+        as.matrix() |>
+        graph_from_edgelist(directed = FALSE)
+}
+
+group_series_matches <- function(series_matches) {
+    if (distinct(series_matches, variable) |> nrow() > 1L) {
+        stop("The series matches must all be for the same variable")
+    }
+    edges <- series_matches |>
+        select(id_x, id_y, tag_same_station, tag_mergeable) |>
+        mutate(edge_same_station = tag_same_station, edge_mergeable = tag_same_station & tag_mergeable, .keep = "unused")
+
+    same_station_graph <- graph_using_edge(edges, edge_same_station)
+    merge_graph <- graph_using_edge(edges, edge_mergeable)
+
+    list(
+        "same_station" = list(
+            "graph" = same_station_graph,
+            "vertex_group" = vertices_groups(same_station_graph)
+        ),
+        "merge" = list(
+            "graph" = merge_graph,
+            "vertex_group" = vertices_groups(merge_graph)
+        )
+    )
 }

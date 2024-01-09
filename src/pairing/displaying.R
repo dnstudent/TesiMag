@@ -16,9 +16,10 @@ clean_from <- function(analysis_table, matched) {
 }
 write_xslx_analysis <- function(analysis, to, ...) {
     analysis <- analysis |> select(
+        starts_with("id"),
         variable,
         offset_days,
-        starts_with("id"),
+        starts_with("dataset"),
         starts_with("name"),
         starts_with("network"),
         strSym,
@@ -33,8 +34,12 @@ write_xslx_analysis <- function(analysis, to, ...) {
         maeT,
         monthlydelT,
         monthlymaeT,
+        climaticdelT,
+        climaticmaeT,
         valid_days_union,
         valid_days_inters,
+        valid_days_x,
+        valid_days_y,
         qc_clim_available, ...
     )
     class(analysis$strSym) <- "percentage"
@@ -45,14 +50,14 @@ write_xslx_analysis <- function(analysis, to, ...) {
     writeDataTable(wb, 1, analysis)
 
     integer_style <- createStyle(numFmt = "0")
-    addStyle(wb, 1, integer_style, rows = 1:5000, cols = 10:14, gridExpand = TRUE)
+    addStyle(wb, 1, integer_style, rows = 1:5000, cols = 12:16, gridExpand = TRUE)
 
     prec2_style <- createStyle(numFmt = "0.00")
-    addStyle(wb, 1, prec2_style, rows = 1:5000, cols = 17:20, gridExpand = TRUE)
+    addStyle(wb, 1, prec2_style, rows = 1:5000, cols = 19:24, gridExpand = TRUE)
 
     outTStyle <- createStyle(fontColour = "#9C0006", bgFill = "#FFC7CE")
-    conditionalFormatting(wb, 1, cols = c(17, 20), rows = 1:5000, rule = "<-0.5", style = outTStyle)
-    conditionalFormatting(wb, 1, cols = c(17, 20), rows = 1:5000, rule = ">0.5", style = outTStyle)
+    conditionalFormatting(wb, 1, cols = c(19, 24), rows = 1:5000, rule = "<-0.5", style = outTStyle)
+    conditionalFormatting(wb, 1, cols = c(19, 24), rows = 1:5000, rule = ">0.5", style = outTStyle)
 
     saveWorkbook(wb, to, overwrite = TRUE)
 }

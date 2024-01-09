@@ -60,7 +60,8 @@ library(RPostgres, warn.conflicts = FALSE)
 # }
 
 load_dbs <- function() {
-    connquack <- dbConnect(duckdb(), "db/tesidb.duckdb", read_only = FALSE)
+    connquack <- dbConnect(duckdb())
+    dbExecute(connquack, "PRAGMA temp_directory='db/tmp'")
     dbExecute(
         connquack,
         "
