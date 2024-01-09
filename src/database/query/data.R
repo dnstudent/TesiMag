@@ -33,19 +33,18 @@ semi_join.ddb <- function(x, y, ...) {
 }
 
 valid_data <- function(dataconn) {
-    tbl(conns$data, "qc1") |>
-        filter(qc_gross_error & qc_excursion & qc_consecutive_value & qc_consecutive_int) |>
-        select(!starts_with("qc_"))
+    suppressMessages(tbl(dataconn, "read_parquet('db/data/qc1/valid=true/**/*.parquet')")) |>
+        select(!c(valid, starts_with("qc_")))
 }
 
 valid_series <- function(valid_data) {
     valid_data |> distinct(station_id, variable)
 }
 
-series_matches <- function(valid_series, station_matches, asymmetric = TRUE) {
+series_matches <- function(valid_series, station_matches, asymmetric = TRUE, cmp = \(x, y) x < y) {
     station_matches |>
-        cross_join(tibble(variable = c("T_MIN", "T_MAX")), copy = TRUE) |>
+        cross_join(tibble(variable = c(-1L, 1L)), copy = TRUE) |>
         semi_join(valid_series, by = c("id_x" = "station_id", "variable")) |>
         semi_join(valid_series, by = c("id_y" = "station_id", "variable")) |>
-        filter((id_x < id_y & asymmetric) | !asymmetric)
+        filter((cmp(id_x, id_y) & asymmetric) | !asymmetric)
 }

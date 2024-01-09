@@ -1,7 +1,7 @@
 library(dplyr, warn.conflicts = FALSE)
 library(DBI, warn.conflicts = FALSE)
 
-pair_full_series <- function(x, lagged_match_list, join) {
+pair_full_series <- function(x, lagged_match_list) {
     left <- x |>
         inner_join(lagged_match_list |> select(starts_with("id"), variable), by = c("station_id" = "id_x", "variable")) |>
         rename(id_x = station_id)
@@ -15,7 +15,7 @@ pair_full_series <- function(x, lagged_match_list, join) {
     full_join(left, right, by = c("id_x", "id_y", "date", "variable"), suffix = c("_x", "_y"))
 }
 
-pair_common_series <- function(x, lagged_match_list, join) {
+pair_common_series <- function(x, lagged_match_list) {
     left <- x |>
         inner_join(lagged_match_list |> select(starts_with("id"), variable), by = c("station_id" = "id_x", "variable")) |>
         rename(id_x = station_id)

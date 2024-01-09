@@ -1,20 +1,23 @@
 CREATE TABLE qc1 AS
 WITH
-excursion_checked AS (
+excursion_checked AS (SELECT
+* EXCLUDE (variable),
+CAST(variable AS INT) AS variable
+FROM (
     UNPIVOT(
         SELECT *,
-            (T_MAX - T_MIN) IS NULL OR (0 < T_MAX - T_MIN AND T_MAX - T_MIN < 50) AS qc_excursion
+            ("1" - "-1") IS NULL OR (0 < "1" - "-1" AND "1" - "-1" < 50) AS qc_excursion
         FROM (
             PIVOT {`table_name`}
             ON variable
             USING first(value)
         )
     )
-    ON T_MIN, T_MAX
+    ON "-1", "1"
     INTO
         NAME variable
         VALUE value
-),
+)),
 with_integers AS (
     SELECT *,
         abs(value - trunc(value)) < 0.0001 AS is_integer
