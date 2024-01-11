@@ -41,14 +41,12 @@ monthly_availabilities.grouped <- function(table, minimum_valid_days = 20L, maxi
         summarise(qc_month_available = (n() >= minimum_valid_days & max(datediff, na.rm = TRUE) <= maximum_consecutive_missing_days), .groups = "drop")
 }
 
-monthly_availabilities.tbl <- function(table, minimum_valid_days = 20L, maximum_consecutive_missing_days = 4L) {
+monthly_availabilities <- function(table, minimum_valid_days = 20L, maximum_consecutive_missing_days = 4L) {
     table |>
         filter(!is.na(value)) |>
         group_by(dataset, station_id, variable, month = as.integer(month(date)), year = as.integer(year(date))) |>
         monthly_availabilities.grouped(minimum_valid_days, maximum_consecutive_missing_days)
 }
-
-monthly_availabilities <- function(x, ...) UseMethod("monthly_availabilities", x)
 
 #' Assess the usability of a complete series of monthly availabilities (as returned by \code{is.month.usable}) for climate normal computation according to WMO standards
 #'
@@ -89,10 +87,8 @@ clim_availability.grouped <- function(monthly_availabilities, n_years_threshold 
         summarise(qc_clim_available = all(qc_clim_available, na.rm = TRUE), .groups = "drop")
 }
 
-clim_availability.tbl <- function(monthly_availabilities, n_years_threshold = 10L) {
+clim_availability <- function(monthly_availabilities, n_years_threshold = 10L) {
     monthly_availabilities |>
         group_by(dataset, station_id, variable, month) |>
         clim_availability.grouped(n_years_threshold)
 }
-
-clim_availability <- function(x, ...) UseMethod("clim_availability", x)

@@ -1,30 +1,32 @@
-library(tidyr, warn.conflicts = FALSE)
 library(dplyr, warn.conflicts = FALSE)
+library(dbplyr, warn.conflicts = FALSE)
 
-source("src/analysis/data/clim_availability.R")
-source("src/database/query/pairing.R")
+lag_analysis <- function(x, series_matches, time_offsets) {
+    series_matches <- copy_to(x$src$con, series_matches, overwrite = TRUE)
 
-# `paired_series` points to a dbplyr query to tesidb with the following columns:
-# - id_x: the id of the first station
-# - id_y: the id of the second station
-# - variable: the variable to compare
-# - date: the date of the measurement
-# - value_x: the value of the first station
-# - value_y: the value of the second station
+    time_offsets <- tibble(offset_days = as.integer(time_offsets))
+    lagged_match_list <- series_matches |>
+        select(starts_with("id"), variable) |>
+        cross_join(time_offsets, copy = TRUE) |>
+        compute()
 
-# `series_matches` points to a dbplyr query to tesidb with the following columns:
-# - id_x: the id of the first station
-# - id_y: the id of the second station
-# - variable: the variable to compare
-# - distance: the distance between the two stations
+    best_lagged_matches <- pair_common_series(x, lagged_match_list) |>
+        group_by(id_x, id_y, variable, offset_days) |>
+        summarise(maeT = mean(abs(value_y - value_x), na.rm = TRUE), .groups = "drop_last") |>
+        slice_min(maeT, with_ties = TRUE, .preserve = TRUE) |>
+        filter(n() == 1L) |>
+        ungroup() |>
+        select(-maeT) |>
+        compute()
 
-# `metadata_table` points to a dbplyr query to tesidb with the station metadata columns
+    nodata_matches <- series_matches |>
+        anti_join(best_lagged_matches, by = c("id_x", "id_y", "variable")) |>
+        mutate(offset_days = 0L) |>
+        select(colnames(best_lagged_matches)) |>
+        compute()
 
-# `x` points to a dbplyr query to tesidb representing temperature measures with the following columns:
-# - station_id: the id of the measuring station
-# - variable: the variable measured
-# - date: the date of the measurement
-# - value: the value of the measurement
+    rows_append(best_lagged_matches, nodata_matches) |> collect()
+}
 
 climatology_avail_statistics <- function(paired_series, minimum_valid_days = 20L, maximum_consecutive_missing_days = 4L, n_years_threshold = 10L) {
     paired_series |>
@@ -79,23 +81,6 @@ daily_statistics <- function(paired_series) {
             f0 = mean(as.integer(abs(difference) <= 1e-4), na.rm = TRUE),
             fsameint = mean(as.integer(abs(trunc(value_y) - trunc(value_x)) < 0.5), na.rm = TRUE),
             .groups = "drop"
-        )
-}
-
-metadata_analysis <- function(series_matches, metadata) {
-    metadata <- metadata |> select(
-        dataset, id, name, network, state, first_registration, last_registration, elevation, glo30m_elevation, glo30asec_elevation
-    )
-    series_matches |>
-        left_join(metadata, join_by(id_x == id)) |>
-        left_join(metadata, join_by(id_y == id), suffix = c("_x", "_y")) |>
-        mutate(
-            delH = elevation_y - elevation_x,
-            delZm = glo30m_elevation_y - glo30m_elevation_x,
-            delZsec = glo30asec_elevation_y - glo30asec_elevation_x,
-            norm_name_x = name_x |> lower() |> replace("_", " ") |> nfc_normalize() |> strip_accents() |> trim(),
-            norm_name_y = name_y |> lower() |> replace("_", " ") |> nfc_normalize() |> strip_accents() |> trim(),
-            strSym = jaro_winkler_similarity(norm_name_y, norm_name_x),
         )
 }
 

@@ -60,6 +60,7 @@ library(RPostgres, warn.conflicts = FALSE)
 # }
 
 load_dbs <- function() {
+    connpost <- dbConnect(Postgres(), dbname = "georefs", user = "davidenicoli", host = "localhost")
     connquack <- dbConnect(duckdb())
     dbExecute(connquack, "PRAGMA temp_directory='db/tmp'")
     dbExecute(
@@ -71,7 +72,6 @@ load_dbs <- function() {
         CREATE OR REPLACE TEMPORARY TABLE stations_tmp AS SELECT * EXCLUDE (geom, geog) FROM postgis_db.station_geo;
         "
     )
-    connpost <- dbConnect(Postgres(), dbname = "georefs", user = "davidenicoli", host = "localhost")
     list(stations = connpost, data = connquack)
 }
 
