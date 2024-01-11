@@ -3,25 +3,35 @@ library(dplyr, warn.conflicts = FALSE)
 source("src/database/query/data.R")
 source("src/database/query/pairing.R")
 
-plot_stations <- function(ids, dataconn) {
+plot_stations <- function(ids, dataconn, same_period = TRUE) {
     data <- valid_data(dataconn) |>
         semi_join(ids, by = colnames(ids), copy = TRUE) |>
         arrange(station_id, date) |>
         collect()
 
-    first_common_date <- data |>
-        group_by(station_id) |>
-        summarize(first_common_date = min(date, na.rm = TRUE)) |>
-        pull(first_common_date) |>
-        max()
+    if (same_period) {
+        first_date <- data |>
+            group_by(station_id) |>
+            summarize(first_common_date = min(date, na.rm = TRUE)) |>
+            pull(first_common_date) |>
+            max()
 
-    last_common_date <- data |>
-        group_by(station_id) |>
-        summarize(last_common_date = max(date, na.rm = TRUE)) |>
-        pull(last_common_date) |>
-        min()
-
-    ggplot(data = data |> mutate(station_id = as.factor(station_id)) |> filter(first_common_date <= date & date <= last_common_date)) +
+        last_date <- data |>
+            group_by(station_id) |>
+            summarize(last_common_date = max(date, na.rm = TRUE)) |>
+            pull(last_common_date) |>
+            min()
+    } else {
+        first_date <- data |>
+            filter(!is.na(value)) |>
+            pull(date) |>
+            min()
+        last_date <- data |>
+            filter(!is.na(value)) |>
+            pull(date) |>
+            max()
+    }
+    ggplot(data = data |> mutate(station_id = as.factor(station_id)) |> filter(first_date <= date & date <= last_date)) +
         geom_line(aes(x = date, y = value, color = station_id)) +
         facet_grid(variable ~ .)
 }

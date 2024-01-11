@@ -1,149 +1,64 @@
 library(dplyr, warn.conflicts = FALSE)
+library(tidyr, warn.conflicts = FALSE)
 
-# Tests for single series errors in data. A result of FALSE means that the value is an error.
-
-
-# Function: gross_errors_check.numeric
-# Description: This function checks for gross errors in numeric values.
-# Parameters:
-#   - value: The numeric value to be checked.
-#   - thresh: The threshold value for identifying gross errors (default = 50).
-# Returns:
-#   TRUE if the value is considered a gross error, FALSE otherwise.
-gross_errors_check.numeric <- function(value, thresh = 50) {
-    abs(value) < thresh
-}
-
-gross_errors_check.arrow_dplyr_query <- function(query, value_col, thresh = 50) {
-    mutate(query, qc_gross = abs({{ value_col }}) < thresh)
-}
-
-gross_errors_check.tbl_lazy <- function(query, value_col, thresh = 50) {
-    mutate(query, qc_gross = abs({{ value_col }}) < thresh)
-}
-
-gross_errors_check.ArrowObject <- function(query, value_col, thresh = 50) {
-    mutate(query, qc_gross = abs({{ value_col }}) < thresh)
-}
-
-
-#' Check for Gross Errors in a Data Frame
-#'
-#' This function checks for gross errors in a data frame by comparing the values
-#' against a threshold. Any values that exceed the threshold are considered as
-#' gross errors.
-#'
-#' @param data The data frame to be checked.
-#' @param thresh The threshold value for identifying gross errors. Default is 50.
-#'
-#' @return A logical vector indicating whether each value in the data frame is a
-#'         gross error or not.
-#'
-#' @examples
-#' data <- data.frame(x = c(10, 20, 30, 100, 40), y = c(50, 60, 70, 80, 90))
-#' gross_errors_check.data.frame(data, thresh = 50)
-#'
-#' @export
-gross_errors_check.data.frame <- function(data, thresh = 50) {
-    data |> mutate(qc_gross = gross_errors_check.numeric(value, thresh))
-}
-
-gross_errors_check <- function(x, ...) UseMethod("gross_errors_check", x)
-
-
-#' Check for repeated values in numeric data
-#'
-#' This function checks for repeated values in a numeric vector.
-#'
-#' @param x A numeric vector.
-#' @param threshold The maximum number of allowed repeated values.
-#'
-#' @return TRUE if the number of repeated values is less than or equal to the threshold, FALSE otherwise.
-#'
-#' @examples
-#' repeated_values_check.numeric(c(1, 2, 3, 3, 4), 2)
-#' # Output: FALSE
-#'
-#' repeated_values_check.numeric(c(1, 2, 3, 3, 4), 3)
-#' # Output: TRUE
-#'
-repeated_values_check.numeric <- function(x, threshold) {
-    rles <- rle(x)
-    rles$values <- rles$lengths < threshold
-    inverse.rle(rles)
-}
-
-#' Tests for repeated or missing values in data: if 'value' is constant or missing for seven consecutive days, it is flagged. WATCH OUT: GAPS SHOULD NOT BE FILLED
-repeated_values_check.data.frame <- function(data, threshold = 8L) {
-    if (!is.grouped_df(data)) {
-        warning("The data provided is not grouped. Is this intentional?")
-    }
+qc_excursion <- function(data, min_excursion = 0, max_excursion = 50) {
     data |>
-        drop_na(value) |>
-        arrange(date, .by_group = TRUE) |>
-        mutate(qc_repeated = repeated_values_check.numeric(value, threshold))
+        pivot_wider(names_from = variable, values_from = value) |>
+        rename(T_MIN = `-1`, T_MAX = `1`) |>
+        mutate(excursion = abs(T_MAX - T_MIN)) |>
+        mutate(qc_excursion = is.na(excursion) | (0 < excursion & excursion < 50)) |>
+        select(-excursion) |>
+        pivot_longer(cols = c("T_MIN", "T_MAX"), names_to = "variable", values_to = "value") |>
+        mutate(variable = case_match(variable, "T_MIN" ~ -1L, "T_MAX" ~ 1L)) |>
+        filter(!is.na(value))
 }
 
-repeated_values_check <- function(x, ...) UseMethod("repeated_values_check", x)
-
-integer_streak_check.numeric <- function(x, threshold) {
-    rles <- rle(abs(x - trunc(x)) <= 1e-4)
-    rles$values <- !(rles$values & (rles$lengths >= threshold))
-    inverse.rle(rles)
-}
-
-integer_streak_check.data.frame <- function(data, threshold = 8L) {
-    if (!is.grouped_df(data)) {
-        warning("The data provided is not grouped. Is this intentional?")
-    }
+qc_gross <- function(data, threshold = 50) {
     data |>
-        drop_na(value) |>
-        mutate(qc_int_streak = integer_streak_check.numeric(value, threshold))
+        mutate(qc_gross = is.na(value) | (abs(value) <= 50))
 }
 
-integer_streak_check.tbl_lazy <- function(data, threshold = 8L) {
+flag_integers <- function(data) {
     data |>
-        filter(!is.na(value)) |>
-        mutate(qc_int_streak = integer_streak_check.numeric(value, threshold))
+        mutate(is_integer = abs(trunc(value) - value) < 1e-4)
 }
 
-integer_streak_check <- function(x, ...) UseMethod("integer_streak_check", x)
-
-
-# QC as summaries
-
-repeated_fraction_check.numeric <- function(x) {
-    rles <- rle(x)
-    sum(rles$lengths[rles$lengths > 1]) / length(x)
-}
-
-repeated_fraction_check.data.frame <- function(data) {
-    if (!is.grouped_df(data)) {
-        warning("The data provided is not grouped. Is this intentional?")
-    }
+assign_repetition_gids <- function(data) {
     data |>
-        drop_na(value) |>
-        summarise(qc_repeated_fraction = repeated_fraction_check.numeric(value))
+        flag_integers() |>
+        group_by(variable, station_id) |>
+        window_order(date) |>
+        mutate(
+            prev_is_different = (abs(value - lag(value)) > 1e-4) |> as.integer() |> coalesce(1L),
+            not_consecutive_ints = (!is_integer | !lag(is_integer)) |> as.integer() |> coalesce(1L),
+        ) |>
+        mutate(
+            consecutive_val_gid = cumsum(prev_is_different),
+            consecutive_int_gid = cumsum(not_consecutive_ints)
+        ) |>
+        ungroup() |>
+        select(!c(is_integer, prev_is_different, not_consecutive_ints))
 }
 
-repeated_fraction_check.tbl_lazy <- function(data) {
+qc_repetitions <- function(data, threshold = 8L) {
     data |>
-        filter(!is.na(value)) |>
-        summarise(qc_repeated_fraction = repeated_fraction_check.numeric(value))
+        assign_repetition_gids() |>
+        group_by(variable, station_id, consecutive_val_gid) |>
+        mutate(
+            qc_repeated_values = n() < threshold
+        ) |>
+        ungroup() |>
+        group_by(variable, station_id, consecutive_int_gid) |>
+        mutate(
+            qc_repeated_integers = n() < threshold
+        ) |>
+        ungroup() |>
+        select(!c(consecutive_val_gid, consecutive_int_gid))
 }
 
-repeated_fraction_check <- function(x, ...) UseMethod("repeated_fraction_check", x)
-
-integers_fraction_check.numeric <- function(x) {
-    mean(abs(x - trunc(x)) <= 1e-4, na.rm = TRUE)
+qc1 <- function(raw_data_tbl) {
+    raw_data_tbl |>
+        qc_excursion() |>
+        qc_gross() |>
+        qc_repetitions()
 }
-
-integers_fraction_check.data.frame <- function(data) {
-    if (!is.grouped_df(data)) {
-        warning("The data provided is not grouped. Is this intentional?")
-    }
-    data |>
-        summarise(qc_integer_fraction = integers_fraction_check.numeric(value))
-}
-
-integers_fraction_check <- function(x, ...) UseMethod("integers_fraction_check", x)

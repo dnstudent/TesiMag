@@ -50,14 +50,14 @@ write_xslx_analysis <- function(analysis, to, ...) {
     writeDataTable(wb, 1, analysis)
 
     integer_style <- createStyle(numFmt = "0")
-    addStyle(wb, 1, integer_style, rows = 1:5000, cols = 12:16, gridExpand = TRUE)
+    addStyle(wb, 1, integer_style, rows = 1:10000, cols = 12:16, gridExpand = TRUE)
 
     prec2_style <- createStyle(numFmt = "0.00")
-    addStyle(wb, 1, prec2_style, rows = 1:5000, cols = 19:24, gridExpand = TRUE)
+    addStyle(wb, 1, prec2_style, rows = 1:10000, cols = 19:24, gridExpand = TRUE)
 
     outTStyle <- createStyle(fontColour = "#9C0006", bgFill = "#FFC7CE")
-    conditionalFormatting(wb, 1, cols = c(19, 24), rows = 1:5000, rule = "<-0.5", style = outTStyle)
-    conditionalFormatting(wb, 1, cols = c(19, 24), rows = 1:5000, rule = ">0.5", style = outTStyle)
+    conditionalFormatting(wb, 1, cols = c(19, 24), rows = 1:10000, rule = "<-0.5", style = outTStyle)
+    conditionalFormatting(wb, 1, cols = c(19, 24), rows = 1:10000, rule = ">0.5", style = outTStyle)
 
     saveWorkbook(wb, to, overwrite = TRUE)
 }
@@ -95,4 +95,56 @@ launch_leaflet <- function(database) {
         )
     }
     map |> leaflet.extras::addSearchOSM()
+}
+
+leaflet_groups <- function(grouped_stations, statconn, gid_variable) {
+    map <- leaflet::leaflet() |>
+        leaflet::addTiles()
+
+    stations <- tbl(statconn, "station_geo") |>
+        select(!c(geom, geog)) |>
+        right_join(grouped_stations, by = "id", copy = TRUE) |>
+        collect() |>
+        st_md_to_sf()
+
+    cs <- c("red", "blue", "green", "purple", "orange", "cadetblue", "beige", "darkgreen", "lightgreen", "darkblue", "lightblue", "darkpurple", "pink", "white", "gray", "lightgray", "black")
+
+    group_colors <- stations |>
+        distinct({{ gid_variable }})
+
+    group_colors <- group_colors |>
+        mutate(group_color = rep_len(cs, nrow(group_colors)))
+
+    groups <- stations |>
+        left_join(group_colors, by = join_by({{ gid_variable }})) |>
+        group_by({{ gid_variable }}, group_color) |>
+        group_split()
+
+    for (group in groups) {
+        map <- map |> leaflet::addAwesomeMarkers(
+            data = group,
+            label = ~name,
+            popup = ~ stringr::str_glue("{name}, {elevation} m, {network}"),
+            icon = leaflet::awesomeIcons(
+                markerColor = ~group_color,
+            )
+        )
+    }
+    map |> leaflet.extras::addSearchOSM()
+}
+
+render_map <- function(map) {
+    library(shiny, warn.conflicts = FALSE)
+    library(leaflet, warn.conflicts = FALSE)
+
+    ui <- fluidPage(
+        leafletOutput("mymap"),
+        p()
+    )
+
+    server <- function(input, output, session) {
+        output$mymap <- renderLeaflet(map)
+    }
+
+    shinyApp(ui, server)
 }

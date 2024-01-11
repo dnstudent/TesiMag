@@ -1,1 +1,0 @@
-# Algoritmi di gap filling
