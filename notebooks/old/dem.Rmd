@@ -1,8 +1,0 @@
-```{r}
-source("load.R")
-library(ggplot2)
-
-dem <- load.DEM.COP30()
-bg <- dem |> filter(8.558350 < x, x < 10.717163, 45.290347 < y, y < 46.358302)
-```
-
