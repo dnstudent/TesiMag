@@ -1,7 +1,7 @@
 library(ggplot2, warn.conflicts = FALSE)
 library(dplyr, warn.conflicts = FALSE)
 source("src/database/query/data.R")
-source("src/database/query/pairing.R")
+source("src/merging/pairing.R")
 
 plot_stations <- function(ids, dataconn, same_period = TRUE) {
     data <- valid_data(dataconn) |>
@@ -45,12 +45,46 @@ plot_diffs <- function(matches, dataconn, ...) {
 
     data <- valid_data(dataconn)
     data <- pair_full_series(data, matches) |>
+        left_join(matches |> select(starts_with("id"), variable, starts_with("dataset"), starts_with("name")), by = c("id_x", "id_y", "variable")) |>
         mutate(delT = value_y - value_x) |>
-        collect()
+        collect() |>
+        filter(!is.na(delT)) |>
+        mutate(
+            variable = factor(variable, levels = c(-1L, 1L), labels = c("T_MIN", "T_MAX")),
+            match_id = as.factor(paste0(dataset_x, " ", name_x, " ", id_x, "\n", dataset_y, " ", name_y, " ", id_y))
+        )
 
     dbExecute(dataconn, "DROP TABLE matches_plot_tmp")
 
-    ggplot(data = data |> filter(!is.na(delT))) +
-        geom_line(aes(x = date, y = delT, ...)) +
-        facet_grid(variable ~ ., scales = "free_y")
+    ggplot(data = data) +
+        geom_line(aes(x = date, y = delT, color = variable, linetype = variable, ...)) +
+        facet_grid(match_id ~ ., scales = "free")
+}
+
+plot_correction <- function(corrections, dataconn, ...) {
+    p <- plot_diffs(corrections, dataconn, ...)
+    c_data <- p$data |>
+        select(variable, starts_with("id"), date) |>
+        left_join(corrections |> mutate(variable = if_else(variable == -1L, "T_MIN", "T_MAX")), by = c("variable", "id_x", "id_y")) |>
+        mutate(t = annual_index(date), correction = k0 + sin(t / 2) * k1 + sin(t) * k2 + sin(3 * t / 2) * k3)
+    p + geom_line(data = c_data, aes(x = date, y = correction, color = variable, ...))
+}
+
+plot_random_matches <- function(matches, dataconn, ..., n = 5L) {
+    combos <- matches |>
+        filter(...) |>
+        slice_sample(n = n) |>
+        select(id_x, id_y, variable)
+
+    matches |>
+        semi_join(combos, by = c("id_x", "id_y")) |>
+        plot_diffs(dataconn)
+}
+
+plot_alldiffs <- function(matches, dataconn, ..., out = "alldiffs.pdf") {
+    relevant <- matches |> filter(...)
+    p <- relevant |>
+        plot_diffs(dataconn)
+
+    ggsave(out, p, height = nrow(relevant) * 2, width = 9, limitsize = FALSE)
 }
