@@ -34,7 +34,8 @@ semi_join.ddb <- function(x, y, ...) {
 
 valid_data <- function(dataconn) {
     suppressMessages(tbl(dataconn, "read_parquet('db/data/qc1/valid=true/**/*.parquet')")) |>
-        select(!c(valid, starts_with("qc_")))
+        select(!c(valid, starts_with("qc_"))) |>
+        mutate(variable = as.integer(variable))
 }
 
 valid_series <- function(valid_data) {

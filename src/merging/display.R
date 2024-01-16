@@ -14,7 +14,7 @@ clean_from <- function(analysis_table, matched) {
         anti_join(matched, by = c("variable", "series_id.x")) |>
         anti_join(matched, by = c("variable", "series_id.y"))
 }
-write_xslx_analysis <- function(analysis, to, ...) {
+write_xlsx_analysis <- function(analysis, to, ...) {
     analysis <- analysis |> select(
         starts_with("id"),
         variable,
@@ -30,6 +30,8 @@ write_xslx_analysis <- function(analysis, to, ...) {
         distance,
         f0,
         fsameint,
+        balance,
+        selfdiff,
         delT,
         maeT,
         monthlydelT,
@@ -40,24 +42,28 @@ write_xslx_analysis <- function(analysis, to, ...) {
         valid_days_inters,
         valid_days_x,
         valid_days_y,
+        starts_with("overlap"),
         qc_clim_available, ...
     )
     class(analysis$strSym) <- "percentage"
     class(analysis$f0) <- "percentage"
     class(analysis$fsameint) <- "percentage"
+    class(analysis$overlap_min) <- "percentage"
+    class(analysis$overlap_max) <- "percentage"
+    class(analysis$overlap_union) <- "percentage"
     wb <- createWorkbook()
     addWorksheet(wb, "data")
     writeDataTable(wb, 1, analysis)
 
     integer_style <- createStyle(numFmt = "0")
-    addStyle(wb, 1, integer_style, rows = 1:10000, cols = 12:16, gridExpand = TRUE)
+    addStyle(wb, 1, integer_style, rows = 1:60000, cols = 12:16, gridExpand = TRUE)
 
     prec2_style <- createStyle(numFmt = "0.00")
-    addStyle(wb, 1, prec2_style, rows = 1:10000, cols = 19:24, gridExpand = TRUE)
+    addStyle(wb, 1, prec2_style, rows = 1:60000, cols = 19:26, gridExpand = TRUE)
 
     outTStyle <- createStyle(fontColour = "#9C0006", bgFill = "#FFC7CE")
-    conditionalFormatting(wb, 1, cols = c(19, 24), rows = 1:10000, rule = "<-0.5", style = outTStyle)
-    conditionalFormatting(wb, 1, cols = c(19, 24), rows = 1:10000, rule = ">0.5", style = outTStyle)
+    conditionalFormatting(wb, 1, cols = c(21, 26), rows = 1:60000, rule = "<-0.5", style = outTStyle)
+    conditionalFormatting(wb, 1, cols = c(21, 26), rows = 1:60000, rule = ">0.5", style = outTStyle)
 
     saveWorkbook(wb, to, overwrite = TRUE)
 }

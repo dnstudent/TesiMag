@@ -1,0 +1,5 @@
+Tesi:
+- climatologie '93-'23: scaricare dati da dove ci sono;
+- parto da ARPA, integro con SCIA;
+- regione per regione;
+- 

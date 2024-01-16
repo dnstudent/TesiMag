@@ -1,6 +1,9 @@
 library(dplyr, warn.conflicts = FALSE)
 library(dbplyr, warn.conflicts = FALSE)
 
+source("src/merging/pairing.R")
+source("src/analysis/data/clim_availability.R")
+
 lag_analysis <- function(x, series_matches, time_offsets) {
     series_matches <- copy_to(x$src$con, series_matches, overwrite = TRUE)
 
@@ -69,6 +72,7 @@ yearmonthly_statistics <- function(paired_series) {
 daily_statistics <- function(paired_series) {
     paired_series |>
         mutate(difference = value_y - value_x, valid_x = !is.na(value_x), valid_y = !is.na(value_y)) |>
+        mutate(difference = if_else(abs(difference) < 1e-4, 0, difference)) |>
         group_by(id_x, id_y, variable) |>
         summarise(
             maeT = mean(abs(difference), na.rm = TRUE),
@@ -79,8 +83,45 @@ daily_statistics <- function(paired_series) {
             valid_days_inters = sum(as.integer(valid_x & valid_y), na.rm = TRUE),
             valid_days_union = sum(as.integer(valid_x | valid_y), na.rm = TRUE),
             f0 = mean(as.integer(abs(difference) <= 1e-4), na.rm = TRUE),
+            balance = mean(na_if(sign(difference), 0), na.rm = TRUE),
             fsameint = mean(as.integer(abs(trunc(value_y) - trunc(value_x)) < 0.5), na.rm = TRUE),
             .groups = "drop"
+        ) |>
+        mutate(
+            overlap_min = valid_days_inters / pmin(valid_days_x, valid_days_y, na.rm = TRUE),
+            overlap_max = valid_days_inters / pmax(valid_days_x, valid_days_y, na.rm = TRUE),
+            overlap_union = valid_days_inters / valid_days_union,
+        )
+}
+
+metadata_analysis <- function(series_matches, metadata) {
+    metadata <- metadata |> select(
+        dataset, id, name, network, state, first_registration, last_registration, elevation, glo30m_elevation, glo30asec_elevation
+    )
+    series_matches |>
+        left_join(metadata, join_by(id_x == id)) |>
+        left_join(metadata, join_by(id_y == id), suffix = c("_x", "_y")) |>
+        mutate(
+            delH = elevation_y - elevation_x,
+            delZm = glo30m_elevation_y - glo30m_elevation_x,
+            delZsec = glo30asec_elevation_y - glo30asec_elevation_x,
+            norm_name_x = name_x |> lower() |> replace("_", " ") |> nfc_normalize() |> strip_accents() |> trim(),
+            norm_name_y = name_y |> lower() |> replace("_", " ") |> nfc_normalize() |> strip_accents() |> trim(),
+            strSym = jaro_winkler_similarity(norm_name_y, norm_name_x),
+        )
+}
+
+periodicity_analysis <- function(paired_series) {
+    diffs <- paired_series |>
+        mutate(delT = value_y - value_x, .keep = "unused") |>
+        filter(!is.na(delT) & abs(delT) > 1e-4) |>
+        mutate(nextyear = date + years(1))
+
+    diffs |>
+        inner_join(diffs, join_by(id_x, id_y, variable, nextyear == date), suffix = c("_0", "_1")) |>
+        group_by(id_x, id_y, variable) |>
+        summarise(
+            selfdiff = mean(abs(delT_0 - delT_1), na.rm = TRUE), .groups = "drop"
         )
 }
 
@@ -100,6 +141,7 @@ series_matches_analysis <- function(series_matches, data, metadata, ...) {
     cs <- climatic_statistics(paired_series)
     csa <- climatology_avail_statistics(paired_series, ...)
     md <- metadata_analysis(matches_offsets, metadata)
+    pa <- periodicity_analysis(paired_series)
 
 
     analysis <- ds |>
@@ -107,6 +149,7 @@ series_matches_analysis <- function(series_matches, data, metadata, ...) {
         full_join(cs, by = c("id_x", "id_y", "variable")) |>
         full_join(csa, by = c("id_x", "id_y", "variable")) |>
         full_join(md, by = c("id_x", "id_y", "variable")) |>
+        full_join(pa, by = c("id_x", "id_y", "variable")) |>
         collect()
 
     dbExecute(data$src$con, "DROP TABLE IF EXISTS paired_series")
