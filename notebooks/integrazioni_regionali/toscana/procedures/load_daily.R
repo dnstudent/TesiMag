@@ -12,7 +12,7 @@ dataset_spec <- function() {
     list(
         "http://www.sir.toscana.it/consistenza-rete",
         "regional",
-        "Dataset del SIR Toscana. Passo Giornaliero. Le stazioni selezionate comprendono quelle categorizzate come Automatiche e Tradizionali."
+        "Dataset del SIR Toscana. Passo Giornaliero. Le stazioni selezionate comprendono quelle categorizzate come Automatiche, Automatiche SIR e Tradizionali."
     )
 }
 
@@ -22,45 +22,44 @@ load_meta <- function() {
     read_delim_arrow(
         file.path(path.toscana, "stazioni.csv"),
         # col_names = ,
-        col_types = "ciccccccidddddd",
-        delim = ";",
+        col_types = "cicccccciddddddc",
+        delim = ",",
         read_options = csv_read_options(
             skip_rows = 1L,
-            column_names = c("id", "StazioneExtra", "name", "Comune", "province", "Fiume", "Strumento", "Unita_Misura", "IDSensoreRete", "lat", "lon", "GB E [m]", "GB N [m]", "elevation", "QuotaTerra"),
-            encoding = "iso-8859-1"
+            column_names = c("original_id", "StazioneExtra", "name", "Comune", "province", "Fiume", "Strumento", "Unita_Misura", "IDSensoreRete", "lat", "lon", "GB E [m]", "GB N [m]", "elevation", "QuotaTerra", "network"),
+            encoding = "utf-8"
         ),
         as_data_frame = TRUE
     ) |>
-        mutate(dataset = "SIRToscana", network = "SIRToscana", state = "Toscana") |>
+        mutate(original_dataset = "SIRToscana", network = str_c("SIRT - ", network), state = "Toscana") |>
         as_arrow_table()
 }
 
-load_data <- function(first_date, last_date) {
+load_data <- function() {
     vroom(
         list.files(file.path(path.toscana, "fragments"), pattern = "*.csv", full.names = TRUE),
         skip = 19L,
         col_names = c("date", "T_MAX", "T_MIN"),
         col_types = cols(
-            date = col_date(format = "%d/%m/%Y"),
-            T_MAX = col_double(),
-            T_MIN = col_double()
+            col_date(format = "%d/%m/%Y"),
+            col_double(),
+            col_double()
         ),
         delim = ";",
         na = c("", "NA", "-9999", "@"),
         id = "path"
     ) |>
         as_tibble() |>
-        filter(first_date <= date & date <= last_date) |>
-        mutate(dataset = "SIRToscana", station_id = path |> basename() |> str_remove("\\.csv$"), .keep = "unused") |>
+        mutate(station_id = path |> basename() |> str_remove("\\.csv$"), .keep = "unused") |>
         pivot_longer(cols = c(T_MAX, T_MIN), names_to = "variable", values_to = "value") |>
         drop_na(value) |>
         as_arrow_table()
 }
 
-load_daily_data.toscana <- function(first_date, last_date) {
-    data <- load_data(first_date, last_date)
+load_daily_data.toscana <- function() {
+    data <- load_data()
     meta <- load_meta() |>
-        semi_join(data, join_by(dataset, id == station_id)) |>
+        semi_join(data, join_by(original_id == station_id)) |>
         compute()
 
     list("meta" = meta, "data" = data)
