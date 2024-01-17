@@ -50,7 +50,7 @@ split_data_metadata <- function(full_table) {
 
 split_station_metadata <- function(full_station_list) {
     base_meta <- select(full_station_list, all_of(station_schema$names)) |> as_arrow_table2(station_schema)
-    extra_meta <- select(full_station_list, !all_of(station_schema$names), dataset, id) |> as_arrow_table()
+    extra_meta <- select(full_station_list, !all_of(station_schema$names), original_dataset, original_id) |> as_arrow_table()
     list("base" = base_meta, "extra" = extra_meta)
 }
 
