@@ -6,27 +6,24 @@ source("src/load/read/SCIA.R")
 
 dataset_spec <- function() {
     list(
-        "SCIA",
         "http://193.206.192.214/servertsdailyutm/serietemporalidaily400.php",
-        "national"
+        "national",
+        "Dataset SCIA a passo giornaliero"
     )
 }
 
-load_daily_data.scia <- function(first_date, last_date) {
+load_daily_data.scia <- function() {
     tmin <- open_dataset(path.datafile("SCIA", "T_MIN")) |>
         rename(value = `Temperatura minima `) |>
-        mutate(variable = "T_MIN")
+        mutate(variable = -1L)
     tmax <- open_dataset(path.datafile("SCIA", "T_MAX")) |>
         rename(value = `Temperatura massima `) |>
-        mutate(variable = "T_MAX")
+        mutate(variable = 1L)
 
     stats <- read.SCIA.metadata("T_MAX")
 
     data <- concat_tables(tmin |> compute(), tmax |> compute(), unify_schemas = FALSE) |>
-        filter(first_date <= date & date <= last_date) |>
         filter(!is.na(value)) |>
-        mutate(station_id = as.character(internal_id), merged = FALSE, dataset = "SCIA") |>
-        select(-internal_id) |>
         compute()
 
     meta <- read.SCIA.metadata("T_MAX") |>

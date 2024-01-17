@@ -1,15 +1,14 @@
 library(arrow, warn.conflicts = FALSE)
 
 data_schema <- schema(
-    dataset = utf8(),
-    station_id = int32(),
+    # dataset = utf8(),
+    station_id = utf8(),
     variable = utf8(),
     date = date32(),
     value = double()
 )
 station_schema <- schema(
-    dataset = utf8(),
-    id = int32(),
+    # id = int32(),
     name = utf8(),
     network = utf8(),
     lon = double(),
@@ -19,8 +18,8 @@ station_schema <- schema(
     first_registration = date32(),
     last_registration = date32(),
     valid_days = int32(),
-    previous_dataset = utf8(),
-    previous_id = utf8()
+    original_dataset = utf8(),
+    original_id = utf8()
 )
 
 # station_cols <- station_schema$names

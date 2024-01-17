@@ -8,14 +8,12 @@ source("src/database/test.R")
 source("src/load/tools.R")
 
 checkpoint_database <- function(database, dataset_id, tag) {
-    database$data <- arrange(database$data, dataset, station_id, variable, date)
+    database$data <- arrange(database$data, station_id, variable, date)
     database |>
         assert_data_uniqueness() |>
         assert_metadata_uniqueness()
     write_data(database$data, dataset_id, tag, provisional = TRUE)
-    write_data(database$data, dataset_id, "last", provisional = TRUE)
     write_metadata(database$meta, dataset_id, tag, provisional = TRUE)
-    write_metadata(database$meta, dataset_id, "last", provisional = TRUE)
 }
 
 open_checkpoint <- function(dataset_id, tag) {
@@ -23,10 +21,6 @@ open_checkpoint <- function(dataset_id, tag) {
         "meta" = open_metadata(dataset_id, tag, provisional = TRUE),
         "data" = open_data(dataset_id, tag, provisional = TRUE)
     ) |> as_database()
-}
-
-open_last_checkpoint <- function(dataset_id) {
-    open_checkpoint(dataset_id, "last")
 }
 
 query_from_checkpoint <- function(datasets, tag) {

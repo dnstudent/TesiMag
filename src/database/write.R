@@ -24,7 +24,7 @@ write_data <- function(data_table, dataset_id, tag, provisional) {
     }
     data_table |>
         as_arrow_table2(schema = data_schema) |>
-        arrange(dataset, station_id, variable, date) |>
+        arrange(station_id, variable, date) |>
         write_parquet(table_path)
 }
 
@@ -36,15 +36,6 @@ write_metadata <- function(metadata_table, dataset_id, tag, provisional) {
     metadata_table |>
         as_arrow_table2(schema = station_schema) |>
         write_parquet(table_path)
-}
-
-push_metadata <- function(conn, metadata_ds) {
-    state_boundaries <- st_read(conn, query = "SELECT name AS state, geom FROM boundary WHERE kind = 'state'", geometry_column = "geom")
-    stations <- metadata_ds |>
-        select(all_of(station_cols_topush)) |>
-        collect()
-    stations <- mutate(stations, state = coalesce(state, st_join(stations |> st_md_to_sf() |> select(geometry), state_boundaries, join = st_within, left = TRUE)$state))
-    dbAppendTable(conn, "station", stations)
 }
 
 # write_extra_metadata <- function(extra_table, dataset_id, provisional) {
