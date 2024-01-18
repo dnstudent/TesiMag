@@ -11,6 +11,7 @@ station_schema <- schema(
     # id = int32(),
     name = utf8(),
     network = utf8(),
+    kind = utf8(),
     lon = double(),
     lat = double(),
     elevation = double(),
