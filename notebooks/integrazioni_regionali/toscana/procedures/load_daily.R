@@ -31,7 +31,7 @@ load_meta <- function() {
         ),
         as_data_frame = TRUE
     ) |>
-        mutate(original_dataset = "SIRToscana", network = str_c("SIRT - ", network), state = "Toscana") |>
+        mutate(kind = case_match(network, "Tradizionali" ~ "meccanica", .default = "automatica"), original_dataset = "SIRToscana", network = str_c("SIRT - ", network), state = "Toscana") |>
         as_arrow_table()
 }
 
@@ -50,7 +50,7 @@ load_data <- function() {
         id = "path"
     ) |>
         as_tibble() |>
-        mutate(station_id = path |> basename() |> str_remove("\\.csv$"), .keep = "unused") |>
+        mutate(dataset = "SIRToscana", station_id = path |> basename() |> str_remove("\\.csv$"), .keep = "unused") |>
         pivot_longer(cols = c(T_MAX, T_MIN), names_to = "variable", values_to = "value") |>
         drop_na(value) |>
         as_arrow_table()
