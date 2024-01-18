@@ -33,7 +33,8 @@ load_meta <- function() {
             across(c(lon, lat), from_degrees),
             original_dataset = "ARPAM",
             network = "SIRMIP",
-            state = "Marche"
+            state = "Marche",
+            kind = case_match(kind, "RT" ~ "automatica", "RM" ~ "meccanica")
         ) |>
         as_arrow_table()
 }
