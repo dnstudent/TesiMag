@@ -81,7 +81,7 @@ load_meta <- function() {
 load_daily_data.scia <- function() {
     meta <- load_meta() |>
         select(-valid_days) |>
-        mutate(original_dataset = "SCIA", state = as.character(state), province = as.character(province), network = as.character(network)) |>
+        mutate(original_dataset = "SCIA", state = as.character(state), province = as.character(province), network = as.character(network), kind = "unknown") |>
         rename(original_id = id) |>
         as_arrow_table()
 
