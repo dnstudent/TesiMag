@@ -37,8 +37,9 @@ semi_join.ddb <- function(x, y, ...) {
 
 query_checkpoint <- function(datasets, what, step, conn = NULL) {
     if (is.null(conn)) conn <- dbConnect(duckdb())
-    injection <- paste0("read_parquet(['", archive_path(datasets, what, step), "'])", collapse = "', '")
-    suppressMessages(tbl(conn, injection))
+    injection <- paste0(archive_path(datasets, what, step), collapse = "', '")
+    tbl_query <- str_glue("read_parquet(['{injection}'])")
+    suppressMessages(tbl(conn, tbl_query))
 }
 
 
