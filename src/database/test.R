@@ -2,8 +2,8 @@ library(dplyr, warn.conflicts = FALSE)
 library(assertr, warn.conflicts = FALSE)
 library(arrow, warn.conflicts = FALSE)
 
-assert_data_uniqueness <- function(database) {
-    if (database$data |>
+assert_data_uniqueness <- function(checkpoint) {
+    if (checkpoint$data |>
         group_by(station_id, variable, date) |>
         tally() |>
         filter(n > 1L) |>
@@ -11,11 +11,11 @@ assert_data_uniqueness <- function(database) {
         nrow() > 0L) {
         stop("Data entries are not unique")
     }
-    database
+    checkpoint
 }
 
-assert_metadata_uniqueness <- function(database) {
-    if (database$meta |>
+assert_metadata_uniqueness <- function(checkpoint) {
+    if (checkpoint$meta |>
         group_by(original_dataset, original_id) |>
         tally() |>
         filter(n > 1L) |>
@@ -23,7 +23,7 @@ assert_metadata_uniqueness <- function(database) {
         nrow() > 0L) {
         stop("Metadata entries are not unique")
     }
-    database
+    checkpoint
 }
 
 id_consistency <- function(data, id_col, naming_fn, ...) {

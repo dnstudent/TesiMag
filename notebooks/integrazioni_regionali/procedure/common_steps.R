@@ -33,15 +33,16 @@ new_numeric_ids <- function(data_pack, new_dataset) {
 #' @param .end The end date of the period to be kept (inclusive).
 #'
 #' @return A database containing only the data relevant to the specified time period and the extra metadata table.
-prepare_daily_data <- function(data_pack, dataset_name) {
+prepare_daily_data <- function(data_pack) {
     # data_pack <- new_numeric_ids(data_pack, dataset_name)
     data_pack$data <- data_pack$data |>
         filter(!is.na(value)) |>
+        mutate(variable = if_else(variable == "T_MIN", -1L, 1L)) |>
         arrange(station_id, variable, date) |>
         compute()
 
     date_stats <- data_pack$data |>
-        group_by(station_id) |>
+        group_by(dataset, station_id) |>
         summarize(
             first_registration = min(date),
             last_registration = max(date),
@@ -50,12 +51,17 @@ prepare_daily_data <- function(data_pack, dataset_name) {
         )
 
     data_pack$meta <- data_pack$meta |>
-        semi_join(data_pack$data, join_by(original_id == station_id)) |>
-        left_join(date_stats, join_by(original_id == station_id), relationship = "one-to-one") |>
+        semi_join(data_pack$data, join_by(original_dataset == dataset, original_id == station_id)) |>
+        left_join(date_stats, join_by(original_dataset == dataset, original_id == station_id), relationship = "one-to-one") |>
+        mutate(original_id = cast(original_id, utf8())) |>
+        compute()
+
+    data_pack$data <- data_pack$data |>
+        mutate(station_id = cast(station_id, utf8())) |>
         compute()
 
     split <- split_station_metadata(data_pack$meta)
-    list("database" = as_database(split[[1]], data_pack$data) |> assert_data_uniqueness() |> assert_metadata_uniqueness(), "extra_meta" = split[[2]])
+    list("checkpoint" = as_checkpoint(split[[1]], data_pack$data) |> assert_data_uniqueness() |> assert_metadata_uniqueness(), "extra_meta" = split[[2]])
 }
 
 #' Produces the plot of year-monthly series availabilities (the number of available and usable series per year/month) and the table used to compute them.
@@ -73,14 +79,15 @@ ymonthly_availabilities <- function(data, ...) {
 
 #' Produces the table and plot of spatial series availabilities.
 spatial_availabilities <- function(ymonthly_avail, stations, map, ...) {
-    spatav <- clim_availability(ymonthly_avail, ...) |>
-        collect()
+    spatav <- clim_availability(ymonthly_avail, ...)
+    # collect()
 
     p <- ggplot() +
         geom_sf(data = map) +
         geom_sf(
             data = spatav |>
-                left_join(stations |> select(dataset, id, lon, lat) |> collect(), join_by(dataset, station_id == id)) |>
+                left_join(stations |> select(original_dataset, original_id, lon, lat), join_by(dataset == original_dataset, station_id == original_id)) |>
+                collect() |>
                 st_md_to_sf(),
             aes(color = qc_clim_available, shape = dataset)
         )
