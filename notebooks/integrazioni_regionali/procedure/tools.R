@@ -14,11 +14,11 @@ filter_inside <- function(metadata, boundaries) {
         as_arrow_table()
 }
 
-filter_checkpoint_inside <- function(database, region) {
+filter_checkpoint_inside <- function(checkpoint, region) {
     if (is.null(region)) {
-        return(database)
+        return(checkpoint)
     }
-    meta <- database$meta |>
+    meta <- checkpoint$meta |>
         collect() |>
         st_md_to_sf(remove = FALSE) |>
         sf::st_filter(region, .predicate = sf::st_within) |>
@@ -26,7 +26,7 @@ filter_checkpoint_inside <- function(database, region) {
         as_arrow_table2(station_schema)
     list(
         "meta" = meta,
-        "data" = database$data |> semi_join(meta, join_by(dataset, station_id == id)) |> compute()
+        "data" = checkpoint$data |> semi_join(meta, join_by(dataset == original_dataset, station_id == original_id)) |> compute()
     )
 }
 
