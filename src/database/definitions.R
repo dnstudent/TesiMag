@@ -1,9 +1,9 @@
 library(arrow, warn.conflicts = FALSE)
 
 data_schema <- schema(
-    # dataset = utf8(),
+    dataset = utf8(),
     station_id = utf8(),
-    variable = utf8(),
+    variable = int32(),
     date = date32(),
     value = double()
 )

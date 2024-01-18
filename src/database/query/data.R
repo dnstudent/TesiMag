@@ -1,3 +1,6 @@
+library(duckdb, warn.conflicts = FALSE)
+library(DBI, warn.conflicts = FALSE)
+
 source("src/database/open.R")
 
 query_from_connection <- function(stations, data_table_name, dataconn) {
@@ -31,6 +34,13 @@ semi_join.ddb <- function(x, y, ...) {
 
     x |> semi_join(y_tbl, ...)
 }
+
+query_checkpoint <- function(datasets, what, step, conn = NULL) {
+    if (is.null(conn)) conn <- dbConnect(duckdb())
+    injection <- paste0("read_parquet(['", archive_path(datasets, what, step), "'])", collapse = "', '")
+    suppressMessages(tbl(conn, injection))
+}
+
 
 valid_data <- function(dataconn) {
     suppressMessages(tbl(dataconn, "read_parquet('db/data/qc1/valid=true/**/*.parquet')")) |>

@@ -1,34 +1,16 @@
 library(arrow, warn.conflicts = FALSE)
 library(dplyr, warn.conflicts = FALSE)
 library(sf, warn.conflicts = FALSE)
+library(duckdb, warn.conflicts = FALSE)
+library(DBI, warn.conflicts = FALSE)
 
 source("src/database/tools.R")
 source("src/load/tools.R")
 
-read_station_metadata <- function(dataset_id, provisional) {
-    read_parquet(file.path(base_path("metadata", provisional), "stations", paste0(dataset_id, ".parquet")), as_data_frame = FALSE)
+read_storage <- function(dataset, what, step) {
+    read_parquet(archive_path(dataset, what, step))
 }
 
-read_station_extra_metadata <- function(dataset_id, provisional) {
-    read_parquet(file.path(base_path("metadata", provisional), "extra", paste0(dataset_id, ".parquet")), as_data_frame = FALSE)
-}
-
-read_series_metadata <- function(dataset_id, provisional) {
-    read_parquet(file.path(base_path("metadata", provisional), "series", paste0(dataset_id, ".parquet")), as_data_frame = FALSE)
-}
-
-open_data <- function(dataset_id, tag, provisional) {
-    open_dataset(file.path(base_path("data", provisional), dataset_id, paste0(tag, ".parquet")))
-}
-
-query_checkpoint_data <- function(datasets, tag) {
-    open_data(datasets, tag, provisional = TRUE) |> to_duckdb(table_name = "data_tmp")
-}
-
-open_metadata <- function(dataset_id, tag, provisional) {
-    open_dataset(file.path(base_path("metadata", provisional), dataset_id, paste0(tag, ".parquet")))
-}
-
-read_extra_metadata <- function(dataset_id, provisional) {
-    read_parquet(file.path(base_path("metadata", provisional), dataset_id, paste0("extra.parquet")), as_data_frame = FALSE)
+open_storage <- function(dataset, what, step) {
+    open_dataset(archive_path(dataset, what, step))
 }
