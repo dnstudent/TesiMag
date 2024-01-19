@@ -13,26 +13,24 @@ dataset_spec <- function() {
 
 load_meta <- function() {
     ds_id <- "ARPAL"
-    read_feather(file.path(path.ds, "ARPA", "LIGURIA", "metadata.arrow"), as_data_frame = FALSE) |>
-        mutate(network = ds_id, dataset = ds_id, state = "Liguria", across(c(anagrafica, identifier, province, BACINO), ~ cast(., utf8()))) |>
-        rename(name = anagrafica, id = identifier) |>
-        collect() |>
-        as_arrow_table()
+    read_csv_arrow(file.path(path.ds, "ARPA", "LIGURIA", "metadata.csv"), as_data_frame = FALSE) |>
+        mutate(network = ds_id, original_dataset = ds_id, state = "Liguria", across(c(anagrafica, identifier, province, BACINO), ~ cast(., utf8())), kind = "unknown") |>
+        rename(name = anagrafica, original_id = identifier) |>
+        compute()
 }
 
-load_data <- function(first_date, last_date) {
+load_data <- function() {
     read_parquet(file.path(path.ds, "ARPA", "LIGURIA", "dataset.parquet"), as_data_frame = FALSE) |>
-        filter(first_date <= date & date <= last_date) |>
         mutate(dataset = "ARPAL", across(c(variable, identifier), ~ cast(., utf8()))) |>
         rename(station_id = identifier) |>
         compute()
 }
 
-load_daily_data.arpal <- function(first_date, last_date) {
+load_daily_data.arpal <- function() {
     meta <- load_meta()
-    data <- load_data(first_date, last_date)
+    data <- load_data()
 
-    meta <- semi_join(meta, data, join_by(dataset, id == station_id)) |> compute()
+    meta <- semi_join(meta, data, join_by(original_id == station_id)) |> compute()
 
     list("meta" = meta, "data" = data)
 }
