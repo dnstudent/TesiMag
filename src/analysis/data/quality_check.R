@@ -15,7 +15,7 @@ qc_excursion <- function(data, min_excursion = 0, max_excursion = 50) {
 
 qc_gross <- function(data, threshold = 50) {
     data |>
-        mutate(qc_gross = is.na(value) | (abs(value) <= 50))
+        mutate(qc_gross = is.na(value) | (abs(value) <= threshold))
 }
 
 flag_integers <- function(data) {
