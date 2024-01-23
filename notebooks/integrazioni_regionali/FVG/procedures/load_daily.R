@@ -30,11 +30,11 @@ load_metadata <- function() {
         )
     ) |>
         as_tibble() |>
-        rename(id = station_code, name = station_name) |>
-        mutate(dataset = "ARPAFVG", state = "Friuli-Venezia Giulia", network = "ARPAFVG")
+        rename(original_id = station_code, name = station_name) |>
+        mutate(original_dataset = "ARPAFVG", state = "Friuli-Venezia Giulia", network = "ARPAFVG", kind = "unknown")
 }
 
-load_data <- function(first_date, last_date) {
+load_data <- function() {
     path.data <- file.path(path.base, "dataset")
     # Ho valutato se pescare anche la T media per fare delle correzioni, ma meglio evitare mischiotti
     open_dataset(path.data) |>
@@ -43,15 +43,15 @@ load_data <- function(first_date, last_date) {
         mutate(station_id = cast(station_id, utf8())) |>
         to_duckdb() |>
         pivot_longer(cols = c(T_MIN, T_MAX), names_to = "variable", values_to = "value") |>
-        filter(!is.na(value), first_date <= date & date <= last_date) |>
+        filter(!is.na(value)) |>
         mutate(dataset = "ARPAFVG") |>
         to_arrow() |>
         compute()
 }
 
-load_daily_data.arpafvg <- function(first_date, last_date) {
+load_daily_data.arpafvg <- function() {
     meta <- load_metadata()
-    data <- load_data(first_date, last_date)
+    data <- load_data()
 
     if (data |> group_by(station_id, variable, date) |> tally() |> filter(n > 1L) |> compute() |> nrow() > 0) {
         stop("Duplicated values")
