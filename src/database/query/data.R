@@ -53,14 +53,23 @@ query_checkpoint <- function(datasets, what, step, conn = NULL) {
 
 
 valid_data <- function(dataconn) {
-    query_parquet("db/data/qc1/valid=true/**/*.parquet", dataconn) |>
-        # suppressMessages(tbl(dataconn, "read_parquet('db/data/qc1/valid=true/**/*.parquet')")) |>
-        select(!c(valid, starts_with("qc_"))) |>
-        mutate(variable = as.integer(variable))
+    suppressMessages(tbl(dataconn, "read_parquet('db/data/qc1/**/*.parquet', hive_partitioning = 1, hive_types = {'valid': boolean, 'variable': int, 'dataset': text})", check_from = FALSE)) |>
+        filter(valid) |>
+        select(!c(valid, starts_with("qc_")))
 }
 
 valid_series <- function(valid_data) {
     valid_data |> distinct(station_id, variable)
+}
+
+useful_data <- function(data_query) {
+    stations <- tbl(data_query$src$con, "raw_stations_tmp") |>
+        filter(lat > 42, !(state %in% c("Lazio", "Abruzzo"))) |>
+        select(id)
+
+    data_query |>
+        filter(date >= as.Date("1990-01-01")) |>
+        semi_join(stations, by = c("station_id" = "id"))
 }
 
 series_matches <- function(valid_series, station_matches, asymmetric = TRUE, cmp = \(x, y) x < y) {

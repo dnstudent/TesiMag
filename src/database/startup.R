@@ -69,7 +69,7 @@ load_dbs <- function() {
         INSTALL postgres;
         LOAD postgres;
         ATTACH 'dbname=georefs' AS postgis_db (TYPE postgres);
-        CREATE OR REPLACE TEMPORARY TABLE stations_tmp AS SELECT * EXCLUDE (geom, geog) FROM postgis_db.station_geo;
+        CREATE OR REPLACE TEMPORARY TABLE raw_stations_tmp AS SELECT * EXCLUDE (geom, geog) FROM postgis_db.raw_station_geo;
         "
     )
     list(stations = connpost, data = connquack)
