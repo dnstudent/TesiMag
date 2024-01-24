@@ -38,7 +38,7 @@ prepare_daily_data <- function(data_pack) {
     data_pack$data <- data_pack$data |>
         filter(!is.na(value)) |>
         mutate(variable = if_else(variable == "T_MIN", -1L, 1L)) |>
-        arrange(station_id, variable, date) |>
+        arrange(dataset, station_id, variable, date) |>
         compute()
 
     date_stats <- data_pack$data |>
