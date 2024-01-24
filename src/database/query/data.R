@@ -35,16 +35,26 @@ semi_join.ddb <- function(x, y, ...) {
     x |> semi_join(y_tbl, ...)
 }
 
+#' WARNING: When an error with the message "Could not find table 'x'" is raised, it is likely that there is an error in the query.
+#' Check again e.g. the join columns
+query_parquet <- function(path, conn = NULL) {
+    if (length(path) > 1L) path <- paste0(path, collapse = "', '")
+    if (is.null(conn)) {
+        conn <- dbConnect(duckdb())
+        dbExecute(conn, "INSTALL icu; LOAD icu;")
+    }
+    tbl_query <- str_glue("read_parquet(['{path}'])")
+    suppressMessages(tbl(conn, tbl_query, check_from = FALSE))
+}
+
 query_checkpoint <- function(datasets, what, step, conn = NULL) {
-    if (is.null(conn)) conn <- dbConnect(duckdb())
-    injection <- paste0(archive_path(datasets, what, step), collapse = "', '")
-    tbl_query <- str_glue("read_parquet(['{injection}'])")
-    suppressMessages(tbl(conn, tbl_query))
+    query_parquet(archive_path(datasets, what, step), conn)
 }
 
 
 valid_data <- function(dataconn) {
-    suppressMessages(tbl(dataconn, "read_parquet('db/data/qc1/valid=true/**/*.parquet')")) |>
+    query_parquet("db/data/qc1/valid=true/**/*.parquet", dataconn) |>
+        # suppressMessages(tbl(dataconn, "read_parquet('db/data/qc1/valid=true/**/*.parquet')")) |>
         select(!c(valid, starts_with("qc_"))) |>
         mutate(variable = as.integer(variable))
 }
