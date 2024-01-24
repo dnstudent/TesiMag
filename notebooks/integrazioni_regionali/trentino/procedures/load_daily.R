@@ -200,14 +200,16 @@ load_daily_data.taa <- function() {
     db1 <- load_bz()
     db2 <- load_tn()
 
-    metas <- bind_rows(db1$meta |> collect(), db2$meta |> collect()) |> mutate(state = "Trentino-Alto Adige")
+    metas <- bind_rows(db1$meta |> collect(), db2$meta |> collect()) |> mutate(state = "Trentino-Alto Adige", original_dataset = "TAA")
     datas <- concat_tables(
         db1$data |>
             relocate(all_of(data_schema$names)) |>
             compute(),
         db2$data,
         unify_schemas = FALSE
-    )
+    ) |>
+        mutate(dataset = "TAA") |>
+        compute()
 
     list("meta" = metas |> as_arrow_table(), "data" = datas)
 }
