@@ -3,12 +3,15 @@ library(dplyr, warn.conflicts = FALSE)
 library(tidyr, warn.conflicts = FALSE)
 library(stringi, warn.conflicts = FALSE)
 library(stringr, warn.conflicts = FALSE)
+library(lubridate, warn.conflicts = FALSE)
 
 source("src/paths/paths.R")
 source("src/database/tools.R")
 source("src/database/test.R")
 source("src/database/definitions.R")
+source("src/database/query/data.R")
 source("src/analysis/data/quality_check.R")
+source("src/analysis/data/aggregation.R")
 
 dataset_spec.aa.api <- function() {
     list(
@@ -38,7 +41,7 @@ dataset_spec.tn <- function() {
     list(
         "http://storico.meteotrentino.it/web.htm",
         "regional",
-        "Dati forniti da Meteotrentino. Risoluzione giornaliera e/o suboraria. Laddove mancante, l''aggregazione giornaliera è stata fatta manualmente dai dati."
+        "Dati forniti da Meteotrentino. Risoluzione giornaliera e/o suboraria. Combinazione di dati da automatiche e da annali. Laddove mancante, l''aggregazione giornaliera è stata fatta manualmente dai dati."
     )
 }
 
@@ -60,29 +63,6 @@ normalize_original <- function(original_id) {
         str_trim()
 }
 
-daily_aggregation <- function(data, threshold = 0.97) {
-    data |>
-        filter(!is.na(value)) |>
-        gross_errors_check(value) |>
-        filter(qc_gross) |>
-        group_by(station_id, date = as.Date(time)) |>
-        summarise(
-            T_MIN = min(value),
-            T_MAX = max(value),
-            n_measures = n(),
-            .groups = "drop"
-        ) |>
-        to_duckdb() |>
-        group_by(station_id, year = year(date), month = month(date)) |>
-        mutate(max_measures = max(n_measures, na.rm = TRUE)) |>
-        ungroup() |>
-        filter(n_measures / max_measures > threshold) |>
-        select(!c(max_measures, n_measures, year, month)) |>
-        pivot_longer(c(T_MIN, T_MAX), names_to = "variable", values_to = "value") |>
-        to_arrow() |>
-        compute()
-}
-
 load_bz_api_meta <- function() {
     # Temperature sensors
     sensor_codes <- read_csv_arrow(file.path(path_bz, "api", "sensors.csv")) |>
@@ -91,8 +71,8 @@ load_bz_api_meta <- function() {
     sf::read_sf(file.path(path_bz, "api", "stations.geojson")) |>
         sf::st_drop_geometry() |>
         semi_join(sensor_codes, by = "SCODE") |>
-        rename(id = SCODE, name = NAME_I, elevation = ALT, lon = LONG, lat = LAT) |>
-        mutate(network = "bz_api", dataset = "Alto Adige API", id = normalize_original(id)) |>
+        rename(original_id = SCODE, name = NAME_I, elevation = ALT, lon = LONG, lat = LAT) |>
+        mutate(network = "bz_api", original_dataset = "Alto Adige API", original_id = normalize_original(original_id), kind = "automatiche") |>
         select(any_of(station_schema$names)) |>
         as_arrow_table()
 }
@@ -110,26 +90,28 @@ load_bz_xlsx_meta <- function() {
         mutate(coords = as_tibble(sf::st_coordinates(geometry)), network = "bz_xlsx", elevation = as.double(elevation)) |>
         sf::st_drop_geometry() |>
         unnest_wider(coords) |>
-        rename(lon = X, lat = Y, x_EPSG_25832 = x, y_EPSG_25832 = y, name = station_name, id = original_id) |>
-        mutate(dataset = "Alto Adige XLSX", id = normalize_original(id))
+        rename(lon = X, lat = Y, x_EPSG_25832 = x, y_EPSG_25832 = y, name = station_name) |>
+        mutate(original_dataset = "Alto Adige XLSX", original_id = normalize_original(original_id), kind = "unknown") |>
+        as_arrow_table()
 }
 
-load_data_bz <- function(first_date, last_date) {
-    bz_api <- open_dataset(file.path(path_bz, "api", "raw_parquet")) |>
+load_data_bz <- function() {
+    bz_api <- query_parquet(file.path(path_bz, "api", "dataset", "*", "*.parquet")) |>
         rename(station_id = original_id, value = VALUE, time = DATE) |>
-        mutate(station_id = cast(station_id, utf8()) |> str_to_upper() |> str_trim()) |>
-        daily_aggregation(0.9) |>
+        mutate(dataset = "Alto Adige API") |>
+        daily_aggregation(quality_threshold = 0.8) |>
+        select(-dataset) |>
+        to_arrow() |>
         relocate(any_of(data_schema$names)) |>
         compute()
 
-    bz_xlsx <- read_parquet(file.path(path_bz, "xlsx", "data.parquet"), as_data_frame = FALSE) |>
+    bz_xlsx <- query_parquet(file.path(path_bz, "xlsx", "data.parquet")) |>
         rename(station_id = original_id) |>
-        mutate(station_id = cast(station_id, utf8()) |> str_to_upper() |> str_trim()) |>
+        mutate(station_id = as.character(station_id) |> str_to_upper() |> str_trim()) |>
         select(-station_name) |>
-        to_duckdb() |>
         pivot_longer(cols = c(T_MIN, T_MAX), names_to = "variable", values_to = "value") |>
-        relocate(any_of(data_schema$names)) |>
         to_arrow() |>
+        relocate(any_of(data_schema$names)) |>
         compute()
 
     concat_tables(
@@ -137,106 +119,90 @@ load_data_bz <- function(first_date, last_date) {
         bz_xlsx,
         unify_schemas = FALSE
     ) |>
-        filter(first_date <= date & date <= last_date) |>
         arrange(station_id, variable, date) |>
         compute()
 }
 
-load_bz <- function(first_date, last_date) {
-    data <- load_data_bz(first_date, last_date)
-
+load_meta_bz <- function() {
     xlsx_meta <- load_bz_xlsx_meta()
-    api_meta <- load_bz_api_meta() |>
-        anti_join(xlsx_meta, by = "id") |>
-        relocate(any_of(colnames(xlsx_meta))) |>
-        collect()
+    api_meta <- load_bz_api_meta()
 
-    meta <- bind_rows(
-        api_meta,
-        xlsx_meta
-    ) |> semi_join(data |> distinct(station_id) |> collect(), join_by(id == station_id))
+    common <- xlsx_meta |>
+        select(!c(lon, lat, elevation, kind)) |>
+        inner_join(api_meta |> select(!c(name, network, original_dataset)), by = "original_id") |>
+        collect()
+    extra <- api_meta |>
+        anti_join(common, by = "original_id") |>
+        collect()
+    bind_rows(
+        common,
+        extra
+    ) |> as_arrow_table()
+}
+
+load_bz <- function() {
+    meta <- load_meta_bz()
+    data <- load_data_bz()
+
+    data <- data |>
+        left_join(meta |> select(station_id = original_id, dataset = original_dataset), by = "station_id", relationship = "many_to_one") |>
+        compute()
 
     list("meta" = meta, "data" = data)
 }
 
-qc_aggregated <- function(data, value_var, valid_var) {
-    select(data, station_id, date, value = {{ value_var }}, valid = {{ valid_var }}) |>
-        filter(valid < 150L, valid != 140L, !is.na(value)) |> # http://storico.meteotrentino.it/
-        gross_errors_check(value) |>
-        arrange(station_id, date) |>
-        group_by(station_id) |>
-        collect() |>
-        repeated_values_check() |>
-        integer_streak_check(threshold = 8L) |>
-        ungroup() |>
-        filter(qc_gross & qc_repeated & qc_int_streak) |>
-        select(!c(valid, starts_with("qc_"))) |>
-        as_arrow_table()
-}
-
-load_data_tn <- function(first_date, last_date) {
-    subh_data <- open_dataset(file.path(path_tn, "fragments_subhour", "dataset")) |>
-        mutate(original_id = cast(original_id, utf8()) |> str_to_upper() |> str_trim()) |>
-        rename(station_id = original_id) |>
-        daily_aggregation(0.9) |>
-        relocate(any_of(data_schema$names)) |>
-        compute()
-
-    given_aggregated <- read_parquet(file.path(path_tn, "fragments", "data.parquet"), as_data_frame = FALSE) |>
+load_data_tn <- function() {
+    auto_data <- query_parquet(file.path(path_tn, "fragments", "t", "data.parquet")) |>
         filter(value_TMIN < value_TMAX) |>
-        mutate(station_id = cast(original_id, utf8()), date = as.Date(time)) |>
-        select(-time, -original_id) |>
+        mutate(station_id = as.character(original_id)) |>
+        select(station_id, date, T_MIN = value_TMIN, valid_TMIN, T_MAX = value_TMAX, valid_TMAX) |>
+        filter(if_all(starts_with("valid"), ~ (. < 150L & . != 140L))) |>
+        pivot_longer(cols = c(T_MIN, T_MAX), names_to = "variable", values_to = "value") |>
+        filter(abs(value) < 50) |>
+        select(!starts_with("valid")) |>
         compute()
 
-    given_remaining <- concat_tables(
-        T_MIN = qc_aggregated(given_aggregated, value_TMIN, valid_TMIN) |> mutate(variable = "T_MIN") |> compute(),
-        T_MAX = qc_aggregated(given_aggregated, value_TMAX, valid_TMAX) |> mutate(variable = "T_MAX") |> compute(),
-        unify_schemas = FALSE
-    )
+    annali_data <- query_parquet(file.path(path_tn, "fragments", "annali.parquet"), auto_data$src$con) |>
+        mutate(date = if_else(variable == "T_MIN", as.Date(time), as.Date(sql("time - INTERVAL 1 DAY")))) |>
+        rename(station_id = original_id) |>
+        select(station_id, date, variable, value) |>
+        anti_join(auto_data, by = c("station_id", "date", "variable"))
 
-    # return(list(given_remaining, subh_data))
-
-    integrations <- anti_join(subh_data, given_remaining, by = c("station_id", "date", "variable")) |>
-        relocate(all_of(colnames(given_remaining))) |>
-        compute()
-
-    concat_tables(
-        given_remaining,
-        integrations,
-        unify_schemas = FALSE
-    ) |>
-        filter(first_date <= date & date <= last_date) |>
+    rows_append(auto_data, annali_data) |>
         mutate(dataset = "Trentino") |>
+        to_arrow() |>
         relocate(all_of(data_schema$names)) |>
         compute()
 }
 
 load_meta_tn <- function() {
     vroom::vroom(file.path(path_tn, "meta.csv"), show_col_types = FALSE) |>
-        mutate(across(c(inizio, fine), dmy), dataset = "Trentino", network = "meteotrentino", id = codice |> str_squish() |> str_to_upper()) |>
+        as_tibble() |>
+        mutate(across(c(inizio, fine), dmy), original_dataset = "Trentino", network = "meteotrentino", original_id = codice |> str_squish() |> str_to_upper(), kind = "unknown") |>
         select(-codice, -nomebreve) |>
         rename(name = nome, elevation = quota, lat = latitudine, lon = longitudine, east = est) |>
-        as_tibble() |>
         as_arrow_table()
 }
 
-load_tn <- function(first_date, last_date) {
-    data <- load_data_tn(first_date, last_date)
-    meta <- load_meta_tn() |>
-        semi_join(data, join_by(id == station_id)) |>
+load_tn <- function() {
+    data <- load_data_tn()
+    meta <- load_meta_tn()
+
+    # Filtering out stations that do not provide temperatures
+    meta <- meta |>
+        semi_join(data, by = c("original_id" = "station_id")) |>
         compute()
 
     list("meta" = meta, "data" = data)
 }
 
-load_daily_data.taa <- function(first_date, last_date) {
-    db1 <- load_bz(first_date, last_date)
-    db2 <- load_tn(first_date, last_date)
+load_daily_data.taa <- function() {
+    db1 <- load_bz()
+    db2 <- load_tn()
 
     metas <- bind_rows(db1$meta |> collect(), db2$meta |> collect()) |> mutate(state = "Trentino-Alto Adige")
     datas <- concat_tables(
         db1$data |>
-            mutate(dataset = "Alto Adige") |>
             relocate(all_of(data_schema$names)) |>
             compute(),
         db2$data,
