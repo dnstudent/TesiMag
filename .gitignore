@@ -13,6 +13,7 @@
 *.csv
 *.duckdb*
 temp/
+tmp_duck/
 cache/
 missing*/
 db/

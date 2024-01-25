@@ -44,7 +44,7 @@ monthly_availabilities.grouped <- function(table, minimum_valid_days = 20L, maxi
 monthly_availabilities <- function(table, minimum_valid_days = 20L, maximum_consecutive_missing_days = 4L) {
     table |>
         filter(!is.na(value)) |>
-        group_by(dataset, station_id, variable, month = as.integer(month(date)), year = as.integer(year(date))) |>
+        group_by(dataset, station_id, variable, month = as.integer(month(date)), year = as.integer(year(date)), .add = TRUE) |>
         monthly_availabilities.grouped(minimum_valid_days, maximum_consecutive_missing_days)
 }
 

@@ -21,19 +21,19 @@ plot_state_avail <- function(metadata, data, start_date = NULL, end_date = NULL,
     list("plot" = p, "data" = ymonthly_availabilities)
 }
 
-plot_state_avail.tbl <- function(data, ...) {
-    ymonthly <- monthly_availabilities(data, ...) |> compute()
+plot_state_avail.tbl <- function(data, .minimum_valid_days = 20L, .maximum_consecutive_missing_days = 4L) {
+    ymonthly <- monthly_availabilities(data, minimum_valid_days = .minimum_valid_days, maximum_consecutive_missing_days = .maximum_consecutive_missing_days) |>
+        compute()
 
     p <- ymonthly |>
-        group_by(dataset, variable, year, month) |>
+        group_by(dataset, variable, year, month, .add = TRUE) |>
         summarise(available_series = sum(if_else(qc_month_available, 1L, 0L), na.rm = TRUE), .groups = "drop") |>
         arrange(year, month) |>
         collect() |>
         mutate(yearmonth = make_yearmonth(year, month)) |>
         as_tsibble(key = c(variable, dataset), index = yearmonth) |>
         ggplot() +
-        geom_line(aes(yearmonth, available_series, color = dataset)) +
-        facet_grid(variable ~ .)
+        geom_line(aes(yearmonth, available_series, color = dataset))
     list("plot" = p, "data" = ymonthly)
 }
 
