@@ -64,7 +64,7 @@ valid_series <- function(valid_data) {
 
 useful_data <- function(data_query) {
     stations <- tbl(data_query$src$con, "raw_stations_tmp") |>
-        filter(lat > 42, !(state %in% c("Lazio", "Abruzzo"))) |>
+        filter(lat > 42.1, !(geom_state %in% c("Lazio", "Abruzzo"))) |>
         select(id)
 
     data_query |>

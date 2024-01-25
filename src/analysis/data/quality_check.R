@@ -60,5 +60,6 @@ qc1 <- function(raw_data_tbl) {
     raw_data_tbl |>
         qc_excursion() |>
         qc_gross() |>
-        qc_repetitions()
+        qc_repetitions() |>
+        mutate(valid = qc_gross & qc_excursion & qc_repeated_values & qc_repeated_integers)
 }
