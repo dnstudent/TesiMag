@@ -2,7 +2,6 @@ library(dplyr, warn.conflicts = FALSE)
 library(arrow, warn.conflicts = FALSE)
 
 source("src/load/tools.R")
-source("src/analysis/metadata.R")
 
 match_list <- function(meta.x, meta.y, dist_km, ...) {
     meta.x <- meta.x |>
