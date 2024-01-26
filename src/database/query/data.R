@@ -44,7 +44,7 @@ query_parquet <- function(path, conn = NULL) {
         dbExecute(conn, "INSTALL icu; LOAD icu;")
     }
     tbl_query <- str_glue("read_parquet(['{path}'])")
-    suppressMessages(tbl(conn, tbl_query, check_from = FALSE))
+    suppressMessages(tbl(conn, tbl_query))
 }
 
 query_checkpoint <- function(datasets, what, step, conn = NULL) {
@@ -53,7 +53,7 @@ query_checkpoint <- function(datasets, what, step, conn = NULL) {
 
 
 valid_data <- function(dataconn) {
-    suppressMessages(tbl(dataconn, "read_parquet('db/data/qc1/**/*.parquet', hive_partitioning = 1, hive_types = {'valid': boolean, 'variable': int, 'dataset': text})", check_from = FALSE)) |>
+    suppressMessages(tbl(dataconn, "read_parquet('db/data/qc1/valid=true/**/*.parquet', hive_partitioning = 1, hive_types = {'variable': int, 'dataset': text})")) |>
         filter(valid) |>
         select(!c(valid, starts_with("qc_")))
 }
@@ -72,10 +72,10 @@ useful_data <- function(data_query) {
         semi_join(stations, by = c("station_id" = "id"))
 }
 
-series_matches <- function(valid_series, station_matches, asymmetric = TRUE, cmp = \(x, y) x < y) {
+series_matches <- function(data, station_matches, metadata) {
+    valid_series <- valid_series(data |> semi_join(metadata, by = c("station_id" = "id"))) |> collect()
     station_matches |>
-        cross_join(tibble(variable = c(-1L, 1L)), copy = TRUE) |>
+        cross_join(tibble(variable = c(-1L, 1L))) |>
         semi_join(valid_series, by = c("id_x" = "station_id", "variable")) |>
-        semi_join(valid_series, by = c("id_y" = "station_id", "variable")) |>
-        filter((cmp(id_x, id_y) & asymmetric) | !asymmetric)
+        semi_join(valid_series, by = c("id_y" = "station_id", "variable"))
 }

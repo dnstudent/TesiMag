@@ -43,7 +43,10 @@ write_xlsx_analysis <- function(analysis, to, ...) {
         valid_days_x,
         valid_days_y,
         starts_with("overlap"),
-        qc_clim_available, ...
+        qc_clim_available,
+        first_registration_x,
+        first_registration_y,
+        ...
     )
     class(analysis$strSym) <- "percentage"
     class(analysis$f0) <- "percentage"

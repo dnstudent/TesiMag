@@ -15,11 +15,11 @@ lag_analysis <- function(x, series_matches, time_offsets) {
 
     best_lagged_matches <- pair_common_series(x, lagged_match_list) |>
         group_by(id_x, id_y, variable, offset_days) |>
-        summarise(maeT = mean(abs(value_y - value_x), na.rm = TRUE), .groups = "drop_last") |>
-        slice_min(maeT, with_ties = TRUE, .preserve = TRUE) |>
+        summarise(f0 = mean(as.integer(abs(value_y - value_x) < 1e-4), na.rm = TRUE), .groups = "drop_last") |>
+        slice_max(f0, with_ties = TRUE, .preserve = TRUE) |>
         filter(n() == 1L) |>
         ungroup() |>
-        select(-maeT) |>
+        select(-f0) |>
         compute()
 
     nodata_matches <- series_matches |>

@@ -1,9 +1,10 @@
 library(ggplot2, warn.conflicts = FALSE)
+library(pals, warn.conflicts = FALSE)
 library(dplyr, warn.conflicts = FALSE)
 source("src/database/query/data.R")
 source("src/merging/pairing.R")
 
-plot_stations <- function(ids, dataconn, same_period = TRUE) {
+plot_stations <- function(ids, dataconn, same_period = TRUE, matches = TRUE) {
     data <- valid_data(dataconn) |>
         semi_join(ids, by = colnames(ids), copy = TRUE) |>
         arrange(station_id, date) |>
@@ -43,12 +44,11 @@ plot_diffs <- function(matches, dataconn, ...) {
             mutate(offset_days = 0L)
     }
 
-    data <- valid_data(dataconn)
+    data <- valid_data(dataconn) |> select(-dataset)
     data <- pair_full_series(data, matches) |>
-        left_join(matches |> select(starts_with("id"), variable, starts_with("dataset"), starts_with("name")), by = c("id_x", "id_y", "variable")) |>
-        mutate(delT = value_y - value_x) |>
+        left_join(matches |> select(starts_with("id"), starts_with("dataset"), variable, starts_with("name")), by = c("id_x", "id_y", "variable")) |>
+        mutate(delT = value_y - value_x, valid = !is.na(delT)) |>
         collect() |>
-        filter(!is.na(delT)) |>
         mutate(
             variable = factor(variable, levels = c(-1L, 1L), labels = c("T_MIN", "T_MAX")),
             match_id = as.factor(paste0(dataset_x, " ", name_x, " ", id_x, "\n", dataset_y, " ", name_y, " ", id_y))
@@ -56,8 +56,11 @@ plot_diffs <- function(matches, dataconn, ...) {
 
     dbExecute(dataconn, "DROP TABLE matches_plot_tmp")
 
-    ggplot(data = data) +
-        geom_line(aes(x = date, y = delT, color = variable, linetype = variable, ...)) +
+    ggplot(data = data |> arrange(match_id, variable, date)) +
+        geom_line(aes(x = date, y = delT, color = variable, linetype = variable, ...), na.rm = TRUE) +
+        # geom_rect(aes(NULL, NULL, xmin = date, xmax = lag(date), fill = valid), ymin = -0.5, ymax = 0.5, na.rm = TRUE) +
+        # scale_fill_manual(values = c("TRUE" = alpha("white", 0), "FALSE" = alpha(c("red"), 0.8))) +
+        scale_color_manual(values = coolwarm(2)) +
         facet_grid(match_id ~ ., scales = "free")
 }
 
