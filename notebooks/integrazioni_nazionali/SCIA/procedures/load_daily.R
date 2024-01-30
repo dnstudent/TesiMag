@@ -81,8 +81,8 @@ load_meta <- function() {
 load_daily_data.scia <- function() {
     meta <- load_meta() |>
         select(-valid_days) |>
-        mutate(original_dataset = "SCIA", state = as.character(state), province = as.character(province), network = as.character(network), kind = "unknown") |>
-        rename(original_id = id) |>
+        mutate(dataset = "SCIA", state = as.character(state), province = as.character(province), network = as.character(network), id = as.character(id), kind = "unknown") |>
+        rename(series_id = id) |>
         as_arrow_table()
 
     tmin <- open_dataset(path.datafile("SCIA", "T_MIN")) |>
@@ -94,26 +94,26 @@ load_daily_data.scia <- function() {
         mutate(variable = "T_MAX")
 
     data <- concat_tables(tmin |> compute(), tmax |> compute(), unify_schemas = FALSE) |>
-        mutate(station_id = cast(internal_id, int32()), .keep = "unused") |>
-        semi_join(meta, join_by(station_id == original_id)) |>
+        mutate(series_id = cast(internal_id, utf8()), .keep = "unused") |>
+        # semi_join(meta, join_by(station_id == original_id)) |>
         filter(!is.na(value)) |>
         mutate(dataset = "SCIA") |>
         compute()
 
     meta <- meta |>
-        semi_join(data, join_by(original_id == station_id)) |>
+        mutate(
+            station_id = NA_character_,
+            sensor_id = NA_character_,
+            sensor_first = as.Date(NA_integer_),
+            sensor_last = as.Date(NA_integer_),
+            station_first = as.Date(NA_integer_),
+            station_last = as.Date(NA_integer_),
+            series_first = as.Date(NA_integer_),
+            series_last = as.Date(NA_integer_),
+            town = NA_character_,
+        ) |>
+        # semi_join(data, join_by(original_id == station_id)) |>
         compute()
-
-    n_dupli <- data |>
-        group_by(station_id, variable, date) |>
-        tally() |>
-        filter(n > 1L) |>
-        compute() |>
-        nrow()
-
-    if (n_dupli > 0) {
-        stop("Duplicate measures in SCIA data")
-    }
 
     list("meta" = meta, "data" = data)
 }

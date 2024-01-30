@@ -26,7 +26,7 @@ flag_integers <- function(data) {
 assign_repetition_gids <- function(data) {
     data |>
         flag_integers() |>
-        group_by(variable, station_id) |>
+        group_by(variable, sensor_key) |>
         window_order(date) |>
         mutate(
             prev_is_different = (abs(value - lag(value)) > 1e-4) |> as.integer() |> coalesce(1L),
@@ -43,12 +43,12 @@ assign_repetition_gids <- function(data) {
 qc_repetitions <- function(data, threshold = 8L) {
     data |>
         assign_repetition_gids() |>
-        group_by(variable, station_id, consecutive_val_gid) |>
+        group_by(variable, sensor_key, consecutive_val_gid) |>
         mutate(
             qc_repeated_values = n() < threshold
         ) |>
         ungroup() |>
-        group_by(variable, station_id, consecutive_int_gid) |>
+        group_by(variable, sensor_key, consecutive_int_gid) |>
         mutate(
             qc_repeated_integers = n() < threshold
         ) |>

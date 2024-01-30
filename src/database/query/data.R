@@ -47,10 +47,28 @@ query_parquet <- function(path, conn = NULL) {
     suppressMessages(tbl(conn, tbl_query))
 }
 
-query_checkpoint <- function(datasets, what, step, conn = NULL) {
-    query_parquet(archive_path(datasets, what, step), conn)
+query_checkpoint_data <- function(datasets, step, conn = NULL) {
+    query_parquet(archive_path(datasets, "data", step), conn)
 }
 
+query_checkpoint_meta <- function(datasets, step = "raw", conn = NULL) {
+    query_parquet(archive_path(datasets, "metadata", step), conn)
+}
+
+query_checkpoint <- function(datasets, step, conn = NULL) {
+    list(
+        "meta" = query_checkpoint_meta(datasets, "raw", conn),
+        "data" = query_checkpoint_data(datasets, step, conn)
+    )
+}
+
+query_filter_checkpoint <- function(dataset, step, conn = NULL, ...) {
+    data <- query_checkpoint_data(dataset, step, conn) |> filter(...)
+    list(
+        "meta" = query_checkpoint_meta(dataset, "raw", conn) |> semi_join(data, by = c("dataset", "sensor_key")),
+        "data" = data
+    )
+}
 
 valid_data <- function(dataconn) {
     suppressMessages(tbl(dataconn, "read_parquet('db/data/qc1/valid=true/**/*.parquet', hive_partitioning = 1, hive_types = {'variable': int, 'dataset': text})")) |>

@@ -1,6 +1,5 @@
 source("src/load/read/BRUN.R")
 source("src/database/tools.R")
-source("src/database/definitions.R")
 
 dataset_spec <- function() {
     list(
@@ -12,16 +11,16 @@ dataset_spec <- function() {
 
 load_work_metadata <- function() {
     tmin <- read.BRUN.metadata("T_MIN", "raw") |>
-        mutate(identifier = as.character(identifier), original_id = str_replace(identifier, regex("^(TMND_)|(TN_)"), ""))
+        mutate(identifier = as.character(identifier), series_id = str_replace(identifier, regex("^(TMND_)|(TN_)"), ""))
     tmax <- read.BRUN.metadata("T_MAX", "raw") |>
-        mutate(identifier = as.character(identifier), original_id = str_replace(identifier, regex("^(TMXD_)|(TX_)"), ""))
+        mutate(identifier = as.character(identifier), series_id = str_replace(identifier, regex("^(TMXD_)|(TX_)"), ""))
 
     bind_rows(
         tmin,
         tmax
     ) |>
         # filter(lat > 42) |>
-        mutate(across(c(region_, country, province), as.character), original_dataset = "ISAC", network = if_else(!is.na(internal_id), "DPC", "ISAC"), kind = "unknown") |>
+        mutate(across(c(region_, country, province), as.character), dataset = "ISAC", network = if_else(!is.na(internal_id), "DPC", "ISAC"), kind = "unknown") |>
         rename(name = anagrafica, actual_original_id = identifier)
 }
 
@@ -39,16 +38,14 @@ load_data <- function(meta) {
     ) |>
         drop_na(value) |>
         as_arrow_table() |>
-        #     write_dataset("db.old/tmp/ISAC")
-        # open_dataset("db.old/tmp/ISAC") |>
         rename(actual_original_id = identifier) |>
         mutate(actual_original_id = cast(actual_original_id, utf8()), dataset = "ISAC") |>
         inner_join(
-            meta |> select(actual_original_id, original_id) |> as_arrow_table(),
+            meta |> select(actual_original_id, series_id) |> as_arrow_table(),
             by = "actual_original_id",
             relationship = "many-to-one"
         ) |>
-        rename(station_id = original_id) |>
+        select(-actual_original_id) |>
         as_arrow_table()
 }
 
@@ -57,7 +54,18 @@ load_daily_data.isac <- function() {
     data <- load_data(meta)
 
     meta <- meta |>
-        distinct(original_dataset, original_id, .keep_all = TRUE) |>
+        distinct(dataset, series_id, .keep_all = TRUE) |>
+        mutate(
+            station_id = NA_character_,
+            sensor_id = NA_character_,
+            sensor_first = as.Date(NA_integer_),
+            sensor_last = as.Date(NA_integer_),
+            station_first = as.Date(NA_integer_),
+            station_last = as.Date(NA_integer_),
+            series_first = as.Date(NA_integer_),
+            series_last = as.Date(NA_integer_),
+            town = NA_character_,
+        ) |>
         as_arrow_table()
 
     list("meta" = meta, "data" = data)
