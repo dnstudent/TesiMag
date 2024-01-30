@@ -55,18 +55,11 @@ query_checkpoint_meta <- function(datasets, step = "raw", conn = NULL) {
     query_parquet(archive_path(datasets, "metadata", step), conn)
 }
 
-query_checkpoint <- function(datasets, step, conn = NULL) {
+query_checkpoint <- function(datasets, step, conn = NULL, all_stations = TRUE) {
+    meta_step <- if (all_stations) "raw" else step
     list(
-        "meta" = query_checkpoint_meta(datasets, "raw", conn),
+        "meta" = query_checkpoint_meta(datasets, meta_step, conn),
         "data" = query_checkpoint_data(datasets, step, conn)
-    )
-}
-
-query_filter_checkpoint <- function(dataset, step, conn = NULL, ...) {
-    data <- query_checkpoint_data(dataset, step, conn) |> filter(...)
-    list(
-        "meta" = query_checkpoint_meta(dataset, "raw", conn) |> semi_join(data, by = c("dataset", "sensor_key")),
-        "data" = data
     )
 }
 
