@@ -1,10 +1,13 @@
 library(arrow, warn.conflicts = FALSE)
 library(tibble, warn.conflicts = FALSE)
 library(dplyr, warn.conflicts = FALSE)
+library(dbplyr, warn.conflicts = FALSE)
 library(rlang, warn.conflicts = FALSE)
 library(stringr, warn.conflicts = FALSE)
+library(tidyr, warn.conflicts = FALSE)
 
 source("src/database/data_model.R")
+source("src/load/ITA.R")
 
 as_arrow_table2.data.frame <- function(table, schema) {
     table |>
@@ -39,7 +42,7 @@ archive_path <- function(dataset, what, step) {
     file.path("db", what, dataset, paste0(step, ".parquet"))
 }
 
-associate_regional_info <- function(metadata) {
+associate_regional_info <- function(metadata, statconn = NULL) {
     regional_info <- read.csv(file.path("external", "province_regioni.csv"), na.strings = c(""))
     if ("province" %in% colnames(metadata)) {
         metadata |>
@@ -60,7 +63,7 @@ associate_regional_info <- function(metadata) {
         metadata |>
             select(!any_of("province_full")) |>
             left_join(regional_info, by = "province_code", copy = TRUE)
-    } else if ("profince_full" %in% colnames(metadata)) {
+    } else if ("province_full" %in% colnames(metadata)) {
         metadata |>
             mutate(province_join = province_full |> str_squish() |> str_to_lower()) |>
             select(-province_full) |>
@@ -71,6 +74,18 @@ associate_regional_info <- function(metadata) {
             ) |>
             select(-province_join)
     } else {
-        metadata |> mutate(province_full = NA_character_, province_code = NA_character_, state = NA_character_)
+        copy_to(statconn, metadata, name = "_m_tmp")
+        metadata <- dbGetQuery(
+            statconn,
+            "
+        SELECT m.*, b.name AS province_full
+        FROM _m_tmp m
+        LEFT JOIN boundary b
+        ON ST_Contains(b.geom, ST_SetSRID(ST_MakePoint(lon, lat), 4326)) AND b.kind = 'province'
+            "
+        )
+        dbRemoveTable(statconn, "_m_tmp")
+        metadata |> associate_regional_info(NULL)
+        # metadata |> mutate(province_full = NA_character_, province_code = NA_character_, state = NA_character_)
     }
 }

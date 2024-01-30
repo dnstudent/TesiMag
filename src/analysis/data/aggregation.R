@@ -24,3 +24,13 @@ daily_aggregation <- function(data, quality_threshold = 0.8) {
         select(!c(year, month, n_measures, quality)) |>
         pivot_longer(cols = c(T_MIN, T_MAX), names_to = "variable", values_to = "value")
 }
+
+date_metadata <- function(data) {
+    dates <- data |>
+        group_by(dataset, station_id) |>
+        summarise(
+            station_first = min(date),
+            station_last = max(date),
+            .groups = "drop"
+        )
+}
