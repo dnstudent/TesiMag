@@ -78,9 +78,9 @@ associate_sensor_key <- function(data, meta) {
         select(!c(all_of(common_id), sensor_first, sensor_last))
 }
 
-prepare_daily_data <- function(data_pack) {
+prepare_daily_data <- function(data_pack, statconn = NULL) {
     data_pack$meta <- make_keys(data_pack$meta) |>
-        associate_regional_info() |>
+        associate_regional_info(statconn) |>
         mutate(sensor_first = coalesce(sensor_first, station_first), sensor_last = coalesce(sensor_last, station_last)) |>
         test_metadata_consistency() |>
         as_arrow_table()
@@ -105,9 +105,6 @@ prepare_daily_data <- function(data_pack) {
 }
 
 qc_checkpoint <- function(dataset, conn) {
-    # ds_meta <- query_checkpoint(dataset, "metadata", "raw", conn)
-    # ds_data <- query_checkpoint(dataset, "data", "raw", conn) |>
-    #     semi_join(ds_meta, c("dataset", "sensor_key"))
     ds <- query_checkpoint(dataset, "raw", conn)
     qc_data <- qc1(ds$data)
     qc_meta <- ds$meta |> semi_join(filter(qc_data, valid), by = c("dataset", "sensor_key"))
@@ -136,7 +133,7 @@ spatial_availabilities <- function(ymonthly_avail, stations, map, ...) {
         geom_sf(data = map) +
         geom_sf(
             data = spatav |>
-                left_join(stations |> select(dataset, sensor_key, lon, lat), join_by(dataset, sensor_key)) |>
+                inner_join(stations |> select(dataset, sensor_key, lon, lat), join_by(dataset, sensor_key)) |>
                 collect() |>
                 st_md_to_sf(),
             aes(color = qc_clim_available, shape = dataset)
