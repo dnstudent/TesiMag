@@ -3,65 +3,115 @@ library(dbplyr, warn.conflicts = FALSE)
 library(arrow, warn.conflicts = FALSE)
 library(tidyr, warn.conflicts = FALSE)
 library(assertr, warn.conflicts = FALSE)
+library(assertthat, warn.conflicts = FALSE)
 library(zeallot, warn.conflicts = FALSE)
 
 source("src/database/tools.R")
 source("src/database/test.R")
-source("src/database/definitions.R")
+source("src/database/data_model.R")
+source("src/analysis/data/quality_check.R")
 source("notebooks/integrazioni_regionali/procedure/checkpoint.R")
 source("notebooks/integrazioni_regionali/procedure/plots.R")
 source("notebooks/integrazioni_regionali/procedure/tools.R")
 
-new_numeric_ids <- function(data_pack, new_dataset) {
-    data_pack$meta <- data_pack$meta |>
-        collect() |>
-        mutate(previous_id = as.character(id), id = row_number(), previous_dataset = dataset, dataset = new_dataset) |>
-        as_arrow_table()
-    data_pack$data <- data_pack$data |>
-        mutate(station_id = as.character(station_id)) |>
-        rename(previous_id = station_id, previous_dataset = dataset) |>
-        left_join(data_pack$meta |> select(station_id = id, previous_id, dataset, previous_dataset), by = c("previous_id")) |>
-        as_arrow_table2(data_schema)
-    data_pack
+test_metadata_consistency <- function(meta) {
+    meta |> verify(!is.na(series_id))
+
+    meta |>
+        group_by(sensor_id, station_id, series_id) |>
+        count() |>
+        verify(n == 1L)
+
+    assert_that(meta |>
+        filter(if_all(c(sensor_id, station_id, series_id), is.na)) |>
+        nrow() == 0L)
+
+    assert_that(meta |>
+        filter(if_any(c(dataset, network, lon, lat, kind), is.na)) |>
+        nrow() == 0L)
+
+    meta
 }
 
-#' Keeps only the data relevant to the specified time period. Filters out stations that do not have data in the specified time period.
-#' Splits base station metadata and extra station metadata.
-#'
-#' @param data_pack A list containing the data and metadata loaded from .
-#' @param .start The start date of the period to be kept (inclusive).
-#' @param .end The end date of the period to be kept (inclusive).
-#'
-#' @return A database containing only the data relevant to the specified time period and the extra metadata table.
+test_data_consistency <- function(data) {
+    if (data |>
+        filter(if_any(c(dataset, sensor_key, variable, date), is.na)) |>
+        compute() |>
+        nrow() > 0L) {
+        stop("Data contains NA keys")
+    }
+
+    if (data |> group_by(dataset, sensor_key, variable, date) |> count() |> filter(n > 1L) |> compute() |> nrow() > 0L) {
+        stop("Data contains duplicate measures for the same key")
+    }
+
+    data
+}
+
+make_keys <- function(meta) {
+    meta |>
+        collect() |>
+        mutate(
+            sensor_key = row_number(),
+            dummy_station_id = coalesce(station_id, series_id)
+        ) |>
+        group_by(dummy_station_id) |>
+        mutate(station_key = cur_group_id()) |>
+        ungroup() |>
+        select(-dummy_station_id) |>
+        group_by(series_id) |>
+        mutate(series_key = cur_group_id()) |>
+        ungroup()
+}
+
+#' Given a measures table and a metadata table, associates the id given in the metadata table to the measures table's key
+#' and returns the resulting table.
+associate_sensor_key <- function(data, meta) {
+    common_id <- intersect(names(data |> select(ends_with("id"))), names(meta |> select(ends_with("id"))))
+    data |>
+        left_join(
+            meta |> mutate(sensor_first = coalesce(sensor_first, station_first, series_first), sensor_last = coalesce(sensor_last, station_last, series_last)) |> select(all_of(common_id), sensor_key, sensor_first, sensor_last),
+            by = common_id,
+            relationship = "many-to-many"
+        ) |>
+        filter((is.na(sensor_first) | sensor_first <= date) & (date <= sensor_last | is.na(sensor_last))) |>
+        select(!c(all_of(common_id), sensor_first, sensor_last))
+}
+
 prepare_daily_data <- function(data_pack) {
-    # data_pack <- new_numeric_ids(data_pack, dataset_name)
+    data_pack$meta <- make_keys(data_pack$meta) |>
+        associate_regional_info() |>
+        mutate(sensor_first = coalesce(sensor_first, station_first), sensor_last = coalesce(sensor_last, station_last)) |>
+        test_metadata_consistency() |>
+        as_arrow_table()
+
     data_pack$data <- data_pack$data |>
         filter(!is.na(value)) |>
         mutate(variable = if_else(variable == "T_MIN", -1L, 1L)) |>
-        arrange(dataset, station_id, variable, date) |>
+        associate_sensor_key(data_pack$meta) |>
+        test_data_consistency() |>
+        arrange(sensor_key, variable, date) |>
         compute()
 
-    date_stats <- data_pack$data |>
-        group_by(dataset, station_id) |>
-        summarize(
-            first_registration = min(date),
-            last_registration = max(date),
-            valid_days = as.integer(sum(!is.na(value)) / 2L),
-            .groups = "drop"
-        )
-
-    data_pack$meta <- data_pack$meta |>
-        semi_join(data_pack$data, join_by(original_dataset == dataset, original_id == station_id)) |>
-        left_join(date_stats, join_by(original_dataset == dataset, original_id == station_id), relationship = "one-to-one") |>
-        mutate(original_id = cast(original_id, utf8())) |>
+    meta <- data_pack$meta |>
+        select(all_of(names(meta_schema))) |>
+        compute()
+    extra_meta <- data_pack$meta |>
+        select(-names(meta_schema), sensor_key) |>
         compute()
 
-    data_pack$data <- data_pack$data |>
-        mutate(station_id = cast(station_id, utf8())) |>
-        compute()
+    # split <- split_station_metadata(data_pack$meta)
+    list("checkpoint" = as_checkpoint(meta, data_pack$data), "extra_meta" = extra_meta)
+}
 
-    split <- split_station_metadata(data_pack$meta)
-    list("checkpoint" = as_checkpoint(split[[1]], data_pack$data) |> assert_data_uniqueness() |> assert_metadata_uniqueness(), "extra_meta" = split[[2]])
+qc_checkpoint <- function(dataset, conn) {
+    # ds_meta <- query_checkpoint(dataset, "metadata", "raw", conn)
+    # ds_data <- query_checkpoint(dataset, "data", "raw", conn) |>
+    #     semi_join(ds_meta, c("dataset", "sensor_key"))
+    ds <- query_checkpoint(dataset, "raw", conn)
+    qc_data <- qc1(ds$data)
+    qc_meta <- ds$meta |> semi_join(filter(qc_data, valid), by = c("dataset", "sensor_key"))
+    as_checkpoint(meta = qc_meta |> to_arrow(), data = qc_data |> to_arrow(), check_schema = FALSE) |> save_checkpoint(dataset, "qc1", check_schema = FALSE)
 }
 
 #' Produces the plot of year-monthly series availabilities (the number of available and usable series per year/month) and the table used to compute them.
@@ -86,7 +136,7 @@ spatial_availabilities <- function(ymonthly_avail, stations, map, ...) {
         geom_sf(data = map) +
         geom_sf(
             data = spatav |>
-                left_join(stations |> select(original_dataset, original_id, lon, lat), join_by(dataset == original_dataset, station_id == original_id)) |>
+                left_join(stations |> select(dataset, sensor_key, lon, lat), join_by(dataset, sensor_key)) |>
                 collect() |>
                 st_md_to_sf(),
             aes(color = qc_clim_available, shape = dataset)
