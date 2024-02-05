@@ -130,9 +130,9 @@ periodicity_analysis <- function(paired_series) {
         )
 }
 
-series_matches_analysis <- function(series_matches, data, metadata, ...) {
+series_matches_analysis <- function(series_matches, data, metadata, matches_offsets = c(-1L, 0L, 1L), ...) {
     dbExecute(data$src$con, "DROP TABLE IF EXISTS paired_series")
-    matches_offsets <- lag_analysis(data, series_matches, c(-1L, 0L, 1L)) |>
+    matches_offsets <- lag_analysis(data, series_matches, matches_offsets) |>
         left_join(series_matches, by = c("key_x", "key_y", "variable"), relationship = "one-to-one")
     matches_offsets <- copy_to(data$src$con, matches_offsets, overwrite = TRUE)
     # matches_offsets <- duckdb::duckdb_register(data$src$con, "matches_offsets", matches_offsets)
