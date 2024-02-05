@@ -30,8 +30,23 @@ load_metadata <- function() {
         )
     ) |>
         as_tibble() |>
-        rename(original_id = station_code, name = station_name) |>
-        mutate(original_dataset = "ARPAFVG", state = "Friuli-Venezia Giulia", network = "ARPAFVG", kind = "unknown")
+        rename(station_id = station_code, name = station_name) |>
+        mutate(
+            dataset = "ARPAFVG",
+            # state = "Friuli-Venezia Giulia",
+            network = "ARPAFVG",
+            kind = "unknown",
+            user_code = station_id,
+            town = NA_character_,
+            sensor_first = as.Date(NA_integer_),
+            sensor_last = as.Date(NA_integer_),
+            sensor_id = NA_character_,
+            series_id = station_id,
+            station_first = as.Date(NA_integer_),
+            station_last = as.Date(NA_integer_),
+            series_first = as.Date(NA_integer_),
+            series_last = as.Date(NA_integer_)
+        )
 }
 
 load_data <- function() {
