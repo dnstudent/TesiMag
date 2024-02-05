@@ -12,6 +12,7 @@
 *.geojson
 *.csv
 *.duckdb*
+~$*.xlsx
 temp/
 tmp_duck/
 cache/

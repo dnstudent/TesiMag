@@ -67,7 +67,7 @@ make_keys <- function(meta) {
 #' Given a measures table and a metadata table, associates the id given in the metadata table to the measures table's key
 #' and returns the resulting table.
 associate_sensor_key <- function(data, meta) {
-    common_id <- intersect(names(data |> select(ends_with("id"))), names(meta |> select(ends_with("id"))))
+    common_id <- intersect(names(data |> select(ends_with("_id"), any_of("user_code"))), names(meta |> select(ends_with("_id"), user_code)))
     data |>
         left_join(
             meta |> mutate(sensor_first = coalesce(sensor_first, station_first, series_first), sensor_last = coalesce(sensor_last, station_last, series_last)) |> select(all_of(common_id), sensor_key, sensor_first, sensor_last),
@@ -76,6 +76,28 @@ associate_sensor_key <- function(data, meta) {
         ) |>
         filter((is.na(sensor_first) | sensor_first <= date) & (date <= sensor_last | is.na(sensor_last))) |>
         select(!c(all_of(common_id), sensor_first, sensor_last))
+}
+
+date_meta <- function(data, meta) {
+    data |>
+        left_join(meta |> select(dataset, sensor_key, station_key, series_key), by = c("dataset", "sensor_key"), relationship = "many-to-one") |>
+        group_by(dataset, sensor_key, station_key, series_key) |>
+        summarise(
+            sensor_first = min(date, na.rm = FALSE),
+            sensor_last = max(date, na.rm = FALSE),
+        ) |>
+        collect() |>
+        group_by(dataset, station_key) |>
+        mutate(
+            station_first = min(sensor_first, na.rm = FALSE),
+            station_last = max(sensor_last, na.rm = FALSE),
+        ) |>
+        group_by(dataset, series_key) |>
+        mutate(
+            series_first = min(sensor_first, na.rm = FALSE),
+            series_last = max(sensor_last, na.rm = FALSE),
+        ) |>
+        ungroup()
 }
 
 prepare_daily_data <- function(data_pack, statconn = NULL) {
@@ -93,7 +115,12 @@ prepare_daily_data <- function(data_pack, statconn = NULL) {
         arrange(sensor_key, variable, date) |>
         compute()
 
+    date_metas <- date_meta(data_pack$data, data_pack$meta) |>
+        as_arrow_table()
+
     meta <- data_pack$meta |>
+        select(!c(ends_with("_first"), ends_with("_last"))) |>
+        left_join(date_metas, by = c("dataset", "sensor_key", "station_key", "series_key")) |>
         select(all_of(names(meta_schema))) |>
         compute()
     extra_meta <- data_pack$meta |>

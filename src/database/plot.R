@@ -4,22 +4,23 @@ library(dplyr, warn.conflicts = FALSE)
 source("src/database/query/data.R")
 source("src/merging/pairing.R")
 
-plot_stations <- function(ids, dataconn, same_period = TRUE, matches = TRUE) {
-    data <- valid_data(dataconn) |>
-        semi_join(ids, by = colnames(ids), copy = TRUE) |>
-        arrange(station_id, date) |>
-        collect()
+plot_stations <- function(ids, data, same_period = TRUE, matches = TRUE) {
+    cols <- colnames(ids)
+    data <- data |>
+        semi_join(ids, by = cols, copy = TRUE) |>
+        collect() |>
+        arrange(sensor_key, date)
 
     if (same_period) {
         first_date <- data |>
-            group_by(station_id) |>
-            summarize(first_common_date = min(date, na.rm = TRUE)) |>
+            group_by(dataset, sensor_key) |>
+            summarize(first_common_date = min(date, na.rm = TRUE), .groups = "drop") |>
             pull(first_common_date) |>
             max()
 
         last_date <- data |>
-            group_by(station_id) |>
-            summarize(last_common_date = max(date, na.rm = TRUE)) |>
+            group_by(dataset, sensor_key) |>
+            summarize(last_common_date = max(date, na.rm = TRUE), .groups = "drop") |>
             pull(last_common_date) |>
             min()
     } else {
@@ -32,26 +33,26 @@ plot_stations <- function(ids, dataconn, same_period = TRUE, matches = TRUE) {
             pull(date) |>
             max()
     }
-    ggplot(data = data |> mutate(station_id = as.factor(station_id)) |> filter(first_date <= date & date <= last_date)) +
-        geom_line(aes(x = date, y = value, color = station_id)) +
+    ggplot(data = data |> mutate(sensor_key = as.factor(sensor_key)) |> filter(first_date <= date & date <= last_date)) +
+        geom_line(aes(x = date, y = value, color = sensor_key, linetype = sensor_key)) +
         facet_grid(variable ~ .)
 }
 
-plot_diffs <- function(matches, dataconn, ...) {
+plot_diffs <- function(matches, data, ...) {
+    dataconn <- data$src$con
     matches <- copy_to(dataconn, matches, overwrite = TRUE, name = "matches_plot_tmp")
     if (!("offset_days" %in% colnames(matches))) {
         matches <- matches |>
             mutate(offset_days = 0L)
     }
 
-    data <- valid_data(dataconn) |> select(-dataset)
     data <- pair_full_series(data, matches) |>
-        left_join(matches |> select(starts_with("id"), starts_with("dataset"), variable, starts_with("name")), by = c("id_x", "id_y", "variable")) |>
+        left_join(matches |> select(starts_with("dataset"), starts_with("sensor_key"), starts_with("key_"), variable, starts_with("name"), starts_with("sensor_id")), by = c("key_x", "key_y", "variable")) |>
         mutate(delT = value_y - value_x, valid = !is.na(delT)) |>
         collect() |>
         mutate(
             variable = factor(variable, levels = c(-1L, 1L), labels = c("T_MIN", "T_MAX")),
-            match_id = as.factor(paste0(dataset_x, " ", name_x, " ", id_x, "\n", dataset_y, " ", name_y, " ", id_y))
+            match_id = as.factor(paste0(dataset_x, " ", name_x, " ", sensor_id_x, "\n", dataset_y, " ", name_y, " ", sensor_id_y))
         )
 
     dbExecute(dataconn, "DROP TABLE matches_plot_tmp")
