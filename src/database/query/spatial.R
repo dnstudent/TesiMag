@@ -77,18 +77,37 @@ close_matches_inside <- function(statconn, state, distance_threshold) {
     tbl(statconn, sql(query))
 }
 
-close_matches <- function(metadata, distance_threshold) {
-    statconn <- metadata$src$con
-    metadata |>
-        compute(name = "stats_tmp", temporary = FALSE)
+filter_stations_inside <- function(metadata, boundary, statconn, buffer_m = 0) {
+    copy_to(statconn, metadata, name = "stats_tmp", overwrite = TRUE)
 
     query <- glue::glue_sql(
         "
-        SELECT a.id AS id_x, b.id AS id_y, ST_Distance(a.geog, b.geog) AS distance
-        FROM stats_tmp a
-        JOIN stats_tmp b
-        ON ST_DWithin(a.geog, b.geog, {distance_threshold})
-        WHERE a.id < b.id
+        SELECT s.*
+        FROM stats_tmp s
+        INNER JOIN boundary b
+        ON b.name = {boundary} AND ST_DWithin(ST_SetSRID(ST_MakePoint(lon, lat), 4326)::geography, b.geom::geography, {buffer_m})
+        ",
+        .con = statconn
+    )
+    matches <- dbGetQuery(statconn, query)
+    statconn |> dbRemoveTable("stats_tmp")
+    matches
+}
+
+close_matches <- function(metadata, distance_threshold, statconn, key = "key") {
+    copy_to(statconn, metadata, name = "stats_tmp", overwrite = TRUE)
+
+    query <- glue::glue_sql(
+        "
+        WITH stats_tmp_geog AS (
+            SELECT {`key`}, ST_SetSRID(ST_MakePoint(lon, lat), 4326)::geography AS geog
+            FROM stats_tmp
+        )
+
+        SELECT a.{`key`} AS key_x, b.{`key`} AS key_y, ST_Distance(a.geog, b.geog) AS distance
+        FROM stats_tmp_geog a
+        JOIN stats_tmp_geog b
+        ON ST_DWithin(a.geog, b.geog, {distance_threshold}) AND a.{`key`} < b.{`key`}
         ",
         .con = statconn
     )

@@ -70,7 +70,7 @@ valid_data <- function(dataconn) {
 }
 
 valid_series <- function(valid_data) {
-    valid_data |> distinct(station_id, variable)
+    valid_data |> distinct(key, variable)
 }
 
 useful_data <- function(data_query) {
@@ -84,9 +84,13 @@ useful_data <- function(data_query) {
 }
 
 series_matches <- function(data, station_matches, metadata) {
-    valid_series <- valid_series(data |> semi_join(metadata, by = c("station_id" = "id"))) |> collect()
+    valid_series <- data |>
+        semi_join(metadata, by = "key") |>
+        distinct(key, variable) |>
+        collect()
+
     station_matches |>
         cross_join(tibble(variable = c(-1L, 1L))) |>
-        semi_join(valid_series, by = c("id_x" = "station_id", "variable")) |>
-        semi_join(valid_series, by = c("id_y" = "station_id", "variable"))
+        semi_join(valid_series, by = c("key_x" = "key", "variable")) |>
+        semi_join(valid_series, by = c("key_y" = "key", "variable"))
 }
