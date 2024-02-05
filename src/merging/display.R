@@ -49,14 +49,14 @@ write_xlsx_analysis <- function(analysis, to, ...) {
     writeDataTable(wb, 1, analysis)
 
     integer_style <- createStyle(numFmt = "0")
-    addStyle(wb, 1, integer_style, rows = 1:60000, cols = 12:14, gridExpand = TRUE)
+    addStyle(wb, 1, integer_style, rows = 1:nrow(analysis), cols = 12:14, gridExpand = TRUE)
 
     prec2_style <- createStyle(numFmt = "0.00")
-    addStyle(wb, 1, prec2_style, rows = 1:60000, cols = 17:23, gridExpand = TRUE)
+    addStyle(wb, 1, prec2_style, rows = 1:nrow(analysis), cols = 17:23, gridExpand = TRUE)
 
     outTStyle <- createStyle(fontColour = "#9C0006", bgFill = "#FFC7CE")
-    conditionalFormatting(wb, 1, cols = c(18, 23), rows = 1:60000, rule = "<-0.5", style = outTStyle)
-    conditionalFormatting(wb, 1, cols = c(18, 23), rows = 1:60000, rule = ">0.5", style = outTStyle)
+    conditionalFormatting(wb, 1, cols = c(18, 23), rows = 1:nrow(analysis), rule = "<-0.5", style = outTStyle)
+    conditionalFormatting(wb, 1, cols = c(18, 23), rows = 1:nrow(analysis), rule = ">0.5", style = outTStyle)
 
     saveWorkbook(wb, to, overwrite = TRUE)
 }
@@ -96,26 +96,30 @@ launch_leaflet <- function(database) {
     map |> leaflet.extras::addSearchOSM()
 }
 
-leaflet_groups <- function(grouped_stations, metadata, gid_variable) {
+leaflet_groups <- function(grouped_stations, metadata, gid_variable, extra_display = c()) {
     map <- leaflet::leaflet() |>
         leaflet::addTiles()
 
     stations <- metadata |>
+        slice_sample(n = nrow(metadata)) |>
         right_join(grouped_stations, by = c("dataset", "sensor_key")) |>
         st_md_to_sf()
 
-    cs <- c("red", "blue", "green", "purple", "orange", "cadetblue", "beige", "darkgreen", "lightgreen", "darkblue", "lightblue", "darkpurple", "pink", "white", "gray", "lightgray", "black")
 
     group_colors <- stations |>
         distinct({{ gid_variable }})
 
+    cs <- rainbow(nrow(group_colors)) # c("red", "blue", "green", "purple", "orange", "cadetblue", "beige", "darkgreen", "lightgreen", "darkblue", "lightblue", "darkpurple", "pink", "white", "gray", "lightgray", "black")
+
     group_colors <- group_colors |>
-        mutate(group_color = rep_len(cs, nrow(group_colors)))
+        mutate(group_color = cs) # rep_len(cs, nrow(group_colors)))
 
     groups <- stations |>
         left_join(group_colors, by = join_by({{ gid_variable }})) |>
         group_by({{ gid_variable }}, group_color) |>
         group_split()
+
+
 
     for (group in groups) {
         map <- map |> leaflet::addAwesomeMarkers(
@@ -123,7 +127,8 @@ leaflet_groups <- function(grouped_stations, metadata, gid_variable) {
             label = ~name,
             popup = ~ stringr::str_glue("{name}, {elevation} m, {network}"),
             icon = leaflet::awesomeIcons(
-                markerColor = ~group_color,
+                iconColor = ~group_color,
+                markerColor = "white"
             )
         )
     }
