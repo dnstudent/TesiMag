@@ -25,7 +25,7 @@ load_work_metadata.arpalombardia <- function() {
             IdSensore = int32(),
             Tipologia = utf8(),
             `Unità DiMisura` = utf8(),
-            IdStazione = utf8(),
+            IdStazione = int32(),
             NomeStazione = utf8(),
             Quota = float64(),
             Provincia = utf8(),
@@ -44,17 +44,25 @@ load_work_metadata.arpalombardia <- function() {
     ) |>
         select(-location) |>
         filter(Tipologia == "Temperatura") |>
-        mutate(across(starts_with("Data"), ~ cast(., date32())), network = "ARPALombardia", state = "Lombardia", original_dataset = "ARPALombardia", kind = "unknown") |>
+        mutate(across(starts_with("Data"), ~ cast(., date32())), network = "ARPALombardia", dataset = "ARPALombardia", kind = "unknown") |>
         rename(
-            original_id = IdSensore,
+            sensor_id = IdSensore,
             name = NomeStazione,
-            province = Provincia,
+            province_code = Provincia,
             elevation = Quota,
             lon = lng,
             type = Tipologia,
-            original_station_id = IdStazione,
-            first_date = DataStart,
-            last_date = DataStop
+            station_id = IdStazione,
+            sensor_first = DataStart,
+            sensor_last = DataStop
+        ) |>
+        mutate(
+            station_first = sensor_first,
+            station_last = sensor_last,
+            series_first = sensor_first,
+            series_last = sensor_last,
+            town = NA_character_,
+            user_code = sensor_id,
         ) |>
         compute()
 }
@@ -63,11 +71,12 @@ load_work_data.arpalombardia <- function(metadata) {
     conn <- dbConnect(duckdb())
     metadata <- metadata |> to_duckdb(con = conn)
     suppressMessages(tbl(conn, "read_parquet('/Users/davidenicoli/Local_Workspace/Datasets/ARPA/LOMBARDIA/dataset/*.parquet')")) |>
-        semi_join(metadata, join_by(station_id == original_id)) |>
+        mutate(station_id = as.integer(station_id)) |>
+        filter(!is.na(value)) |>
+        rename(sensor_id = station_id) |>
+        semi_join(metadata, by = "sensor_id") |>
         mutate(time = time - sql("INTERVAL 10 MINUTES")) |>
-        qc_gross(threshold = 50) |>
-        group_by(station_id, date = as.Date(time)) |>
-        filter(all(qc_gross, na.rm = TRUE)) |>
+        group_by(sensor_id, date = sql("date_trunc('day', time)")) |>
         summarise(
             T_MIN = min(value, na.rm = TRUE),
             T_MAX = max(value, na.rm = TRUE),
@@ -81,7 +90,16 @@ load_work_data.arpalombardia <- function(metadata) {
 
 load_daily_data.arpalombardia <- function() {
     work_meta <- load_work_metadata.arpalombardia()
-    work_data <- load_work_data.arpalombardia(work_meta)
+    work_data <- load_work_data.arpalombardia(work_meta) |>
+        mutate(sensor_id = cast(sensor_id, utf8()))
+
+    work_meta <- work_meta |>
+        mutate(
+            sensor_id = cast(sensor_id, utf8()),
+            station_id = cast(station_id, utf8()),
+            series_id = station_id
+        ) |>
+        compute()
 
     # work_meta <- work_meta |>
     #     semi_join(work_data, join_by(dataset, id == station_id)) |>
