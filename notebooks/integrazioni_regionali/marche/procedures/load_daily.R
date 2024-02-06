@@ -25,16 +25,23 @@ from_degrees <- function(value_str) {
 
 load_meta <- function() {
     arpam_path <- file.path(path.ds, "ARPA", "MARCHE")
-    meta <- vroom::vroom(file.path(arpam_path, "metadata.csv"), trim_ws = TRUE, delim = ",", col_types = "iccdicc", show_col_types = FALSE) |>
-        as_tibble()
-    meta |>
+    vroom::vroom(file.path(arpam_path, "metadata.csv"), trim_ws = TRUE, delim = ",", col_types = "iccdicc", show_col_types = FALSE) |>
+        as_tibble() |>
+        rename(series_id = original_id, station_id = ` Codice stazione`, network = kind) |>
         mutate(
             across(c(lon, lat), ~ str_replace(., "Ḟ", "°")),
             across(c(lon, lat), from_degrees),
-            original_dataset = "ARPAM",
-            network = "SIRMIP",
+            dataset = "ARPAM",
             state = "Marche",
-            kind = case_match(kind, "RT" ~ "automatica", "RM" ~ "meccanica")
+            user_code = str_c(kind, "-", series_id),
+            kind = case_match(kind, "RT" ~ "automatica", "RM" ~ "meccanica"),
+            town = NA_character_,
+            sensor_first = as.Date(NA_integer_),
+            sensor_last = as.Date(NA_integer_),
+            station_first = as.Date(NA_integer_),
+            station_last = as.Date(NA_integer_),
+            series_first = as.Date(NA_integer_),
+            series_last = as.Date(NA_integer_),
         ) |>
         as_arrow_table()
 }
