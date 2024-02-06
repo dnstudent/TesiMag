@@ -5,7 +5,6 @@ library(stringr, warn.conflicts = FALSE)
 library(tidyr, warn.conflicts = FALSE)
 
 source("src/paths/paths.R")
-source("src/database/definitions.R")
 
 dataset_spec <- function() {
     list(
@@ -24,18 +23,17 @@ from_degrees <- function(value_str) {
 }
 
 load_meta <- function() {
-    arpam_path <- file.path(path.ds, "ARPA", "MARCHE")
-    vroom::vroom(file.path(arpam_path, "metadata.csv"), trim_ws = TRUE, delim = ",", col_types = "iccdicc", show_col_types = FALSE) |>
+    vroom::vroom(file.path(path.ds, "ARPA", "MARCHE", "metadata.csv"), trim_ws = TRUE, delim = ",", col_types = "iccdicc", show_col_types = FALSE) |>
         as_tibble() |>
-        rename(series_id = original_id, station_id = ` Codice stazione`, network = kind) |>
+        rename(series_id = original_id, station_id = `Codice stazione`, network = kind) |>
         mutate(
             across(c(lon, lat), ~ str_replace(., "Ḟ", "°")),
             across(c(lon, lat), from_degrees),
             dataset = "ARPAM",
-            state = "Marche",
-            user_code = str_c(kind, "-", series_id),
-            kind = case_match(kind, "RT" ~ "automatica", "RM" ~ "meccanica"),
+            user_code = str_c(network, "-", series_id),
+            kind = case_match(network, "RT" ~ "automatica", "RM" ~ "meccanica"),
             town = NA_character_,
+            sensor_id = NA_character_,
             sensor_first = as.Date(NA_integer_),
             sensor_last = as.Date(NA_integer_),
             station_first = as.Date(NA_integer_),
@@ -47,12 +45,10 @@ load_meta <- function() {
 }
 
 load_data <- function() {
-    arpam_path <- file.path(path.ds, "ARPA", "MARCHE")
-    data <- open_dataset(file.path(arpam_path, "dataset"))
-    data |>
-        rename(station_id = codice_sensore, T_MIN = tmin, T_MAX = tmax) |>
+    open_dataset(file.path(path.ds, "ARPA", "MARCHE", "dataset")) |>
+        rename(series_id = codice_sensore, T_MIN = tmin, T_MAX = tmax, station_id = codice_stazione) |>
         filter(quality > 90) |>
-        select(!c(quality, num_valori, codice_stazione)) |>
+        select(!c(quality, num_valori)) |>
         to_duckdb() |>
         pivot_longer(c(T_MIN, T_MAX), names_to = "variable", values_to = "value") |>
         to_arrow() |>
