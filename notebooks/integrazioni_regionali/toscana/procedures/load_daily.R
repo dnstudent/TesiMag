@@ -5,7 +5,6 @@ library(vroom, warn.conflicts = FALSE)
 library(tidyr, warn.conflicts = FALSE)
 
 source("src/paths/paths.R")
-source("src/database/definitions.R")
 source("src/database/tools.R")
 
 dataset_spec <- function() {
@@ -26,12 +25,24 @@ load_meta <- function() {
         delim = ",",
         read_options = csv_read_options(
             skip_rows = 1L,
-            column_names = c("original_id", "StazioneExtra", "name", "Comune", "province", "Fiume", "Strumento", "Unita_Misura", "IDSensoreRete", "lat", "lon", "GB E [m]", "GB N [m]", "elevation", "QuotaTerra", "network"),
+            column_names = c("series_id", "StazioneExtra", "name", "town", "province_code", "Fiume", "Strumento", "Unita_Misura", "sensor_id", "lat", "lon", "GB E [m]", "GB N [m]", "elevation", "QuotaTerra", "network"),
             encoding = "utf-8"
         ),
         as_data_frame = TRUE
     ) |>
-        mutate(kind = case_match(network, "Tradizionali" ~ "meccanica", .default = "automatica"), original_dataset = "SIRToscana", network = str_c("SIRT - ", network), state = "Toscana") |>
+        mutate(
+            kind = case_match(network, "Tradizionali" ~ "meccanica", .default = "automatica"),
+            dataset = "SIRToscana",
+            network = str_c("SIRT - ", network),
+            station_id = series_id,
+            user_code = series_id,
+            sensor_first = as.Date(NA_integer_),
+            sensor_last = as.Date(NA_integer_),
+            station_first = as.Date(NA_integer_),
+            station_last = as.Date(NA_integer_),
+            series_first = as.Date(NA_integer_),
+            series_last = as.Date(NA_integer_),
+        ) |>
         as_arrow_table()
 }
 
@@ -59,7 +70,7 @@ load_data <- function() {
 load_daily_data.toscana <- function() {
     data <- load_data()
     meta <- load_meta() |>
-        semi_join(data, join_by(original_id == station_id)) |>
+        semi_join(data, join_by(station_id)) |>
         compute()
 
     list("meta" = meta, "data" = data)
