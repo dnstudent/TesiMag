@@ -42,10 +42,28 @@ archive_path <- function(dataset, what, step) {
     file.path("db", what, dataset, paste0(step, ".parquet"))
 }
 
+fill_regional_na <- function(metadata, statconn) {
+    copy_to(statconn, metadata, name = "_m_tmp", overwrite = TRUE)
+    metadata <- dbGetQuery(
+        statconn,
+        "
+        SELECT m.*, b.name AS fill_province
+        FROM _m_tmp m
+        LEFT JOIN boundary b
+        ON ST_Contains(b.geom, ST_SetSRID(ST_MakePoint(lon, lat), 4326)) AND b.kind = 'province'
+        "
+    )
+    dbRemoveTable(statconn, "_m_tmp")
+    metadata |>
+        mutate(province = coalesce(province, fill_province)) |>
+        select(-fill_province)
+}
+
 associate_regional_info <- function(metadata, statconn = NULL) {
     regional_info <- read.csv(file.path("external", "province_regioni.csv"), na.strings = c(""))
     if ("province" %in% colnames(metadata)) {
         metadata |>
+            fill_regional_na(statconn) |>
             select(!any_of(c("province_code", "province_full"))) |>
             mutate(
                 province_full = if_else(!is.na(province) & str_length(province) == 2L, NA_character_, province),
@@ -74,7 +92,7 @@ associate_regional_info <- function(metadata, statconn = NULL) {
             ) |>
             select(-province_join)
     } else {
-        copy_to(statconn, metadata, name = "_m_tmp")
+        copy_to(statconn, metadata, name = "_m_tmp", overwrite = TRUE)
         metadata <- dbGetQuery(
             statconn,
             "
