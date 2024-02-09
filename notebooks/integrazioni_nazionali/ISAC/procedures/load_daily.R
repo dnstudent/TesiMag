@@ -9,10 +9,10 @@ dataset_spec <- function() {
     )
 }
 
-load_work_metadata <- function() {
-    tmin <- read.BRUN.metadata("T_MIN", "raw") |>
+load_work_metadata <- function(variant) {
+    tmin <- read.BRUN.metadata("T_MIN", variant) |>
         mutate(identifier = as.character(identifier), series_id = str_replace(identifier, regex("^(TMND_)|(TN_)"), ""))
-    tmax <- read.BRUN.metadata("T_MAX", "raw") |>
+    tmax <- read.BRUN.metadata("T_MAX", variant) |>
         mutate(identifier = as.character(identifier), series_id = str_replace(identifier, regex("^(TMXD_)|(TX_)"), ""))
 
     bind_rows(
@@ -24,11 +24,11 @@ load_work_metadata <- function() {
         rename(name = anagrafica, actual_original_id = identifier)
 }
 
-load_data <- function(meta) {
-    tmin <- read.BRUN.series("T_MIN", "raw") |>
+load_data <- function(meta, variant) {
+    tmin <- read.BRUN.series("T_MIN", variant) |>
         rename(value = T_MIN)
 
-    tmax <- read.BRUN.series("T_MAX", "raw") |>
+    tmax <- read.BRUN.series("T_MAX", variant) |>
         rename(value = T_MAX)
 
     bind_rows(
@@ -49,9 +49,9 @@ load_data <- function(meta) {
         as_arrow_table()
 }
 
-load_daily_data.isac <- function() {
-    meta <- load_work_metadata()
-    data <- load_data(meta)
+load_daily_data.isac <- function(variant = "raw") {
+    meta <- load_work_metadata(variant)
+    data <- load_data(meta, variant)
 
     meta <- meta |>
         distinct(dataset, series_id, .keep_all = TRUE) |>
