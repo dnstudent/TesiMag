@@ -12,7 +12,7 @@ tag_same_series <- function(analysis) {
                 (dataset_x == "ARPAE" & dataset_y == "ARPAE") & ((overlap_union > 0.8 & f0 > 0.9) | (valid_days_inters == 0L & distance < 1)),
             tag_same_series =
             # ARPAE-specific
-                ((dataset_x == "ARPAE" & dataset_y == "ARPAE") & (distance < 200) & (is.na(f0) | f0 > 0.9)) |
+                ((dataset_x == "ARPAE" & dataset_y == "ARPAE") & (distance < 200) & (valid_days_inters < 10 | f0 > 0.9)) |
                     # SCIA-specific
                     ((dataset_x == "SCIA" & dataset_y == "SCIA") & (
                         (valid_days_inters >= 160L & f0 > 0.2) |

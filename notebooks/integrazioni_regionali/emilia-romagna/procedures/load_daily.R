@@ -13,6 +13,15 @@ dataset_spec <- function() {
     )
 }
 
+load_dext3r <- function() {
+    open_dataset(file.path(path.ds, "ARPA", "EMILIA-ROMAGNA", "Dext3r", "data") |> list.files(pattern = "*.parquet", full.names = TRUE)) |>
+        to_duckdb() |>
+        filter(!is.na(value)) |>
+        group_by(name, variable, date = as.Date(start)) |>
+        slice_min(start) |>
+        ungroup()
+}
+
 load_data <- function() {
     ds <- open_dataset(file.path(path.ds, "ARPA", "EMILIA-ROMAGNA", "OpenData", "tables")) |>
         # time is the start of the period in GMT
