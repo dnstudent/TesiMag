@@ -146,7 +146,7 @@ series_matches_analysis <- function(series_matches, data, metadata, matches_offs
     cs <- climatic_statistics(paired_series)
     csa <- climatology_avail_statistics(paired_series, ...)
     md <- metadata_analysis(matches_offsets, metadata)
-    pa <- periodicity_analysis(paired_series)
+    # pa <- periodicity_analysis(paired_series)
 
 
     analysis <- ds |>
@@ -154,7 +154,7 @@ series_matches_analysis <- function(series_matches, data, metadata, matches_offs
         full_join(cs, by = c("key_x", "key_y", "variable")) |>
         full_join(csa, by = c("key_x", "key_y", "variable")) |>
         full_join(md, by = c("key_x", "key_y", "variable")) |>
-        full_join(pa, by = c("key_x", "key_y", "variable")) |>
+        # full_join(pa, by = c("key_x", "key_y", "variable")) |>
         collect()
 
     dbExecute(data$src$con, "DROP TABLE IF EXISTS paired_series")
