@@ -1,5 +1,6 @@
 library(dplyr, warn.conflicts = FALSE)
 library(arrow, warn.conflicts = FALSE)
+library(stringr, warn.conflicts = FALSE)
 
 source("src/paths/paths.R")
 source("src/database/tools.R")
@@ -13,13 +14,41 @@ dataset_spec <- function() {
     )
 }
 
-load_dext3r <- function() {
-    open_dataset(file.path(path.ds, "ARPA", "EMILIA-ROMAGNA", "Dext3r", "data") |> list.files(pattern = "*.parquet", full.names = TRUE)) |>
-        to_duckdb() |>
+load_daily_data.dext3r <- function(dataconn) {
+    meta <- read_parquet(file.path(path.ds, "ARPA", "EMILIA-ROMAGNA", "Dext3r", "stations.parquet"), as_data_frame = TRUE) |>
+        mutate(dataset = "Dext3r", kind = "unknown") |>
+        select(-geometry, -ident) |>
+        unnest(cols = c(region, province, municipality, basin, subbasin, macroarea, country, owner, manager), names_sep = "_") |>
+        hoist(categories, category = 1L) |>
+        select(-categories) |>
+        rename(elevation = height, state_o = region_name, province_full = province_name, province_num = province_code, station_id = id, town = municipality_name) |>
+        mutate(
+            lon = lon / 1e5,
+            lat = lat / 1e5,
+            province_full = str_to_title(province_full),
+            series_id = station_id,
+            sensor_id = station_id,
+            sensor_first = as.Date(NA_integer_),
+            sensor_last = as.Date(NA_integer_),
+            station_first = as.Date(NA_integer_),
+            station_last = as.Date(NA_integer_),
+            series_first = as.Date(NA_integer_),
+            series_last = as.Date(NA_integer_),
+            user_code = NA_character_
+        )
+
+    data <- open_dataset(file.path(path.ds, "ARPA", "EMILIA-ROMAGNA", "Dext3r", "data", "fragments") |> list.files(pattern = "*.parquet", full.names = TRUE)) |>
+        to_duckdb(con = dataconn) |>
         filter(!is.na(value)) |>
-        group_by(name, variable, date = as.Date(start)) |>
-        slice_min(start) |>
-        ungroup()
+        group_by(id, variable, date = as.Date(start)) |>
+        slice_min(start, with_ties = FALSE) |>
+        ungroup() |>
+        select(station_id = id, variable, date, value) |>
+        mutate(dataset = "Dext3r") |>
+        to_arrow() |>
+        compute()
+
+    list("meta" = meta, "data" = data)
 }
 
 load_data <- function() {
