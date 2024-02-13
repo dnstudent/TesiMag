@@ -10,6 +10,7 @@ source("src/database/tools.R")
 source("src/database/test.R")
 source("src/database/data_model.R")
 source("src/analysis/data/quality_check.R")
+source("src/merging/combining.R")
 source("notebooks/integrazioni_regionali/procedure/checkpoint.R")
 source("notebooks/integrazioni_regionali/procedure/plots.R")
 source("notebooks/integrazioni_regionali/procedure/tools.R")
@@ -166,4 +167,12 @@ spatial_availabilities <- function(ymonthly_avail, stations, map, ...) {
             aes(color = qc_clim_available, shape = dataset)
         )
     list("plot" = p, "data" = spatav)
+}
+
+merge_same_series <- function(tagged_analysis, metadata, data, ...) {
+    gs <- series_groups(tagged_analysis, metadata, data, tag_same_series, group_by_component, FALSE)
+    ranked_series_groups <- gs$table |>
+        rank_series_groups(metadata, ...)
+    merged <- dynamic_merge(data, ranked_series_groups, tagged_analysis)
+    list("series_groups" = ranked_series_groups, "data" = merged, "graph" = gs$graph)
 }
