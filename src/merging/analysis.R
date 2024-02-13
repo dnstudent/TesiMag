@@ -13,7 +13,7 @@ lag_analysis <- function(x, series_matches, time_offsets) {
         cross_join(time_offsets, copy = TRUE) |>
         compute()
 
-    best_lagged_matches <- pair_common_series(x, lagged_match_list) |>
+    best_lagged_matches <- pair_common_series(x, lagged_match_list, copy = FALSE) |>
         group_by(key_x, key_y, variable, offset_days) |>
         summarise(f0 = mean(as.integer(abs(value_y - value_x) < 1e-4), na.rm = TRUE), analyse = n() > 360L, .groups = "drop_last") |>
         mutate(analyse = any(analyse, na.rm = TRUE)) |>

@@ -6,12 +6,14 @@ library(zeallot, warn.conflicts = FALSE)
 library(igraph, warn.conflicts = FALSE)
 library(DBI, warn.conflicts = FALSE)
 library(tidyr, warn.conflicts = FALSE)
+library(lubridate, warn.conflicts = FALSE)
+library(logger, warn.conflicts = FALSE)
 
 source("src/database/write.R")
 source("src/merging/pairing.R")
 
 annual_index <- function(date) {
-    2 * pi * yday(date) / yday(ceiling_date(date, unit = "year") - as.difftime(1, units = "days"))
+    2 * pi * yday(date) / yday(make_date(year(date), 12L, 31L))
 }
 
 group_by_component <- function(graph) {
@@ -35,14 +37,13 @@ add_nonmatching <- function(graph, metadata) {
 
     missing <- metadata |>
         distinct(key) |>
-        collect() |>
         anti_join(tibble(key = already_there), by = "key")
 
     add_vertices(graph, nrow(missing), name = missing$key)
 }
 
 
-series_groups <- function(series_matches, metadata, tag, vertex_grouping, direct) {
+series_groups <- function(series_matches, metadata, data, tag, vertex_grouping, direct) {
     graph_edgelist <- series_matches |>
         arrange(key_x, key_y, variable) |>
         select(key_x, key_y, {{ tag }})
@@ -69,7 +70,9 @@ series_groups <- function(series_matches, metadata, tag, vertex_grouping, direct
         add_nonmatching(metadata)
 
     # table <- bind_rows(vertex_grouping(graph_tmin) |> mutate(variable = -1L), vertex_grouping(graph_tmax) |> mutate(variable = 1L))
-    table <- vertex_grouping(graph)
+    table <- vertex_grouping(graph) |>
+        cross_join(tibble(variable = c(-1L, 1L))) |>
+        semi_join(data |> distinct(key, variable) |> collect(), by = c("key", "variable"))
     list(
         "table" = table,
         # "graph_tmin" = graph_tmin,
@@ -79,7 +82,7 @@ series_groups <- function(series_matches, metadata, tag, vertex_grouping, direct
 }
 
 set_dataset_priority <- function(metadata, dataset_priority) {
-    metadata |> mutate(dataset = factor(dataset, levels = dataset_priority, ordered = TRUE))
+    metadata |> mutate(dataset = factor(dataset, levels = rev(dataset_priority), ordered = TRUE))
 }
 
 diff_coeffs <- function(delmonthlyT, t) {
@@ -101,111 +104,110 @@ rank_series_groups <- function(series_groups, metadata, dataset_priority, ...) {
         left_join(metadata, by = "key") |>
         set_dataset_priority(dataset_priority) |>
         arrange(...) |>
-        group_by(gkey) |>
+        group_by(gkey, variable) |>
         mutate(priority = -row_number()) |>
         ungroup() |>
-        select(gkey, key, priority)
+        select(gkey, variable, key, priority)
 }
 
-match_with_highest_ranked <- function(ranked_series_groups, match_offsets) {
-    all_offsets <- bind_rows(
-        match_offsets |> select(key_x, key_y, variable, offset_days),
-        match_offsets |> select(key_x = key_y, key_y = key_x, variable, offset_days)
-    )
 
-    ranked_series_groups |>
-        group_by(gid, variable) |>
-        filter(n() > 1L) |>
-        slice_max(priority, with_ties = FALSE) |>
-        ungroup() |>
-        select(gid, id, variable) |>
-        left_join(ranked_series_groups, by = c("gid", "variable"), suffix = c("_x", "_y")) |>
-        filter(key_x != key_y) |>
-        left_join(all_offsets, by = c("key_x", "key_y", "variable"), relationship = "many-to-one")
-}
-
-#' Computes the coefficients for the model Ty - Tx ~ k0 + k1 * sin(t / 2) + k2 * sin(t) + k3 * sin(3 * t / 2)
-compute_corrections <- function(lagged_series_matches, data) {
-    lsm <- copy_to(data$src$con, lagged_series_matches, overwrite = TRUE, name = "lagged_series_matches_tmp")
-    # Using pair_full_series instead of pair_common_series as to preserve the presence of matching series with no common period
-    corrections <- pair_full_series(data, lsm, by = c("key_x", "key_y", "variable")) |>
-        mutate(delT = value_y - value_x) |>
-        group_by(variable, key_x, key_y, month = month(date), year = year(date)) |>
-        summarise(delT = mean(delT, na.rm = TRUE), .groups = "drop_last") |>
-        summarise(monthlydelT = mean(delT, na.rm = TRUE), .groups = "drop") |>
-        # summarise(across(starts_with("value"), ~ mean(., na.rm = TRUE)), .groups = "drop_last") |>
-        # summarise(across(starts_with("value"), ~ mean(., na.rm = TRUE)), .groups = "drop_last") |>
-        # mutate(delmonthlyT = value_y - value_x, t = 2 * pi * (month - 0.5) / 12) |>
+pairs_corrections <- function(pairs_list, data) {
+    have_common_data <- pair_common_series(data, pairs_list, copy = TRUE, by = c("pkey", "key_x", "key_y", "variable")) |>
+        mutate(delT = value_x - value_y) |>
+        group_by(pkey, month = month(date)) |>
+        filter(n() > 25L) |>
+        summarise(monthlydelT = mean(delT, na.rm = TRUE), .groups = "drop_last") |>
         mutate(t = 2 * pi * (month - 0.5) / 12) |>
         collect() |>
-        group_by(variable, key_x, key_y) |>
         summarise(coeffs = diff_coeffs(monthlydelT, t), .groups = "drop") |>
-        unnest(coeffs) |>
-        left_join(lagged_series_matches |> select(gid, key_x, key_y, variable), by = c("key_x", "key_y", "variable"))
+        unnest(coeffs)
 
-    dbExecute(data$src$con, "DROP TABLE lagged_series_matches_tmp")
-    corrections
+    no_common_data <- pairs_list |>
+        anti_join(have_common_data, by = "pkey") |>
+        mutate(k0 = 0, k1 = 0, k2 = 0, k3 = 0) |>
+        select(all_of(colnames(have_common_data)))
+
+    rows_append(have_common_data, no_common_data)
 }
 
-existing_measures <- function(series, data) {
+correction_model <- function(t, k0, k1, k2, k3) {
+    k0 + sin(t / 2) * k1 + sin(t) * k2 + sin(3 * t / 2) * k3
+}
+
+make_pair_list <- function(prioritized_series_groups, optimal_offsets) {
+    pl <- prioritized_series_groups |>
+        group_by(gkey, variable) |>
+        slice_max(priority, n = 2L, with_ties = FALSE) |>
+        filter(n() == 2L) |>
+        mutate(which_key = case_match(row_number(priority), 2L ~ "key_x", 1L ~ "key_y")) |>
+        ungroup() |>
+        pivot_wider(id_cols = c(gkey, variable), names_from = which_key, values_from = key) |>
+        mutate(pkey = row_number())
+    if (nrow(pl) > 0L) {
+        pl |>
+            left_join(optimal_offsets, by = c("key_x", "key_y", "variable")) |>
+            mutate(offset_days = coalesce(offset_days, 0L))
+    } else {
+        pl |> mutate(key_x = 0L, key_y = 0L, offset_days = 0L)
+    }
+}
+
+pairs_merge <- function(pairs_list, data) {
+    corrections <- pairs_corrections(pairs_list, data)
+    reference <- data |>
+        inner_join(pairs_list |> select(pkey, key = key_x, variable), by = c("key", "variable"), copy = TRUE) |>
+        mutate(priority = -1L)
+    corrected <- data |>
+        inner_join(pairs_list |> select(pkey, key = key_y, variable), by = c("key", "variable"), copy = TRUE) |>
+        anti_join(reference, by = c("pkey", "variable", "date")) |> #
+        left_join(corrections, by = "pkey", copy = TRUE) |>
+        mutate(t = 2 * pi * yday(date) / yday(make_date(year(date), 12L, 31L))) |>
+        mutate(priority = -2L, value = value + k0 + sin(t / 2) * k1 + sin(t) * k2 + sin(3 * t / 2) * k3) |>
+        select(all_of(colnames(reference)))
+    rows_append(reference, corrected) |> select(pkey, variable, date, value, from_key)
+}
+
+prepare_data <- function(data, series_groups) {
     data |>
-        semi_join(series, by = c("station_id", "variable"), copy = TRUE) |>
-        filter(!is.na(value)) |>
-        select(station_id, variable, date)
+        semi_join(series_groups, by = c("key", "variable"), copy = TRUE) |>
+        collect() |>
+        mutate(from_key = key) |>
+        select(date, variable, value, key, from_key)
 }
 
-#' Merges the series in a given group to produce a single series.
-#'
-#' @param series_groups A table of series groups, consisting of id (station), variable, and gid.
-#' ... specifies the order in which the series are merged comparing series metadata: the first series is the one with the highest priority, and so on.
-merge_series_group <- function(series_groups, metadata, data, optimal_offset, dataset_priority, ...) {
-    # 1. Ranking the series inside their group according to the criteria given in ..., which is passed to arrange()
-    ranked_series_groups <- rank_inside_group(series_groups, metadata, dataset_priority, ...)
-    # ranked_series_groups <- copy_to(data$src$con, ranked_series_groups, overwrite = TRUE, name = "ranked_series_matches_tmp")
+next_tables <- function(series_groups, current_pairs_list, current_merge_result, data, optimal_offsets) {
+    series_groups <- series_groups |> anti_join(current_pairs_list, by = c("key" = "key_y", "variable"))
+    next_pair_list <- series_groups |>
+        make_pair_list(optimal_offsets)
 
-    # 2. Building the match table which describes how series are merged. Every series gets matched against the highest ranked series in the group.
-    merging_matches <- match_with_highest_ranked(ranked_series_groups, optimal_offset)
-    merged_on_series <- merging_matches |>
-        distinct(gid, station_id = key_x, variable)
+    merge_data <- current_merge_result |>
+        left_join(current_pairs_list |> select(pkey, key = key_x), by = "pkey") |>
+        select(-pkey)
 
-    # 3. Computing the corrections for each series in the group
-    corrections <- compute_corrections(merging_matches, data)
-    # `corrections` is a table with columns gid, variable, key_x, key_y, k0, k1, k2, k3
+    next_data <- data |>
+        anti_join(current_pairs_list, by = c("key" = "key_x", "variable")) |>
+        anti_join(current_pairs_list, by = c("key" = "key_y", "variable")) |>
+        rows_append(merge_data)
 
-    # 4. Listing the dates that are already present in the highest ranked series for each group
-    already_there <- existing_measures(merged_on_series, data) |> compute()
-
-    # 5. Corrected series. These are the key_y series, corrected by the coefficients computed in step 3.
-    integrations <- data |>
-        inner_join(corrections, by = c("variable", "station_id" = "key_y"), copy = TRUE) |>
-        # table with columns: gid, variable, key_x, station_id, date, value, k0, k1, k2, k3
-        # Removing the measures that are already present in the highest ranked series for each group, stored in `already_there`
-        anti_join(already_there, by = c("key_x" = "station_id", "variable", "date")) |>
-        mutate(
-            t = 2 * pi * yday(date) / yday(make_date(year(date), 1L, 1L)),
-            delT = k0 + k1 * sin(t / 2.0) + k2 * sin(t) + k3 * sin(3.0 * t / 2.0),
-            value = value - delT
-        ) |>
-        select(!c(k0, k1, k2, k3, t, delT, key_x))
-
-    # 6. Using the corrected series to fill the gaps in the highest ranked series
-    data |>
-        inner_join(merged_on_series, by = c("variable", "station_id"), copy = TRUE) |>
-        # table with columns: gid, variable, station_id, date, value
-        rows_append(integrations) |>
-        left_join(ranked_series_groups, by = c("gid", "variable", "station_id" = "id"), copy = TRUE) |>
-        group_by(gid, variable, date) |>
-        window_order(priority) |>
-        summarise(value = first(value), station_id = first(station_id), .groups = "drop")
+    list(next_pair_list, next_data, series_groups)
 }
 
-merge_series_groups.2 <- function(series_groups, metadata, data, dataset_priority, ...) {
-    ranked_series_groups <- rank_series_groups(series_groups, metadata, dataset_priority, ...)
-    ranked_series_groups <- copy_to(data$src$con, ranked_series_groups, overwrite = TRUE, name = "ranked_series_matches_tmp")
-    ranked_data <- ranked_series_groups |> left_join(data, by = "key")
-    ranked_data |>
-        # arrange(priority) |>
-        group_by(gkey, variable, date) |>
-        window_order(desc(priority)) |>
-        summarise(value = first(value), from_dataset = first(dataset), from_sensor = first(sensor_key), from_key = first(key), .groups = "drop")
+dynamic_merge <- function(data, series_groups, optimal_offsets) {
+    if (series_groups |> group_by(key, variable) |> count() |> filter(n > 1) |> nrow() > 0L) {
+        stop("There are series with the same key and variable in the series_groups table")
+    }
+    data <- prepare_data(data, series_groups)
+    optimal_offsets <- bind_rows(
+        optimal_offsets |> select(key_x, key_y, variable, offset_days),
+        optimal_offsets |> select(key_x = key_y, key_y = key_x, variable, offset_days) |> mutate(offset_days = -offset_days)
+    )
+    pair_list <- make_pair_list(series_groups, optimal_offsets)
+    while (nrow(pair_list) > 0L) {
+        merge_result <- pairs_merge(pair_list, data)
+        r <- next_tables(series_groups, pair_list, merge_result, data, optimal_offsets)
+        pair_list <- r[[1]]
+        data <- r[[2]]
+        series_groups <- r[[3]]
+    }
+    data
 }
