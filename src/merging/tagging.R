@@ -18,3 +18,10 @@ default_logic <- function(tagged_analysis, require_all) {
             tag_mergeable = tag_same_series & tag_mergeable
         )
 }
+
+default_weak_tagger <- function(tagged_analysis) {
+    tagged_analysis |>
+        mutate(
+            tag_weak_link = tag_same_series & valid_days_inters < 100L
+        )
+}
