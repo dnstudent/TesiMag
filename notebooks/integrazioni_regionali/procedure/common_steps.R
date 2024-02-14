@@ -5,6 +5,7 @@ library(tidyr, warn.conflicts = FALSE)
 library(assertr, warn.conflicts = FALSE)
 library(assertthat, warn.conflicts = FALSE)
 library(zeallot, warn.conflicts = FALSE)
+library(stringr, warn.conflicts = FALSE)
 
 source("src/database/tools.R")
 source("src/database/test.R")
@@ -175,4 +176,22 @@ merge_same_series <- function(tagged_analysis, metadata, data, ...) {
         rank_series_groups(metadata, ...)
     merged <- dynamic_merge(data, ranked_series_groups, tagged_analysis)
     list("series_groups" = ranked_series_groups, "data" = merged, "graph" = gs$graph)
+}
+
+merged_checkpoint <- function(merge_results, metadata, dataset_name) {
+    data <- merge_results$data |>
+        left_join(metadata |> select(key, from_sensor_key = sensor_key, from_dataset = dataset), by = c("from_key" = "key")) |>
+        mutate(dataset = dataset_name) |>
+        rename(sensor_key = key)
+
+    metadata <- metadata |>
+        # semi_join(data |> distinct(sensor_key, from_dataset, from_sensor_key), by = "sensor_key") |>
+        mutate(dataset = dataset_name) |>
+        inner_join(merge_results$meta |> filter(variable == 1L) |> select(-gkey, -variable), by = "key") |>
+        mutate(sensor_key = key) |>
+        select(-key, -from_keys)
+
+    checkpoint <- as_checkpoint(meta = metadata |> as_arrow_table(), data = data |> as_arrow_table(), check_schema = FALSE)
+    save_checkpoint(checkpoint, dataset_name, "merged", check_schema = FALSE)
+    checkpoint
 }

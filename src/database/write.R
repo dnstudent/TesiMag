@@ -24,13 +24,16 @@ write_data <- function(data_table, dataset, step, check_schema = TRUE) {
         write_parquet(table_path)
 }
 
-write_metadata <- function(metadata_table, dataset, step) {
+write_metadata <- function(metadata_table, dataset, step, check_schema = TRUE) {
     table_path <- archive_path(dataset, "metadata", step)
     if (!dir.exists(dirname(table_path))) {
         dir.create(dirname(table_path), recursive = TRUE)
     }
+    if (check_schema) {
+        metadata_table <- metadata_table |>
+            as_arrow_table2(schema = meta_schema)
+    }
     metadata_table |>
-        as_arrow_table2(schema = meta_schema) |>
         write_parquet(table_path)
 }
 

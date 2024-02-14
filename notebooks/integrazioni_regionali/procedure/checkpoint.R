@@ -12,7 +12,7 @@ as_checkpoint <- function(meta, data, check_schema = TRUE) {
     if (check_schema) {
         list("meta" = as_arrow_table2(meta, meta_schema), "data" = as_arrow_table2(data, data_schema))
     } else {
-        list("meta" = as_arrow_table2(meta, meta_schema), "data" = as_arrow_table(data))
+        list("meta" = as_arrow_table(meta), "data" = as_arrow_table(data))
     }
 }
 
@@ -22,7 +22,7 @@ save_checkpoint <- function(checkpoint, dataset, step, check_schema = TRUE) {
     #     assert_data_uniqueness() |>
     #     assert_metadata_uniqueness()
     write_data(checkpoint$data, dataset, step, check_schema)
-    write_metadata(checkpoint$meta, dataset, step)
+    write_metadata(checkpoint$meta, dataset, step, check_schema)
 }
 
 open_checkpoint <- function(dataset, step) {
