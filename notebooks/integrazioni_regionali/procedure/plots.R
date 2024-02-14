@@ -33,6 +33,6 @@ plot_state_avail.tbl <- function(data, .minimum_valid_days = 20L, .maximum_conse
         mutate(yearmonth = make_yearmonth(year, month)) |>
         as_tsibble(key = c(variable, dataset), index = yearmonth) |>
         ggplot() +
-        geom_line(aes(yearmonth, available_series, color = dataset))
+        geom_area(aes(yearmonth, available_series, fill = dataset), position = "stack")
     list("plot" = p, "data" = ymonthly)
 }

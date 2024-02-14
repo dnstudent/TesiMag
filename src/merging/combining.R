@@ -42,7 +42,7 @@ add_nonmatching <- function(graph, metadata) {
     add_vertices(graph, nrow(missing), name = missing$key)
 }
 
-series_groups <- function(series_matches, metadata, data, tag, vertex_grouping, direct) {
+series_groups <- function(series_matches, metadata, data, tag) {
     graph_edgelist <- series_matches |>
         arrange(key_x, key_y, variable) |>
         select(key_x, key_y, {{ tag }})
@@ -50,11 +50,11 @@ series_groups <- function(series_matches, metadata, data, tag, vertex_grouping, 
     graph <- graph_from_isedge(
         graph_edgelist,
         {{ tag }},
-        direct
+        FALSE
     ) |>
         add_nonmatching(metadata)
 
-    table <- vertex_grouping(graph) |>
+    table <- group_by_component(graph) |>
         cross_join(tibble(variable = c(-1L, 1L))) |>
         semi_join(data |> distinct(key, variable) |> collect(), by = c("key", "variable"))
     list(
@@ -138,19 +138,17 @@ pairs_merge <- function(pairs_list, data, rejection_threshold) {
     accepted_corrections <- corrections |> filter(abs(k0) <= rejection_threshold)
     rejected_corrections <- corrections |>
         filter(abs(k0) > rejection_threshold) |>
-        select(!c(k1, k2, k3)) |>
         left_join(pairs_list, by = "pkey")
     reference <- data |>
-        inner_join(pairs_list |> select(pkey, key = key_x, variable), by = c("key", "variable"), copy = TRUE) |>
-        mutate(priority = -1L)
+        inner_join(pairs_list |> select(pkey, key = key_x, variable), by = c("key", "variable"), copy = TRUE)
     corrected <- data |>
         inner_join(pairs_list |> select(pkey, key = key_y, variable), by = c("key", "variable"), copy = TRUE) |>
         anti_join(reference, by = c("pkey", "variable", "date")) |> #
         inner_join(accepted_corrections, by = "pkey", copy = TRUE) |>
         mutate(t = 2 * pi * yday(date) / yday(make_date(year(date), 12L, 31L))) |>
-        mutate(priority = -2L, value = value + k0 + sin(t / 2) * k1 + sin(t) * k2 + sin(3 * t / 2) * k3) |>
+        mutate(correction = k0 + sin(t / 2) * k1 + sin(t) * k2 + sin(3 * t / 2) * k3, value = value + correction) |>
         select(all_of(colnames(reference)))
-    list("merged" = rows_append(reference, corrected) |> select(pkey, variable, date, value, from_key), "rejected" = rejected_corrections)
+    list("merged" = rows_append(reference, corrected) |> select(pkey, variable, date, value, from_key, correction), "rejected" = rejected_corrections)
 }
 
 prepare_data <- function(data, series_groups) {
@@ -158,7 +156,8 @@ prepare_data <- function(data, series_groups) {
         semi_join(series_groups, by = c("key", "variable"), copy = TRUE) |>
         collect() |>
         mutate(from_key = key) |>
-        select(date, variable, value, key, from_key)
+        select(date, variable, value, key, from_key) |>
+        mutate(correction = 0)
 }
 
 prepare_offsets <- function(matches_offsets) {
@@ -186,10 +185,15 @@ next_tables <- function(series_groups, current_pairs_list, current_merge_result,
     list(next_pair_list, next_data, series_groups)
 }
 
-dynamic_merge <- function(data, series_groups, optimal_offsets, rejection_threshold) {
+dynamic_merge <- function(data, series_groups, metadata, optimal_offsets, rejection_threshold) {
     if (series_groups |> group_by(key, variable) |> count() |> filter(n > 1) |> nrow() > 0L) {
         stop("There are series with the same key and variable in the series_groups table")
     }
+    key_meta <- series_groups |>
+        left_join(metadata |> select(key, sensor_key, dataset), by = "key") |>
+        arrange(desc(priority)) |>
+        group_by(gkey, variable) |>
+        summarise(from_keys = list(key), from_sensor_keys = list(sensor_key), from_datasets = list(dataset), key = first(key), .groups = "drop")
     data <- prepare_data(data, series_groups)
     optimal_offsets <- prepare_offsets(optimal_offsets)
     pair_list <- make_pair_list(series_groups, optimal_offsets)
@@ -201,7 +205,7 @@ dynamic_merge <- function(data, series_groups, optimal_offsets, rejection_thresh
         data <- r[[2]]
         series_groups <- r[[3]]
     }
-    data
+    list("meta" = key_meta, "data" = data)
 }
 
 incompatible_merges <- function(data, series_groups, optimal_offsets, cycles, rejection_threshold) {
@@ -213,7 +217,7 @@ incompatible_merges <- function(data, series_groups, optimal_offsets, cycles, re
     pair_list <- make_pair_list(series_groups, optimal_offsets)
     n_rejected <- 0L
     counter <- 0L
-    rejects <- tibble(pkey = integer(), k0 = double(), gkey = integer(), key_x = integer(), key_y = integer(), variable = integer(), offset_days = integer())
+    rejects <- tibble(pkey = integer(), k0 = double(), k1 = double(), k2 = double(), k3 = double(), gkey = integer(), key_x = integer(), key_y = integer(), variable = integer(), offset_days = integer())
     while ((n_rejected == 0L | counter < cycles) & nrow(pair_list) > 0L) {
         merge_results <- pairs_merge(pair_list, data, rejection_threshold)
         n_rejected <- nrow(merge_results$rejected)
