@@ -1,22 +1,27 @@
 library(dplyr, warn.conflicts = FALSE)
 
-tag_manual <- function(analysis) {
-    analysis |>
+tag_manual <- function(tagged_analysis) {
+    tagged_analysis |>
         mutate(
-            tag_same_series = tag_same_series &
-                !(user_code_x == "VERZI" & user_code_y == "07LOAN0") &
-                !(dataset_x == "SCIA" & dataset_y == "SCIA" &
-                    ((sensor_key_x == 1331L & sensor_key_y == 1333L) |
-                        (sensor_key_x == 1803L & sensor_key_y == 3118L) |
-                        (name_x == "Calice Ligure" & name_y == "Calice Ligure")
+            tag_same_series =
+                (dataset_x == "ARPAL" & dataset_y == "ARPAL" & sensor_key_x == 62L & sensor_key_y == 63L) |
+                    (
+                        tag_same_series &
+                            !(user_code_x == "VERZI" & user_code_y == "07LOAN0") &
+                            !(dataset_x == "SCIA" & dataset_y == "SCIA" &
+                                (
+                                    (name_x == "Calice Ligure" & name_y == "Calice Ligure") |
+                                        (sensor_key_x == 1803L & sensor_key_y == 3118L) | # Mattarana - Tavarone
+                                        (sensor_key_x == 1331L & sensor_key_y == 1333L) # Giacopiane Diga / Lago
+                                )
+                            ) &
+                            !(dataset_x == "ARPAL" & dataset_y == "ARPAL" &
+                                (sensor_key_x == 22L & sensor_key_y == 23L)
+                            ) &
+                            !(dataset_x == "ARPAL" & dataset_y == "SCIA" &
+                                (sensor_key_x == 22L & sensor_key_y == 687L)
+                            )
                     )
-                ) &
-                !(dataset_x == "ARPAL" & dataset_y == "ARPAL" &
-                    (sensor_key_x == 22L & sensor_key_y == 23L)
-                ) &
-                !(dataset_x == "ARPAL" & dataset_y == "SCIA" &
-                    (sensor_key_x == 22L & sensor_key_y == 687L)
-                )
         )
 }
 
