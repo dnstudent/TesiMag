@@ -21,7 +21,7 @@ plot_state_avail <- function(metadata, data, start_date = NULL, end_date = NULL,
     list("plot" = p, "data" = ymonthly_availabilities)
 }
 
-plot_state_avail.tbl <- function(data, .minimum_valid_days = 20L, .maximum_consecutive_missing_days = 4L) {
+plot_state_avail.tbl <- function(data, stack, .minimum_valid_days = 20L, .maximum_consecutive_missing_days = 4L) {
     ymonthly <- monthly_availabilities(data, minimum_valid_days = .minimum_valid_days, maximum_consecutive_missing_days = .maximum_consecutive_missing_days) |>
         compute()
 
@@ -32,7 +32,21 @@ plot_state_avail.tbl <- function(data, .minimum_valid_days = 20L, .maximum_conse
         collect() |>
         mutate(yearmonth = make_yearmonth(year, month)) |>
         as_tsibble(key = c(variable, dataset), index = yearmonth) |>
-        ggplot() +
-        geom_area(aes(yearmonth, available_series, fill = dataset), position = "stack")
+        ggplot()
+
+    if (stack) {
+        p <- p + geom_area(aes(yearmonth, available_series, fill = dataset), position = "stack")
+    } else {
+        p <- p + geom_line(aes(yearmonth, available_series, color = dataset))
+    }
     list("plot" = p, "data" = ymonthly)
+}
+
+plot_available_by_elevation <- function(clim_availabilities, metadata, ...) {
+    clim_availabilities |>
+        filter(qc_clim_available) |>
+        mutate(variable = case_match(variable, -1L ~ "T_MIN", 1L ~ "T_MAX")) |>
+        left_join(metadata |> select(dataset, sensor_key, elevation) |> collect(), join_by(dataset, sensor_key)) |>
+        ggplot() +
+        geom_histogram(aes(elevation, fill = variable, ...), binwidth = 100, boundary = 0, position = "dodge")
 }
