@@ -36,6 +36,14 @@ write_xlsx_analysis <- function(analysis, to, ...) {
         starts_with("common_period_"), # 33,34
         ...
     )
+
+    if ("tag_same_series" %in% colnames(analysis)) {
+        analysis <- analysis |> relocate(tag_same_series)
+        off <- 1L
+    } else {
+        off <- 0L
+    }
+
     class(analysis$strSym) <- "percentage"
     class(analysis$f0) <- "percentage"
     class(analysis$fsameint) <- "percentage"
@@ -46,17 +54,17 @@ write_xlsx_analysis <- function(analysis, to, ...) {
     class(analysis$common_period_vs_y) <- "percentage"
     wb <- createWorkbook()
     addWorksheet(wb, "data")
-    writeDataTable(wb, 1, analysis)
+    writeDataTable(wb, 1, analysis, tableStyle = "TableStyleMedium2")
 
     integer_style <- createStyle(numFmt = "0")
-    addStyle(wb, 1, integer_style, rows = 1:nrow(analysis), cols = 12:14, gridExpand = TRUE)
+    addStyle(wb, 1, integer_style, rows = 1:nrow(analysis), cols = (off + 12):(off + 14), gridExpand = TRUE)
 
     prec2_style <- createStyle(numFmt = "0.00")
-    addStyle(wb, 1, prec2_style, rows = 1:nrow(analysis), cols = 17:23, gridExpand = TRUE)
+    addStyle(wb, 1, prec2_style, rows = 1:nrow(analysis), cols = (off + 17):(off + 23), gridExpand = TRUE)
 
     outTStyle <- createStyle(fontColour = "#9C0006", bgFill = "#FFC7CE")
-    conditionalFormatting(wb, 1, cols = c(18, 23), rows = 1:nrow(analysis), rule = "<-0.5", style = outTStyle)
-    conditionalFormatting(wb, 1, cols = c(18, 23), rows = 1:nrow(analysis), rule = ">0.5", style = outTStyle)
+    conditionalFormatting(wb, 1, cols = c(off + 18, off + 23), rows = 1:nrow(analysis), rule = "<-0.5", style = outTStyle)
+    conditionalFormatting(wb, 1, cols = c(off + 18, off + 23), rows = 1:nrow(analysis), rule = ">0.5", style = outTStyle)
 
     saveWorkbook(wb, to, overwrite = TRUE)
 }

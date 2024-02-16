@@ -147,23 +147,22 @@ qc_checkpoint <- function(dataset, conn) {
 #' @param ... Additional arguments to be passed to monthly_availabilities (the availability thresholds).
 #'
 #' @return A list containing the plot and the data.
-ymonthly_availabilities <- function(data, ...) {
+ymonthly_availabilities <- function(data, stack = FALSE, ...) {
     plot_state_avail.tbl(
-        data, ...
+        data, stack, ...
     )
 }
 
 #' Produces the table and plot of spatial series availabilities.
 spatial_availabilities <- function(ymonthly_avail, stations, map, ...) {
-    spatav <- clim_availability(ymonthly_avail, ...)
+    spatav <- clim_availability(ymonthly_avail, ...) |> collect()
     # collect()
 
     p <- ggplot() +
         geom_sf(data = map) +
         geom_sf(
             data = spatav |>
-                inner_join(stations |> select(dataset, sensor_key, lon, lat), join_by(dataset, sensor_key)) |>
-                collect() |>
+                inner_join(stations |> select(dataset, sensor_key, lon, lat) |> collect(), join_by(dataset, sensor_key)) |>
                 st_md_to_sf(),
             aes(color = qc_clim_available, shape = dataset)
         )
@@ -181,17 +180,31 @@ merge_same_series <- function(tagged_analysis, metadata, data, ...) {
 merged_checkpoint <- function(merge_results, metadata, dataset_name) {
     data <- merge_results$data |>
         left_join(metadata |> select(key, from_sensor_key = sensor_key, from_dataset = dataset), by = c("from_key" = "key")) |>
-        mutate(dataset = dataset_name) |>
-        rename(sensor_key = key)
+        rename(sensor_key = key) |>
+        mutate(dataset = dataset_name)
+
+    stats90 <- data |>
+        filter(year(date) >= 1990L) |>
+        group_by(dataset, sensor_key) |>
+        summarise(valid90 = n(), .groups = "drop")
+
+    date_stats <- data |>
+        group_by(dataset, sensor_key) |>
+        summarise(series_first = min(date, na.rm = FALSE), series_last = max(date, na.rm = FALSE), valid_days = n(), .groups = "drop") |>
+        left_join(stats90, by = c("dataset", "sensor_key")) |>
+        mutate(valid90 = coalesce(valid90, 0L))
 
     metadata <- metadata |>
-        # semi_join(data |> distinct(sensor_key, from_dataset, from_sensor_key), by = "sensor_key") |>
         mutate(dataset = dataset_name) |>
-        inner_join(merge_results$meta |> filter(variable == 1L) |> select(-gkey, -variable), by = "key") |>
+        inner_join(merge_results$meta |> select(-gkey, -variable) |> distinct(key, .keep_all = TRUE), by = "key") |>
         mutate(sensor_key = key) |>
-        select(-key, -from_keys)
+        select(!c(key, from_keys, ends_with("_first"), ends_with("_last"), )) |>
+        left_join(date_stats, by = c("dataset", "sensor_key")) |>
+        as_arrow_table()
 
-    checkpoint <- as_checkpoint(meta = metadata |> as_arrow_table(), data = data |> as_arrow_table(), check_schema = FALSE)
+    # metadata |> select(!c(ends_with("_first"), ends_with("_last"), ))
+
+    checkpoint <- as_checkpoint(meta = metadata, data = data |> as_arrow_table(), check_schema = FALSE)
     save_checkpoint(checkpoint, dataset_name, "merged", check_schema = FALSE)
     checkpoint
 }
