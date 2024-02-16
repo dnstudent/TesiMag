@@ -15,7 +15,7 @@ dataset_spec <- function() {
 }
 
 load_daily_data.dext3r <- function(dataconn) {
-    meta <- read_parquet(file.path(path.ds, "ARPA", "EMILIA-ROMAGNA", "Dext3r", "stations.parquet"), as_data_frame = TRUE) |>
+    meta <- read_parquet(file.path(path.ds, "ARPA", "EMILIA-ROMAGNA", "Dext3r", "site_stations.parquet"), as_data_frame = TRUE) |>
         mutate(dataset = "Dext3r", kind = "unknown") |>
         select(-geometry, -ident) |>
         unnest(cols = c(region, province, municipality, basin, subbasin, macroarea, country, owner, manager), names_sep = "_") |>
@@ -25,7 +25,7 @@ load_daily_data.dext3r <- function(dataconn) {
         mutate(
             lon = lon / 1e5,
             lat = lat / 1e5,
-            province_full = str_to_title(province_full),
+            province_full = str_to_title(province_full) |> case_match("Reggio Emilia" ~ "Reggio nell'Emilia", "Forli-Cesena" ~ "Forli'-Cesena", .default = str_to_title(province_full)),
             series_id = station_id,
             sensor_id = station_id,
             sensor_first = as.Date(NA_integer_),
@@ -34,8 +34,31 @@ load_daily_data.dext3r <- function(dataconn) {
             station_last = as.Date(NA_integer_),
             series_first = as.Date(NA_integer_),
             series_last = as.Date(NA_integer_),
-            user_code = NA_character_
+            user_code = NA_character_,
         )
+
+    # email_meta <- vroom::vroom(file.path(path.ds, "ARPA", "EMILIA-ROMAGNA", "Dext3r", "email_metadata.csv"), show_col_types = FALSE) |>
+    #     as_tibble() |>
+    #     rename(
+    #         town = Comune,
+    #         province_full = Provincia,
+    #         # state = Regione,
+    #         station_id = id
+    #     ) |>
+    #     mutate(
+    #         province_full = str_to_title(province_full),
+    #         series_id = station_id,
+    #         sensor_id = station_id,
+    #         sensor_first = as.Date(NA_integer_),
+    #         sensor_last = as.Date(NA_integer_),
+    #         station_first = as.Date(NA_integer_),
+    #         station_last = as.Date(NA_integer_),
+    #         series_first = as.Date(NA_integer_),
+    #         series_last = as.Date(NA_integer_),
+    #         user_code = NA_character_,
+    #         dataset = "Dext3r",
+    #         kind = "unknown"
+    #     )
 
     data <- open_dataset(file.path(path.ds, "ARPA", "EMILIA-ROMAGNA", "Dext3r", "data", "fragments") |> list.files(pattern = "*.parquet", full.names = TRUE)) |>
         to_duckdb(con = dataconn) |>
