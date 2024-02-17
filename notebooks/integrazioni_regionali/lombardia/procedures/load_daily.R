@@ -5,6 +5,7 @@ library(duckdb, warn.conflicts = FALSE)
 library(DBI, warn.conflicts = FALSE)
 
 source("src/database/tools.R")
+source("src/database/query/data.R")
 source("src/paths/paths.R")
 source("src/analysis/data/quality_check.R")
 
@@ -67,16 +68,34 @@ load_work_metadata.arpalombardia <- function() {
         compute()
 }
 
+load_hexts <- function(metadata) {
+    conn <- dbConnect(duckdb())
+    metadata <- metadata |> to_duckdb(con = conn)
+    query_parquet(list.files(file.path(path.lom, "dataset"), full.names = TRUE), conn = conn) |>
+        mutate(station_id = as.integer(station_id)) |>
+        filter(!is.na(value), idOperatore == 1L) |>
+        rename(sensor_id = station_id) |>
+        semi_join(metadata, by = "sensor_id") |>
+        mutate(time = time - sql("INTERVAL 1 MINUTES")) |>
+        group_by(sensor_id, date = as.Date(time), hour = hour(time)) |>
+        summarise(value = trunc(mean(value, na.rm = TRUE) * 10) / 10, .groups = "drop_last") |>
+        summarise(T_MIN = min(value, na.rm = TRUE), T_MAX = max(value, na.rm = TRUE), .groups = "drop") |>
+        pivot_longer(cols = c("T_MIN", "T_MAX"), names_to = "variable", values_to = "value") |>
+        mutate(dataset = "ARPALombardia") |>
+        to_arrow() |>
+        compute()
+}
+
 load_work_data.arpalombardia <- function(metadata) {
     conn <- dbConnect(duckdb())
     metadata <- metadata |> to_duckdb(con = conn)
-    suppressMessages(tbl(conn, "read_parquet('/Users/davidenicoli/Local_Workspace/Datasets/ARPA/LOMBARDIA/dataset/*.parquet')")) |>
+    query_parquet(list.files(file.path(path.lom, "dataset"), full.names = TRUE), conn = conn) |>
         mutate(station_id = as.integer(station_id)) |>
         filter(!is.na(value)) |>
         rename(sensor_id = station_id) |>
         semi_join(metadata, by = "sensor_id") |>
         mutate(time = time - sql("INTERVAL 10 MINUTES")) |>
-        group_by(sensor_id, date = sql("date_trunc('day', time)")) |>
+        group_by(sensor_id, date = as.Date(time)) |>
         summarise(
             T_MIN = min(value, na.rm = TRUE),
             T_MAX = max(value, na.rm = TRUE),
@@ -90,7 +109,7 @@ load_work_data.arpalombardia <- function(metadata) {
 
 load_daily_data.arpalombardia <- function() {
     work_meta <- load_work_metadata.arpalombardia()
-    work_data <- load_work_data.arpalombardia(work_meta) |>
+    work_data <- load_hexts(work_meta) |> # load_work_data.arpalombardia(work_meta) |>
         mutate(sensor_id = cast(sensor_id, utf8()))
 
     work_meta <- work_meta |>
