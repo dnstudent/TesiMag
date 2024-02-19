@@ -10,3 +10,4 @@ dependencies:
   - black
   - pip:
     - adbc_driver_manager
+
