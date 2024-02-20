@@ -63,7 +63,7 @@ load_work_metadata.arpalombardia <- function() {
             series_first = sensor_first,
             series_last = sensor_last,
             town = NA_character_,
-            user_code = sensor_id,
+            user_code = str_pad(as.character(station_id), width = 5L, side = "left", pad = "0"),
         ) |>
         compute()
 }
@@ -94,7 +94,7 @@ load_work_data.arpalombardia <- function(metadata) {
         filter(!is.na(value)) |>
         rename(sensor_id = station_id) |>
         semi_join(metadata, by = "sensor_id") |>
-        mutate(time = time - sql("INTERVAL 10 MINUTES")) |>
+        mutate(time = time - sql("INTERVAL 1 MINUTES")) |>
         group_by(sensor_id, date = as.Date(time)) |>
         summarise(
             T_MIN = min(value, na.rm = TRUE),
@@ -107,9 +107,14 @@ load_work_data.arpalombardia <- function(metadata) {
         compute()
 }
 
-load_daily_data.arpalombardia <- function() {
+load_daily_data.arpalombardia <- function(hexts = FALSE) {
     work_meta <- load_work_metadata.arpalombardia()
-    work_data <- load_hexts(work_meta) |> # load_work_data.arpalombardia(work_meta) |>
+    if (hexts) {
+        work_data <- load_hexts(work_meta)
+    } else {
+        work_data <- load_work_data.arpalombardia(work_meta)
+    }
+    work_data <- work_data |> # load_work_data.arpalombardia(work_meta) |>
         mutate(sensor_id = cast(sensor_id, utf8()))
 
     work_meta <- work_meta |>
