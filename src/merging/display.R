@@ -1,7 +1,31 @@
 library(dplyr, warn.conflicts = FALSE)
 library(openxlsx, warn.conflicts = FALSE)
+library(tidyr, warn.conflicts = FALSE)
 
 source("src/load/tools.R")
+
+show_merge <- function(merged_meta, unmerged_meta, ...) {
+    unmerged_meta <- collect(unmerged_meta)
+    colnms <- paste0(rep(c(...), each = 2L), rep(c("_master", "_merged"), length(c(...))))
+    merged_meta |>
+        collect() |>
+        rowwise() |>
+        mutate(master_key = first(from_sensor_keys), master_ds = first(from_datasets)) |>
+        ungroup() |>
+        select(from_sensor_keys, from_datasets, master_key, master_ds) |>
+        unnest_longer(col = c(from_sensor_keys, from_datasets)) |>
+        left_join(unmerged_meta, by = c("master_key" = "sensor_key", "master_ds" = "dataset")) |>
+        left_join(unmerged_meta, by = c("from_sensor_keys" = "sensor_key", "from_datasets" = "dataset"), suffix = c("_master", "_merged")) |>
+        select(
+            master_key,
+            master_ds,
+            from_sensor_keys,
+            from_datasets,
+            name_master,
+            name_merged,
+            any_of(colnms)
+        )
+}
 
 write_xlsx_analysis <- function(analysis, to, ...) {
     analysis <- analysis |> select(
