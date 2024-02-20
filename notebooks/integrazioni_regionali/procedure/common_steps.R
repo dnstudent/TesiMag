@@ -186,11 +186,11 @@ merged_checkpoint <- function(merge_results, metadata, dataset_name) {
     stats90 <- data |>
         filter(year(date) >= 1990L) |>
         group_by(dataset, sensor_key) |>
-        summarise(valid90 = n(), .groups = "drop")
+        summarise(valid90 = as.integer(n() %/% 2L), .groups = "drop")
 
     date_stats <- data |>
         group_by(dataset, sensor_key) |>
-        summarise(series_first = min(date, na.rm = FALSE), series_last = max(date, na.rm = FALSE), valid_days = n(), .groups = "drop") |>
+        summarise(series_first = min(date, na.rm = FALSE), series_last = max(date, na.rm = FALSE), valid_days = as.integer(n() %/% 2L), .groups = "drop") |>
         left_join(stats90, by = c("dataset", "sensor_key")) |>
         mutate(valid90 = coalesce(valid90, 0L))
 
@@ -200,11 +200,12 @@ merged_checkpoint <- function(merge_results, metadata, dataset_name) {
         mutate(sensor_key = key) |>
         select(!c(key, from_keys, ends_with("_first"), ends_with("_last"), )) |>
         left_join(date_stats, by = c("dataset", "sensor_key")) |>
-        as_arrow_table()
+        filter(valid_days >= 30L)
 
+    data <- data |> semi_join(metadata, by = c("dataset", "sensor_key"))
     # metadata |> select(!c(ends_with("_first"), ends_with("_last"), ))
 
-    checkpoint <- as_checkpoint(meta = metadata, data = data |> as_arrow_table(), check_schema = FALSE)
+    checkpoint <- as_checkpoint(meta = metadata, data = data, check_schema = FALSE)
     save_checkpoint(checkpoint, dataset_name, "merged", check_schema = FALSE)
     checkpoint
 }

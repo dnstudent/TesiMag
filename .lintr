@@ -1,6 +1,6 @@
 linters: linters_with_defaults(
     line_length_linter = line_length_linter(200L),
     object_name_linter = object_name_linter(c("dotted.case", "snake_case", "symbol")),
-    indentation_linter = indentation_linter(indent = 2L)
+    indentation_linter = indentation_linter(indent = 4L),
   )
 encoding: "UTF-8"

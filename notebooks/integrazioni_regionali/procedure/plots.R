@@ -27,17 +27,17 @@ plot_state_avail.tbl <- function(data, stack, .minimum_valid_days = 20L, .maximu
 
     p <- ymonthly |>
         group_by(dataset, variable, year, month, .add = TRUE) |>
-        summarise(available_series = sum(if_else(qc_month_available, 1L, 0L), na.rm = TRUE), .groups = "drop") |>
+        summarise(available_series = sum(as.integer(qc_month_available), na.rm = TRUE), .groups = "drop") |>
         arrange(year, month) |>
         collect() |>
         mutate(yearmonth = make_yearmonth(year, month)) |>
         as_tsibble(key = c(variable, dataset), index = yearmonth) |>
-        ggplot()
+        ggplot(aes(x = yearmonth, y = available_series))
 
     if (stack) {
-        p <- p + geom_area(aes(yearmonth, available_series, fill = dataset), position = "stack")
+        p <- p + geom_area(aes(fill = dataset), position = "stack")
     } else {
-        p <- p + geom_line(aes(yearmonth, available_series, color = dataset))
+        p <- p + geom_line(aes(color = dataset))
     }
     list("plot" = p, "data" = ymonthly)
 }

@@ -3,6 +3,7 @@ library(pals, warn.conflicts = FALSE)
 library(dplyr, warn.conflicts = FALSE)
 source("src/database/query/data.R")
 source("src/merging/pairing.R")
+source("src/merging/combining.R")
 
 plot_stations <- function(ids, data, same_period = TRUE, matches = TRUE) {
     cols <- colnames(ids)
@@ -46,32 +47,60 @@ plot_diffs <- function(matches, data, ...) {
             mutate(offset_days = 0L)
     }
 
-    data <- pair_full_series(data, matches) |>
+    data <- pair_common_series(data, matches) |>
         left_join(matches |> select(starts_with("dataset"), starts_with("sensor_key"), starts_with("key_"), variable, starts_with("name"), starts_with("sensor_id")), by = c("key_x", "key_y", "variable")) |>
         mutate(delT = value_y - value_x, valid = !is.na(delT)) |>
         collect() |>
         mutate(
             variable = factor(variable, levels = c(-1L, 1L), labels = c("T_MIN", "T_MAX")),
-            match_id = as.factor(paste0(dataset_x, " ", name_x, " ", sensor_id_x, "\n", dataset_y, " ", name_y, " ", sensor_id_y))
+            match_id = as.factor(paste0(dataset_x, " ", name_x, "\n", dataset_y, " ", name_y))
         )
 
     dbExecute(dataconn, "DROP TABLE matches_plot_tmp")
 
     ggplot(data = data |> arrange(match_id, variable, date)) +
         geom_line(aes(x = date, y = delT, color = variable, linetype = variable, ...), na.rm = TRUE) +
-        # geom_rect(aes(NULL, NULL, xmin = date, xmax = lag(date), fill = valid), ymin = -0.5, ymax = 0.5, na.rm = TRUE) +
-        # scale_fill_manual(values = c("TRUE" = alpha("white", 0), "FALSE" = alpha(c("red"), 0.8))) +
         scale_color_manual(values = coolwarm(2)) +
         facet_grid(match_id ~ ., scales = "free")
 }
 
-plot_correction <- function(corrections, dataconn, ...) {
-    p <- plot_diffs(corrections, dataconn, ...)
-    c_data <- p$data |>
-        select(variable, starts_with("id"), date) |>
-        left_join(corrections |> mutate(variable = if_else(variable == -1L, "T_MIN", "T_MAX")), by = c("variable", "id_x", "id_y")) |>
-        mutate(t = annual_index(date), correction = k0 + sin(t / 2) * k1 + sin(t) * k2 + sin(3 * t / 2) * k3)
-    p + geom_line(data = c_data, aes(x = date, y = correction, color = variable, ...))
+plot_correction <- function(corrections, metadata, data, ...) {
+    if (!("offset_days" %in% colnames(corrections))) {
+        corrections <- corrections |>
+            mutate(offset_days = 0L)
+    }
+    corrections <- corrections |>
+        select(key_x, key_y, variable, k0, k1, k2, k3, offset_days)
+
+    diffs <- pair_common_series(data, corrections, by = c("key_x", "key_y", "variable")) |>
+        collect() |>
+        left_join(corrections |> select(-offset_days), by = c("key_x", "key_y", "variable")) |>
+        left_join(metadata |> select(key, dataset, name), by = c("key_x" = "key")) |>
+        left_join(metadata |> select(key, dataset, name), by = c("key_y" = "key"), suffix = c("_x", "_y")) |>
+        mutate(
+            variable = factor(variable, levels = c(-1L, 1L), labels = c("T_MIN", "T_MAX"), ordered = TRUE),
+            delT = value_x - value_y,
+            t = annual_index(date),
+            match_id = as.factor(paste0(dataset_x, " ", name_x, "\n", dataset_y, " ", name_y)),
+            correction = k0 + sin(t / 2) * k1 + sin(t) * k2 + sin(2 * t) * k3
+        )
+
+    monthly <- diffs |>
+        group_by(match_id, variable, key_x, key_y, year = year(date), month = month(date)) |>
+        summarise(
+            delT = mean(delT, na.rm = TRUE),
+            day = as.integer(mean(day(date), na.rm = TRUE)),
+            .groups = "drop"
+        ) |>
+        mutate(
+            date = make_date(year, month, day),
+        )
+
+    ggplot() +
+        geom_point(data = monthly, aes(x = date, y = delT, color = variable, ...), na.rm = TRUE) +
+        geom_line(data = diffs, aes(x = date, y = correction, color = variable, ...), na.rm = TRUE) +
+        scale_color_manual(values = coolwarm(2L)) +
+        facet_grid(match_id ~ ., scales = "free")
 }
 
 plot_random_matches <- function(matches, dataconn, ..., n = 5L) {
