@@ -13,7 +13,7 @@ source("src/database/write.R")
 source("src/merging/pairing.R")
 
 annual_index <- function(date) {
-    2 * pi * yday(date) / yday(make_date(year(date), 12L, 31L))
+    4 * pi * (yday(date) / yday(make_date(year(date), 12L, 31L)) + 1 / 3)
 }
 
 group_by_component <- function(graph) {
@@ -70,7 +70,7 @@ set_dataset_priority <- function(metadata, dataset_priority) {
 diff_coeffs <- function(delmonthlyT, t) {
     n_data <- length(delmonthlyT |> na.omit())
     coeffs <- if (n_data >= 8) {
-        coeffs <- lm(delmonthlyT ~ sin(t / 2) + sin(t) + sin(3 * t / 2))$coefficients
+        coeffs <- lm(delmonthlyT ~ sin(t / 2) + sin(t) + sin(2 * t))$coefficients
         names(coeffs) <- c("k0", "k1", "k2", "k3")
         coeffs
     } else if (n_data > 2) {
@@ -95,10 +95,11 @@ rank_series_groups <- function(series_groups, metadata, dataset_priority, ...) {
 pairs_corrections <- function(pairs_list, data) {
     have_common_data <- pair_common_series(data, pairs_list, copy = TRUE, by = c("pkey", "key_x", "key_y", "variable")) |>
         mutate(delT = value_x - value_y) |>
+        filter(abs(delT) < 10) |>
         group_by(pkey, month = month(date)) |>
         filter(n() > 25L) |>
         summarise(monthlydelT = mean(delT, na.rm = TRUE), .groups = "drop_last") |>
-        mutate(t = 2 * pi * (month - 0.5) / 12) |>
+        mutate(t = 4 * pi * ((month - 0.5) / 12 + 1 / 3)) |>
         collect() |>
         summarise(coeffs = diff_coeffs(monthlydelT, t), .groups = "drop") |>
         unnest(coeffs)
@@ -109,10 +110,6 @@ pairs_corrections <- function(pairs_list, data) {
         select(all_of(colnames(have_common_data)))
 
     rows_append(have_common_data, no_common_data)
-}
-
-correction_model <- function(t, k0, k1, k2, k3) {
-    k0 + sin(t / 2) * k1 + sin(t) * k2 + sin(3 * t / 2) * k3
 }
 
 make_pair_list <- function(prioritized_series_groups, optimal_offsets) {
@@ -138,15 +135,15 @@ pairs_merge <- function(pairs_list, data, rejection_threshold) {
     accepted_corrections <- corrections |> filter(abs(k0) <= rejection_threshold)
     rejected_corrections <- corrections |>
         filter(abs(k0) > rejection_threshold) |>
-        left_join(pairs_list, by = "pkey")
+        left_join(pairs_list, by = "pkey", suffix = c("_x", "_y"))
     reference <- data |>
         inner_join(pairs_list |> select(pkey, key = key_x, variable), by = c("key", "variable"), copy = TRUE)
     corrected <- data |>
         inner_join(pairs_list |> select(pkey, key = key_y, variable), by = c("key", "variable"), copy = TRUE) |>
         anti_join(reference, by = c("pkey", "variable", "date")) |> #
         inner_join(accepted_corrections, by = "pkey", copy = TRUE) |>
-        mutate(t = 2 * pi * yday(date) / yday(make_date(year(date), 12L, 31L))) |>
-        mutate(correction = k0 + sin(t / 2) * k1 + sin(t) * k2 + sin(3 * t / 2) * k3, value = value + correction) |>
+        mutate(t = 4 * pi * (yday(date) / yday(make_date(year(date), 12L, 31L)) + 1 / 3)) |>
+        mutate(correction = k0 + sin(t / 2) * k1 + sin(t) * k2 + sin(2 * t) * k3, value = value + correction) |>
         select(all_of(colnames(reference)))
     list("merged" = rows_append(reference, corrected) |> select(pkey, variable, date, value, from_key, correction), "rejected" = rejected_corrections)
 }
