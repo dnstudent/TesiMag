@@ -1,49 +1,25 @@
 library(dplyr, warn.conflicts = FALSE)
 
-
-tag_same_station <- function(analysis) {
-    analysis |>
-        mutate(
-            same_station = (
-                (valid_days_inters > 360) & ((!is.na(strSym) & (f0 > 0.101 | (strSym > 0.93) | distance < 400)) | (is.na(strSym) & ((f0 > 0.6) | (distance < 600))))
-            )
-        ) |>
-        group_by(station_id.x, station_id.y) |>
-        mutate(
-            same_station = any(same_station)
-        ) |>
-        ungroup()
-}
-
-tag_unusable <- function(analysis) {
+tag_same_series <- function(analysis) {
     analysis |> mutate(
-        unusable = (
-            !is.na(monthlydelT) & (abs(monthlydelT) > 0.7 | maeT > 1.5)
-        )
+        tag_same_sensor = (overlap_union > 0.9 & f0 > 0.9),
+        tag_same_station = (overlap_union > 0.8 & f0 > 0.8),
+        tag_sseries_svs = (dataset_x == "SCIA" & dataset_y == "SCIA") & (
+            (valid_days_inters >= 160L & f0 > 0.7)
+        ),
+        tag_sseries_ivi = (dataset_x == "ISAC" & dataset_y == "ISAC") & (
+            (valid_days_inters >= 160L & f0 > 0.1) | (valid_days_inters == 0L & distance < 200)
+        ),
+        tag_sseries_ivs = (dataset_x == "ISAC" & dataset_y == "SCIA") & (
+            (valid_days_inters >= 160L & (f0 > 0.101 | distance < 100))
+        ),
+        tag_same_series = tag_sseries_svs | tag_sseries_ivi | tag_sseries_ivs,
+        tag_mergeable = TRUE
     )
 }
 
-tag_same_station_internal <- function(analysis) {
-    analysis |>
-        mutate(
-            same_station = (
-                ((valid_days_inters > 360) &
-                    ((!is.na(strSym) &
-                        (f0 > 0.1 | distance < 400)))) |
-                    (is.na(strSym) & (distance < 600))
-            )
-        ) |>
-        group_by(station_id.x, station_id.y) |>
-        mutate(
-            same_station = any(same_station)
-        ) |>
-        ungroup()
-}
-
-tag_unusable_internal <- function(analysis) {
-    analysis |> mutate(
-        unusable = (
-            !is.na(monthlydelT) & (abs(monthlydelT) > 0.7 | maeT > 1.5)
-        )
+tag_manual <- function(tagged_analysis) {
+    tagged_analysis |> mutate(
+        tag_same_series = tag_same_series
     )
 }
