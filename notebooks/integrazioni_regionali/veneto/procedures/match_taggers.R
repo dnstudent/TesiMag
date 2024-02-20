@@ -17,23 +17,19 @@ tag_unusable <- function(analysis) {
 #' @param analysis The analysis table.
 #'
 #' @return A table with an additional column, same_station_tag, which is TRUE if the match is considered to represent the same station.
-tag_same_station <- function(analysis) {
+tag_same_series <- function(analysis) {
     analysis |>
         mutate(
-            same_station = (
-                !is.na(f0) & (
-                    (f0 >= 0.1 & valid_days_inters * f0 > 30) |
-                        strSym > 0.82 |
-                        distance < 500
-                )
+            tag_same_sensor = FALSE,
+            tag_same_station = FALSE,
+            tag_mergeable = TRUE,
+            tag_same_series = (
+                valid_days_inters >= 160L & f0 > 0.1
             ) |
-                is.na(f0) & (
-                    strSym > 0.78
+                valid_days_inters < 160L & (
+                    distance < 200 | strSym > 0.99
                 )
-        ) |>
-        group_by(station_id.x, station_id.y) |>
-        mutate(same_station = all(same_station)) |>
-        ungroup()
+        )
 }
 
 tag_pairable <- function(analysis) {
