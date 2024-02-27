@@ -40,3 +40,12 @@ write_metadata <- function(metadata_table, dataset, step, check_schema = TRUE) {
 write_extra_metadata <- function(extra_table, dataset_name, conn) {
     dbWriteTable(conn, paste0("extra_", dataset_name), extra_table, overwrite = TRUE)
 }
+
+write_correction_coefficients <- function(correction_table, dataset, conn, metadata) {
+    metadata <- metadata |> select(key, sensor_key, dataset)
+    correction_table <- correction_table |>
+        left_join(metadata, by = c("key_x" = "key")) |>
+        left_join(metadata, by = c("key_y" = "key"), suffix = c("_x", "_y")) |>
+        select(!c(key_x, key_y))
+    dbWriteTable(conn, paste0("correction_", dataset), correction_table, overwrite = TRUE)
+}
