@@ -9,6 +9,7 @@ library(stringr, warn.conflicts = FALSE)
 
 source("src/database/tools.R")
 source("src/database/test.R")
+source("src/database/write.R")
 source("src/database/data_model.R")
 source("src/analysis/data/quality_check.R")
 source("src/merging/combining.R")
@@ -177,7 +178,9 @@ merge_same_series <- function(tagged_analysis, metadata, data, ...) {
     list("series_groups" = ranked_series_groups, "data" = merged, "graph" = gs$graph)
 }
 
-merged_checkpoint <- function(merge_results, metadata, dataset_name) {
+merged_checkpoint <- function(merge_results, metadata, dataset_name, statconn) {
+    write_correction_coefficients(merge_results$coeffs, dataset_name, statconn, metadata)
+
     data <- merge_results$data |>
         left_join(metadata |> select(key, from_sensor_key = sensor_key, from_dataset = dataset), by = c("from_key" = "key")) |>
         rename(sensor_key = key) |>
@@ -207,5 +210,4 @@ merged_checkpoint <- function(merge_results, metadata, dataset_name) {
 
     checkpoint <- as_checkpoint(meta = metadata, data = data, check_schema = FALSE)
     save_checkpoint(checkpoint, dataset_name, "merged", check_schema = FALSE)
-    checkpoint
 }

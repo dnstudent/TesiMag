@@ -89,6 +89,7 @@ plot_correction <- function(corrections, metadata, data, ...) {
         group_by(match_id, variable, key_x, key_y, year = year(date), month = month(date)) |>
         summarise(
             delT = mean(delT, na.rm = TRUE),
+            valid = n() > 15L,
             day = as.integer(mean(day(date), na.rm = TRUE)),
             .groups = "drop"
         ) |>
@@ -97,7 +98,7 @@ plot_correction <- function(corrections, metadata, data, ...) {
         )
 
     ggplot() +
-        geom_point(data = monthly, aes(x = date, y = delT, color = variable, ...), na.rm = TRUE) +
+        geom_point(data = monthly, aes(x = date, y = delT, color = variable, shape = valid, ...), na.rm = TRUE) +
         geom_line(data = diffs, aes(x = date, y = correction, color = variable, ...), na.rm = TRUE) +
         scale_color_manual(values = coolwarm(2L)) +
         facet_grid(match_id ~ ., scales = "free")

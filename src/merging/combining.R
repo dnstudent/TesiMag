@@ -13,7 +13,7 @@ source("src/database/write.R")
 source("src/merging/pairing.R")
 
 annual_index <- function(date) {
-    4 * pi * (yday(date) / yday(make_date(year(date), 12L, 31L)) + 1 / 3)
+    2 * pi * (yday(date) / yday(make_date(year(date), 12L, 31L)))
 }
 
 group_by_component <- function(graph) {
@@ -67,6 +67,12 @@ set_dataset_priority <- function(metadata, dataset_priority) {
     metadata |> mutate(dataset = factor(dataset, levels = rev(dataset_priority), ordered = TRUE))
 }
 
+sin_coeffs <- function(delmonthlyT, t) {
+    coeffs <- lm(delmonthlyT ~ sin(t / 2) + sin(t) + sin(2 * t))$coefficients
+    names(coeffs) <- c("k0", "k1", "k2", "k3")
+    as_tibble_row(coeffs)
+}
+
 diff_coeffs <- function(delmonthlyT, t) {
     n_data <- length(delmonthlyT |> na.omit())
     coeffs <- if (n_data >= 8) {
@@ -92,24 +98,59 @@ rank_series_groups <- function(series_groups, metadata, dataset_priority, ...) {
         select(gkey, variable, key, priority)
 }
 
-pairs_corrections <- function(pairs_list, data) {
-    have_common_data <- pair_common_series(data, pairs_list, copy = TRUE, by = c("pkey", "key_x", "key_y", "variable")) |>
-        mutate(delT = value_x - value_y) |>
-        filter(abs(delT) < 10) |>
-        group_by(pkey, month = month(date)) |>
-        filter(n() > 25L) |>
+pairs_corrections <- function(pairs_list, data, ignore_corrections = NULL) {
+    if (!is.null(ignore_corrections)) {
+        pl <- pairs_list |> anti_join(ignore_corrections, by = colnames(ignore_corrections))
+    } else {
+        pl <- pairs_list
+    }
+
+    DELT <- pair_common_series(data, pl, copy = TRUE, by = c("pkey", "key_x", "key_y", "variable")) |>
+        mutate(delT = value_x - value_y, month = month(date)) |>
+        filter(abs(delT) < 7, !is.na(delT)) |>
+        compute()
+
+    sin_correction_keys <- DELT |>
+        group_by(pkey, month) |>
+        tally() |>
+        filter(n >= 20L) |>
+        ungroup(month) |>
+        tally() |>
+        filter(n >= 8L) |>
+        ungroup()
+
+    sin_corrections <- DELT |>
+        semi_join(sin_correction_keys, by = "pkey") |>
+        group_by(pkey, month) |>
+        filter(n() >= 20L) |>
         summarise(monthlydelT = mean(delT, na.rm = TRUE), .groups = "drop_last") |>
-        mutate(t = 4 * pi * ((month - 0.5) / 12 + 1 / 3)) |>
+        mutate(t = 2 * pi * (month - 0.5) / 12) |>
         collect() |>
-        summarise(coeffs = diff_coeffs(monthlydelT, t), .groups = "drop") |>
+        group_by(pkey) |>
+        summarise(coeffs = sin_coeffs(monthlydelT, t), .groups = "drop") |>
         unnest(coeffs)
 
-    no_common_data <- pairs_list |>
-        anti_join(have_common_data, by = "pkey") |>
-        mutate(k0 = 0, k1 = 0, k2 = 0, k3 = 0) |>
-        select(all_of(colnames(have_common_data)))
+    mean_correction_keys <- DELT |>
+        anti_join(sin_corrections, by = "pkey") |>
+        distinct(pkey, month) |>
+        group_by(pkey) |>
+        filter(n() > 2L) |>
+        ungroup()
 
-    rows_append(have_common_data, no_common_data)
+    mean_corrections <- DELT |>
+        semi_join(mean_correction_keys, by = "pkey") |>
+        group_by(pkey) |>
+        summarise(k0 = mean(delT, na.rm = TRUE), k1 = 0, k2 = 0, k3 = 0, .groups = "drop") |>
+        collect()
+
+    corrections <- rows_append(sin_corrections, mean_corrections)
+
+    zero_corrections <- pairs_list |>
+        anti_join(corrections, by = "pkey") |>
+        mutate(k0 = 0, k1 = 0, k2 = 0, k3 = 0) |>
+        select(all_of(colnames(corrections)))
+
+    rows_append(corrections, zero_corrections)
 }
 
 make_pair_list <- function(prioritized_series_groups, optimal_offsets) {
@@ -130,8 +171,8 @@ make_pair_list <- function(prioritized_series_groups, optimal_offsets) {
     }
 }
 
-pairs_merge <- function(pairs_list, data, rejection_threshold) {
-    corrections <- pairs_corrections(pairs_list, data)
+pairs_merge <- function(pairs_list, data, rejection_threshold, ignore_corrections = NULL) {
+    corrections <- pairs_corrections(pairs_list, data, ignore_corrections)
     accepted_corrections <- corrections |> filter(abs(k0) <= rejection_threshold)
     rejected_corrections <- corrections |>
         filter(abs(k0) > rejection_threshold) |>
@@ -142,10 +183,10 @@ pairs_merge <- function(pairs_list, data, rejection_threshold) {
         inner_join(pairs_list |> select(pkey, key = key_y, variable), by = c("key", "variable"), copy = TRUE) |>
         anti_join(reference, by = c("pkey", "variable", "date")) |> #
         inner_join(accepted_corrections, by = "pkey", copy = TRUE) |>
-        mutate(t = 4 * pi * (yday(date) / yday(make_date(year(date), 12L, 31L)) + 1 / 3)) |>
+        mutate(t = 2 * pi * (yday(date) / yday(make_date(year(date), 12L, 31L)))) |>
         mutate(correction = k0 + sin(t / 2) * k1 + sin(t) * k2 + sin(2 * t) * k3, value = value + correction) |>
         select(all_of(colnames(reference)))
-    list("merged" = rows_append(reference, corrected) |> select(pkey, variable, date, value, from_key, correction), "rejected" = rejected_corrections)
+    list("merged" = rows_append(reference, corrected) |> select(pkey, variable, date, value, from_key, correction), "rejected" = rejected_corrections, "accepted" = accepted_corrections)
 }
 
 prepare_data <- function(data, series_groups) {
@@ -164,7 +205,7 @@ prepare_offsets <- function(matches_offsets) {
     )
 }
 
-next_tables <- function(series_groups, current_pairs_list, current_merge_result, data, optimal_offsets) {
+next_tables <- function(series_groups, current_pairs_list, current_merge_result, data, optimal_offsets, running_k) {
     series_groups <- series_groups |> anti_join(current_pairs_list, by = c("key" = "key_y", "variable"))
 
     next_pair_list <- series_groups |>
@@ -179,11 +220,28 @@ next_tables <- function(series_groups, current_pairs_list, current_merge_result,
         anti_join(current_pairs_list, by = c("key" = "key_y", "variable")) |>
         rows_append(merge_data)
 
-    list(next_pair_list, next_data, series_groups)
+    coeffs_table <- current_merge_result$accepted |>
+        left_join(current_pairs_list, by = "pkey") |>
+        select(-pkey)
+    if (!is.null(running_k)) {
+        running_k <- bind_rows(running_k, coeffs_table)
+    } else {
+        running_k <- coeffs_table
+    }
+
+    list(next_pair_list, next_data, series_groups, running_k)
 }
 
-dynamic_merge <- function(data, series_groups, metadata, optimal_offsets, rejection_threshold) {
-    if (series_groups |> group_by(key, variable) |> count() |> filter(n > 1) |> nrow() > 0L) {
+make_exclusion_table <- function(matches, exclusion) {
+    m <- matches |>
+        semi_join(exclusion, by = colnames(exclusion)) |>
+        select(key_x, key_y, variable)
+    bind_rows(m, m |> select(key_x = key_y, key_y = key_x, variable))
+}
+
+#' Merges the time series in data according to the series_groups table.
+dynamic_merge <- function(data, series_groups, metadata, optimal_offsets, rejection_threshold, ignore_corrections = NULL) {
+    if (series_groups |> group_by(key, variable) |> count() |> filter(n > 1L) |> nrow() > 0L) {
         stop("There are series with the same key and variable in the series_groups table")
     }
     key_meta <- series_groups |>
@@ -194,18 +252,19 @@ dynamic_merge <- function(data, series_groups, metadata, optimal_offsets, reject
     data <- prepare_data(data, series_groups)
     optimal_offsets <- prepare_offsets(optimal_offsets)
     pair_list <- make_pair_list(series_groups, optimal_offsets)
+    running_ks <- NULL
     while (nrow(pair_list) > 0L) {
-        merge_results <- pairs_merge(pair_list, data, rejection_threshold)
-        # pair_list <- pair_list |> anti_join(merge_results$rejected, by = "pkey")
-        r <- next_tables(series_groups, pair_list, merge_results, data, optimal_offsets)
+        merge_results <- pairs_merge(pair_list, data, rejection_threshold, ignore_corrections)
+        r <- next_tables(series_groups, pair_list, merge_results, data, optimal_offsets, running_ks)
         pair_list <- r[[1]]
         data <- r[[2]]
         series_groups <- r[[3]]
+        running_ks <- r[[4]]
     }
-    list("meta" = key_meta, "data" = data)
+    list("meta" = key_meta, "data" = data, "coeffs" = running_ks)
 }
 
-incompatible_merges <- function(data, series_groups, optimal_offsets, cycles, rejection_threshold) {
+incompatible_merges <- function(data, series_groups, optimal_offsets, cycles, rejection_threshold, ignore_corrections = NULL) {
     if (series_groups |> group_by(key, variable) |> count() |> filter(n > 1) |> nrow() > 0L) {
         stop("There are series with the same key and variable in the series_groups table")
     }
@@ -215,14 +274,16 @@ incompatible_merges <- function(data, series_groups, optimal_offsets, cycles, re
     n_rejected <- 0L
     counter <- 0L
     rejects <- tibble(pkey = integer(), k0 = double(), k1 = double(), k2 = double(), k3 = double(), gkey = integer(), key_x = integer(), key_y = integer(), variable = integer(), offset_days = integer())
+    running_ks <- NULL
     while ((n_rejected == 0L | counter < cycles) & nrow(pair_list) > 0L) {
-        merge_results <- pairs_merge(pair_list, data, rejection_threshold)
+        merge_results <- pairs_merge(pair_list, data, rejection_threshold, ignore_corrections)
         n_rejected <- nrow(merge_results$rejected)
         rejects <- rows_append(rejects, merge_results$rejected)
-        r <- next_tables(series_groups, pair_list, merge_results, data, optimal_offsets)
+        r <- next_tables(series_groups, pair_list, merge_results, data, optimal_offsets, running_ks)
         pair_list <- r[[1]]
         data <- r[[2]]
         series_groups <- r[[3]]
+        running_ks <- r[[4]]
         counter <- counter + 1L
     }
     rejects
