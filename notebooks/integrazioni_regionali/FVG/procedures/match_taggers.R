@@ -52,6 +52,8 @@ tag_manual <- function(tagged_analysis) {
                                 (sensor_key_x == 13L & sensor_key_y == 797L) |
                                 (sensor_key_x == 31L & sensor_key_y == 1607L) |
                                 (sensor_key_x == 50L & sensor_key_y == 3185L) |
+                                # Tolmezzo
+                                (sensor_key_x == 51L) |
                                 (sensor_key_x == 22L & sensor_key_y == 1148L) |
                                 (sensor_key_x == 52L & sensor_key_y == 3311L)
                         )
@@ -69,7 +71,8 @@ tag_manual <- function(tagged_analysis) {
                     !(dataset_x == "ARPAFVG" & dataset_y == "SCIA" &
                         (
                             (sensor_key_x == 13L & sensor_key_y == 576L) |
-                                (sensor_key_x == 31L & sensor_key_y == 1468L)
+                                (sensor_key_x == 31L & sensor_key_y == 1468L) |
+                                (sensor_key_x == 51L)
                         )
                     ) &
                     !(dataset_x == "ARPAFVG" & name_x == "Piancavallo") &
