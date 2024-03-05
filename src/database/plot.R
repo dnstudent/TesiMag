@@ -89,12 +89,11 @@ plot_correction <- function(corrections, metadata, data, ...) {
         group_by(match_id, variable, key_x, key_y, year = year(date), month = month(date)) |>
         summarise(
             delT = mean(delT, na.rm = TRUE),
-            valid = n() > 15L,
-            day = as.integer(mean(day(date), na.rm = TRUE)),
+            valid = n() >= 15L,
             .groups = "drop"
         ) |>
         mutate(
-            date = make_date(year, month, day),
+            date = make_date(year, month, 15L),
         )
 
     ggplot() +
