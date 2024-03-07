@@ -2,7 +2,6 @@ library(arrow, warn.conflicts = FALSE)
 library(dplyr, warn.conflicts = FALSE)
 library(dbplyr, warn.conflicts = FALSE)
 library(stringi, warn.conflicts = FALSE)
-library(igraph, warn.conflicts = FALSE)
 library(zeallot, warn.conflicts = FALSE)
 library(DBI, warn.conflicts = FALSE)
 library(tidyr, warn.conflicts = FALSE)
@@ -11,14 +10,13 @@ library(logger, warn.conflicts = FALSE)
 
 source("src/database/write.R")
 source("src/merging/pairing.R")
-# source("src/merging/combining/dynamic_merge.R")
 
 annual_index <- function(date) {
     2 * pi * (yday(date) / yday(make_date(year(date), 12L, 31L)))
 }
 
 group_by_component <- function(graph) {
-    mmb <- components(graph, mode = "weak")$membership
+    mmb <- igraph::components(graph, mode = "weak")$membership
     tibble(key = as.integer(names(mmb)), gkey = as.integer(unname(mmb)))
 }
 
@@ -28,11 +26,11 @@ graph_from_isedge <- function(matches, is_edge_variable, directed) {
         select(key_x, key_y) |>
         mutate(across(everything(), as.character)) |>
         as.matrix() |>
-        graph_from_edgelist(directed = directed)
+        igraph::graph_from_edgelist(directed = directed)
 }
 
 add_nonmatching <- function(graph, metadata) {
-    already_there <- V(graph) |>
+    already_there <- igraph::V(graph) |>
         names() |>
         as.integer()
 
@@ -40,7 +38,7 @@ add_nonmatching <- function(graph, metadata) {
         distinct(key) |>
         anti_join(tibble(key = already_there), by = "key")
 
-    add_vertices(graph, nrow(missing), name = missing$key)
+    igraph::add_vertices(graph, nrow(missing), name = missing$key)
 }
 
 series_groups <- function(series_matches, metadata, data, tag) {
