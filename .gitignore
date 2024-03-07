@@ -27,6 +27,7 @@ stationsdb/
 tokens
 
 build/
+text/
 *.aux
 *.log
 *.toc

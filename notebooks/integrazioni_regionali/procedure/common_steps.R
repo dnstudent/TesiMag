@@ -165,7 +165,7 @@ spatial_availabilities <- function(ymonthly_avail, stations, map, ...) {
             data = spatav |>
                 inner_join(stations |> select(dataset, sensor_key, lon, lat) |> collect(), join_by(dataset, sensor_key)) |>
                 st_md_to_sf(),
-            aes(color = qc_clim_available, shape = dataset)
+            aes(color = qc_clim_available)
         )
     list("plot" = p, "data" = spatav)
 }
