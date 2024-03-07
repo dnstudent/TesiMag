@@ -30,6 +30,7 @@ load_meta <- function() {
         ),
         as_data_frame = TRUE
     ) |>
+        filter(Strumento == "termometro") |>
         mutate(
             kind = case_match(network, "Tradizionali" ~ "meccanica", .default = "automatica"),
             dataset = "SIRToscana",
@@ -68,9 +69,12 @@ load_data <- function() {
 }
 
 load_daily_data.toscana <- function() {
-    data <- load_data()
-    meta <- load_meta() |>
-        semi_join(data, join_by(station_id)) |>
+    meta <- load_meta()
+    data <- load_data() |>
+        semi_join(meta, by = "station_id") |>
+        compute()
+    meta <- meta |>
+        semi_join(data, by = "station_id") |>
         compute()
 
     list("meta" = meta, "data" = data)
