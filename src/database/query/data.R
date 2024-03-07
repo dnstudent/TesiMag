@@ -37,29 +37,29 @@ semi_join.ddb <- function(x, y, ...) {
 
 #' WARNING: When an error with the message "Could not find table 'x'" is raised, it is likely that there is an error in the query.
 #' Check again e.g. the join columns
-query_parquet <- function(path, conn = NULL) {
+query_parquet <- function(path, conn = NULL, filename = FALSE) {
     if (length(path) > 1L) path <- paste0(path, collapse = "', '")
     if (is.null(conn)) {
         conn <- dbConnect(duckdb())
         dbExecute(conn, "INSTALL icu; LOAD icu;")
     }
-    tbl_query <- str_glue("read_parquet(['{path}'])")
+    tbl_query <- str_glue("read_parquet(['{path}'], filename = {filename})")
     suppressMessages(tbl(conn, tbl_query))
 }
 
-query_checkpoint_data <- function(datasets, step, conn = NULL) {
-    query_parquet(archive_path(datasets, "data", step), conn)
+query_checkpoint_data <- function(datasets, step, conn = NULL, filename = FALSE) {
+    query_parquet(archive_path(datasets, "data", step), conn, filename)
 }
 
-query_checkpoint_meta <- function(datasets, step = "raw", conn = NULL) {
-    query_parquet(archive_path(datasets, "metadata", step), conn)
+query_checkpoint_meta <- function(datasets, step = "raw", conn = NULL, filename = FALSE) {
+    query_parquet(archive_path(datasets, "metadata", step), conn, filename)
 }
 
-query_checkpoint <- function(datasets, step, conn = NULL, all_stations = TRUE) {
+query_checkpoint <- function(datasets, step, conn = NULL, all_stations = TRUE, filename = FALSE) {
     meta_step <- if (all_stations) "raw" else step
     list(
-        "meta" = query_checkpoint_meta(datasets, meta_step, conn),
-        "data" = query_checkpoint_data(datasets, step, conn)
+        "meta" = query_checkpoint_meta(datasets, meta_step, conn, filename),
+        "data" = query_checkpoint_data(datasets, step, conn, filename)
     )
 }
 
