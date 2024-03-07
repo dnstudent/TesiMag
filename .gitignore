@@ -27,3 +27,7 @@ stationsdb/
 tokens
 
 build/
+*.aux
+*.log
+*.toc
+*.synctex.gz
