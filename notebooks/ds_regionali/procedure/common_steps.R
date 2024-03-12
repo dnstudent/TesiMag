@@ -13,9 +13,9 @@ source("src/database/write.R")
 source("src/database/data_model.R")
 source("src/analysis/data/quality_check.R")
 source("src/merging/combining.R")
-source("notebooks/integrazioni_regionali/procedure/checkpoint.R")
-source("notebooks/integrazioni_regionali/procedure/plots.R")
-source("notebooks/integrazioni_regionali/procedure/tools.R")
+source("notebooks/ds_regionali/procedure/checkpoint.R")
+source("notebooks/ds_regionali/procedure/plots.R")
+source("notebooks/ds_regionali/procedure/tools.R")
 
 test_metadata_consistency <- function(meta) {
     meta |> verify(!is.na(series_id))
@@ -127,7 +127,7 @@ prepare_daily_data <- function(data_pack, statconn = NULL) {
         select(all_of(names(meta_schema))) |>
         compute()
     extra_meta <- data_pack$meta |>
-        select(-names(meta_schema), sensor_key) |>
+        select(-names(meta_schema), sensor_key, dataset) |>
         compute()
 
     # split <- split_station_metadata(data_pack$meta)

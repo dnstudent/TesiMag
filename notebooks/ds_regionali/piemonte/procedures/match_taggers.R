@@ -30,6 +30,7 @@ tag_same_series <- function(analysis) {
 }
 
 tag_manual <- function(tagged_analysis) {
+    stop("Rifare")
     tagged_analysis |> mutate(
         tag_same_series = tag_same_series & !(
             ((dataset_x == "ISAC" & dataset_y == "SCIA") &

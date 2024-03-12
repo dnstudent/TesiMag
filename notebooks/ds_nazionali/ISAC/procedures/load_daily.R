@@ -5,7 +5,7 @@ dataset_spec <- function() {
     list(
         "locale",
         "national",
-        "Dataset DPC+ISAC fornito da Michele Brunetti. Utilizzo la versione qc con era5. Probabilmente per varie regioni registra gli estremi delle medie orarie, invece che gli estremi giornalieri."
+        "Dataset DPC+ISAC fornito da Michele Brunetti. Le serie DPC registrano gli estremi delle medie orarie, invece che gli estremi giornalieri. Le serie ISAC sono omogeneizzate."
     )
 }
 
@@ -19,7 +19,6 @@ load_work_metadata <- function(variant) {
         tmin,
         tmax
     ) |>
-        # filter(lat > 42) |>
         mutate(across(c(region_, country, province), as.character), dataset = "ISAC", network = if_else(!is.na(internal_id), "DPC", "ISAC"), kind = "unknown") |>
         rename(name = anagrafica, actual_original_id = identifier)
 }
@@ -36,7 +35,7 @@ load_data <- function(meta, variant) {
         T_MAX = tmax,
         .id = "variable"
     ) |>
-        drop_na(value) |>
+        filter(!is.na(value)) |>
         as_arrow_table() |>
         rename(actual_original_id = identifier) |>
         mutate(actual_original_id = cast(actual_original_id, utf8()), dataset = "ISAC") |>

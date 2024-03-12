@@ -167,7 +167,12 @@ load_meta_nivo <- function(meta_meteo) {
 
 load_meta <- function() {
     meteo_meta <- load_meta_meteo()
-    bind_rows("meteorologica" = meteo_meta, "centenaria" = load_meta_centenaria(), "nivo" = load_meta_nivo(meteo_meta), .id = "network") |>
+    bind_rows(
+        "meteorologica" = meteo_meta,
+        "centenaria" = load_meta_centenaria(),
+        # "nivo" = load_meta_nivo(meteo_meta),
+        .id = "network"
+    ) |>
         mutate(dataset = "ARPAPiemonte")
 }
 
@@ -222,7 +227,7 @@ load_data <- function() {
     concat_tables(
         dataset_meteo() |> compute(),
         dataset_centenaria() |> compute(),
-        dataset_nivo() |> compute(),
+        # dataset_nivo() |> compute(),
         unify_schemas = FALSE
     ) |>
         to_duckdb() |>
