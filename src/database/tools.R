@@ -39,7 +39,7 @@ split_station_metadata <- function(full_station_list) {
 }
 
 archive_path <- function(dataset, what, step) {
-    file.path("db", what, dataset, paste0(step, ".parquet"))
+    file.path("db", what, step, paste0(dataset, ".parquet"))
 }
 
 fill_regional_na <- function(metadata, statconn) {
