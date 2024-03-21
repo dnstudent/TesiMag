@@ -71,10 +71,16 @@ yearmonthly_statistics <- function(paired_series) {
         )
 }
 
-daily_statistics <- function(paired_series) {
+daily_statistics <- function(paired_series, epsilon) {
     paired_series |>
-        mutate(difference = value_y - value_x, valkey_x = !is.na(value_x), valkey_y = !is.na(value_y)) |>
-        mutate(difference = if_else(abs(difference) < 1e-4, 0, difference)) |>
+        mutate(
+            difference = value_y - value_x,
+            valkey_x = !is.na(value_x),
+            valkey_y = !is.na(value_y),
+            ints = (abs(value_x - trunc(value_x)) < 1e-4) & (abs(value_y - trunc(value_y)) < 1e-4),
+            nointsdiff = if_else(ints, NA, difference)
+        ) |>
+        mutate(difference = if_else(abs(difference) <= epsilon, 0, difference)) |>
         group_by(key_x, key_y, variable) |>
         summarise(
             maeT = mean(abs(difference), na.rm = TRUE),
@@ -84,9 +90,10 @@ daily_statistics <- function(paired_series) {
             valid_days_y = sum(as.integer(valkey_y), na.rm = TRUE),
             valid_days_inters = sum(as.integer(valkey_x & valkey_y), na.rm = TRUE),
             valid_days_union = sum(as.integer(valkey_x | valkey_y), na.rm = TRUE),
-            f0 = mean(as.integer(abs(difference) <= 1e-4), na.rm = TRUE),
+            f0 = mean(as.integer(abs(difference) <= epsilon), na.rm = TRUE),
             balance = mean(na_if(sign(difference), 0), na.rm = TRUE),
             fsameint = mean(as.integer(abs(trunc(value_y) - trunc(value_x)) < 0.5), na.rm = TRUE),
+            f0noint = mean(as.integer(abs(nointsdiff) <= epsilon), na.rm = TRUE),
             .groups = "drop"
         ) |>
         mutate(
@@ -130,7 +137,7 @@ periodicity_analysis <- function(paired_series) {
         )
 }
 
-series_matches_analysis <- function(series_matches, data, metadata, matches_offsets = c(-1L, 0L, 1L), ...) {
+series_matches_analysis <- function(series_matches, data, metadata, matches_offsets = c(-1L, 0L, 1L), epsilon = 1e-4, ...) {
     dbExecute(data$src$con, "DROP TABLE IF EXISTS paired_series")
     matches_offsets <- lag_analysis(data, series_matches, matches_offsets) |>
         left_join(series_matches, by = c("key_x", "key_y", "variable"), relationship = "one-to-one")
@@ -141,7 +148,7 @@ series_matches_analysis <- function(series_matches, data, metadata, matches_offs
 
     gc()
 
-    ds <- daily_statistics(paired_series)
+    ds <- daily_statistics(paired_series, epsilon)
     ys <- yearmonthly_statistics(paired_series)
     cs <- climatic_statistics(paired_series)
     csa <- climatology_avail_statistics(paired_series, ...)

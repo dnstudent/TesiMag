@@ -17,6 +17,16 @@ dataset_spec <- function() {
 
 path.base <- file.path(path.ds, "ARPA", "FVG")
 
+load_osmer_meta <- function() {
+    path <- file.path(path.base, "osmer_metas.json")
+    jsonlite::fromJSON(path, flatten = TRUE)$fvg |>
+        as_tibble() |>
+        select(!c(DT_RowId, `0`, `1`, `2`, `3`, `4`, `5`, `6`, `8`, `9`)) |>
+        rename_with(~ str_remove(., "properties."), .cols = starts_with("properties.")) |>
+        rename(gestore = `7`, name = nome, user_code = sigla, kind = tecnologia, lat = latitudine, lon = longitudine, elevation = `altezza (m. s.l.m.)`, series_first = `data inizio`) |>
+        mutate(lat = as.numeric(lat), lon = as.numeric(lon), elevation = as.numeric(elevation), series_first = ymd(series_first))
+}
+
 load_metadata <- function() {
     path.stats <- file.path(path.base, "station_info.csv")
     vroom::vroom(path.stats,

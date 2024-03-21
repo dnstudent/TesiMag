@@ -33,6 +33,7 @@ station_schema <- schema(
     lon = float64(),
     lat = float64(),
     elevation = float64(),
+    elevation_glo30 = float64(),
 )
 series_schema <- schema(
     series_key = int32(),
