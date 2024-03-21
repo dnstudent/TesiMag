@@ -11,6 +11,7 @@ source("src/database/tools.R")
 source("src/database/test.R")
 source("src/database/write.R")
 source("src/database/data_model.R")
+source("src/database/query/spatial.R")
 source("src/analysis/data/quality_check.R")
 source("src/merging/combining.R")
 source("notebooks/ds_regionali/procedure/checkpoint.R")
@@ -103,9 +104,17 @@ date_meta <- function(data, meta) {
         ungroup()
 }
 
-prepare_daily_data <- function(data_pack, statconn = NULL) {
-    data_pack$meta <- make_keys(data_pack$meta) |>
+associate_dem_elevation <- function(metadata, statconn) {
+    metadata |> query_elevations(statconn)
+}
+
+
+prepare_daily_data <- function(data_pack, statconn) {
+    data_pack$meta <- data_pack$meta |>
+        arrange(name, series_id, user_code) |>
+        make_keys() |>
         associate_regional_info(statconn) |>
+        associate_dem_elevation(statconn) |>
         mutate(sensor_first = coalesce(sensor_first, station_first), sensor_last = coalesce(sensor_last, station_last)) |>
         test_metadata_consistency() |>
         as_arrow_table()
@@ -138,7 +147,7 @@ qc_checkpoint <- function(dataset, conn) {
     ds <- query_checkpoint(dataset, "raw", conn)
     qc_data <- qc1(ds$data)
     qc_meta <- ds$meta |> semi_join(filter(qc_data, valid), by = c("dataset", "sensor_key"))
-    as_checkpoint(meta = qc_meta |> to_arrow(), data = qc_data |> to_arrow(), check_schema = FALSE) |> save_checkpoint(dataset, "qc1", check_schema = FALSE)
+    as_checkpoint(meta = qc_meta |> to_arrow(), data = qc_data |> to_arrow(), check_schema = FALSE) |> save_checkpoint(dataset, "qc1", check_schema = FALSE, partitioning = c("valid", "variable"))
 }
 
 #' Produces the plot of year-monthly series availabilities (the number of available and usable series per year/month) and the table used to compute them.
@@ -165,7 +174,7 @@ spatial_availabilities <- function(ymonthly_avail, stations, map, ...) {
             data = spatav |>
                 inner_join(stations |> select(dataset, sensor_key, lon, lat) |> collect(), join_by(dataset, sensor_key)) |>
                 st_md_to_sf(),
-            aes(color = qc_clim_available)
+            aes(color = qc_clim_available, shape = dataset)
         )
     list("plot" = p, "data" = spatav)
 }
@@ -178,8 +187,9 @@ merge_same_series <- function(tagged_analysis, metadata, data, ...) {
     list("series_groups" = ranked_series_groups, "data" = merged, "graph" = gs$graph)
 }
 
-merged_checkpoint <- function(merge_results, metadata, dataset_name, statconn) {
+merged_checkpoint <- function(merge_results, metadata, dataset_name, statconn, series_groups) {
     write_correction_coefficients(merge_results$coeffs, dataset_name, statconn, metadata)
+    write_series_groups(series_groups, dataset_name, statconn, metadata)
 
     data <- merge_results$data |>
         left_join(metadata |> select(key, from_sensor_key = sensor_key, from_dataset = dataset), by = c("from_key" = "key")) |>

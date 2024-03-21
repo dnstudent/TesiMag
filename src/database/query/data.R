@@ -19,25 +19,6 @@ query_from_connection <- function(stations, data_table_name, dataconn) {
     )
 }
 
-query_from_checkpoint <- function(datasets, tag) {
-    open_data(datasets, tag, provisional = TRUE) |> to_duckdb(table_name = "data_tmp")
-}
-
-#' Dplyr semi_join where the left table is a duckdb table and the tight table is not.
-#'
-#' @param x A duckdb table
-#' @param y An object coercible to an arrow table
-#' @param ... Additional arguments passed to semi_join
-#' @param .table_name The name of the temporary table to create
-#'
-#' @return The semi_join of x and y
-semi_join.ddb <- function(x, y, ...) {
-    y_tbl <- y |>
-        as_arrow_table() |>
-        to_duckdb(con = x$src$con, table_name = "station_tmp", auto_disconnect = FALSE)
-
-    x |> semi_join(y_tbl, ...)
-}
 
 #' WARNING: When an error with the message "Could not find table 'x'" is raised, it is likely that there is an error in the query.
 #' Check again e.g. the join columns
@@ -48,15 +29,32 @@ query_parquet <- function(path, conn = NULL, filename = FALSE) {
         dbExecute(conn, "INSTALL icu; LOAD icu;")
     }
     tbl_query <- str_glue("read_parquet(['{path}'], filename = {filename})")
-    suppressMessages(tbl(conn, tbl_query))
+    tbl(conn, tbl_query)
 }
 
-query_checkpoint_data <- function(datasets, step, conn = NULL, filename = FALSE) {
-    query_parquet(archive_path(datasets, "data", step), conn, filename)
+query_dataset <- function(path, conn = NULL, filename = FALSE, hive_types = list()) {
+    path <- file.path(path, "**", "*.parquet")
+    if (length(path) > 1L) path <- paste0(path, collapse = "', '")
+    if (is.null(conn)) {
+        conn <- dbConnect(duckdb())
+        dbExecute(conn, "INSTALL icu; LOAD icu;")
+    }
+    if (length(hive_types) > 0L) {
+        hive_types <- purrr::map2_chr(names(hive_types), hive_types, ~ str_glue("'{.x}': {.y}")) |> paste(collapse = ", ")
+        hive_types <- str_glue(", hive_types = {{ {hive_types} }}")
+    } else {
+        hive_types <- ""
+    }
+    tbl_query <- str_glue("read_parquet(['{path}'], filename = {filename}{hive_types})")
+    tbl(conn, tbl_query)
 }
 
-query_checkpoint_meta <- function(datasets, step = "raw", conn = NULL, filename = FALSE) {
-    query_parquet(archive_path(datasets, "metadata", step), conn, filename)
+query_checkpoint_data <- function(datasets, step, conn = NULL, filename = FALSE, hive_types = list("variable" = "INT")) {
+    query_dataset(archive_path(datasets, "data", step), conn, filename, hive_types)
+}
+
+query_checkpoint_meta <- function(datasets, step = "raw", conn = NULL, filename = FALSE, hive_types = list()) {
+    query_dataset(archive_path(datasets, "metadata", step), conn, filename, hive_types)
 }
 
 query_checkpoint <- function(datasets, step, conn = NULL, all_stations = TRUE, filename = FALSE) {
@@ -65,12 +63,6 @@ query_checkpoint <- function(datasets, step, conn = NULL, all_stations = TRUE, f
         "meta" = query_checkpoint_meta(datasets, meta_step, conn, filename),
         "data" = query_checkpoint_data(datasets, step, conn, filename)
     )
-}
-
-valid_data <- function(dataconn) {
-    suppressMessages(tbl(dataconn, "read_parquet('db/data/qc1/valid=true/**/*.parquet', hive_partitioning = 1, hive_types = {'variable': int, 'dataset': text})")) |>
-        filter(valid) |>
-        select(!c(valid, starts_with("qc_")))
 }
 
 valid_series <- function(valid_data) {

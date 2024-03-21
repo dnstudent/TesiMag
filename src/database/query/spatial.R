@@ -115,3 +115,54 @@ close_matches <- function(metadata, distance_threshold, statconn, key = "key") {
     statconn |> dbRemoveTable("stats_tmp")
     matches
 }
+
+query_elevations <- function(metadata, statconn) {
+    copy_to(statconn, metadata, name = "stats_tmp", overwrite = TRUE)
+
+    query <- glue::glue_sql(
+        "
+        WITH s AS (
+            SELECT sensor_key, dataset, ST_SetSRID(ST_MakePoint(lon, lat), 4326) AS geom
+            FROM stats_tmp
+        )
+        SELECT s.sensor_key, s.dataset, ST_Value(rast, s.geom, false) AS elevation_glo30
+        FROM s
+        JOIN cop30dem
+        ON ST_Intersects(rast, s.geom)
+        ",
+        .con = statconn
+    )
+    elevations <- dbGetQuery(statconn, query)
+    statconn |> dbRemoveTable("stats_tmp")
+    metadata |>
+        left_join(elevations, by = c("sensor_key", "dataset")) |>
+        distinct(dataset, sensor_key, .keep_all = TRUE)
+}
+
+closest_within <- function(x, y, distance_threshold, statconn) {
+    copy_to(statconn, x, name = "x_tmp", overwrite = TRUE)
+    copy_to(statconn, y, name = "y_tmp", overwrite = TRUE)
+    query <- glue::glue_sql(
+        "
+        WITH x_geog AS (
+            SELECT sensor_key, ST_SetSRID(ST_MakePoint(lon, lat), 4326)::geography AS geog
+            FROM x_tmp
+        ),
+        y_geog AS (
+            SELECT user_code, ST_SetSRID(ST_MakePoint(lon, lat), 4326)::geography AS geog
+            FROM y_tmp
+        )
+        SELECT sensor_key, user_code, ST_Distance(x.geog, y.geog) AS distance
+        FROM x_geog x
+        JOIN y_geog y
+        ON ST_DWithin(x.geog, y.geog, {distance_threshold})
+        ",
+        .con = statconn
+    )
+    matches <- dbGetQuery(statconn, query)
+    statconn |>
+        dbRemoveTable("x_tmp")
+    statconn |>
+        dbRemoveTable("y_tmp")
+    matches |> as_tibble()
+}

@@ -10,7 +10,7 @@ library(DBI, warn.conflicts = FALSE)
 source("src/database/data_model.R")
 source("src/database/tools.R")
 
-write_data <- function(data_table, dataset, step, check_schema = TRUE) {
+write_data <- function(data_table, dataset, step, check_schema = TRUE, partitioning = "variable") {
     table_path <- archive_path(dataset, "data", step)
     if (!dir.exists(dirname(table_path))) {
         dir.create(dirname(table_path), recursive = TRUE)
@@ -21,7 +21,7 @@ write_data <- function(data_table, dataset, step, check_schema = TRUE) {
     }
     data_table |>
         arrange(sensor_key, variable, date) |>
-        write_parquet(table_path)
+        write_dataset(table_path, partitioning = partitioning)
 }
 
 write_metadata <- function(metadata_table, dataset, step, check_schema = TRUE) {
@@ -34,11 +34,11 @@ write_metadata <- function(metadata_table, dataset, step, check_schema = TRUE) {
             as_arrow_table2(schema = meta_schema)
     }
     metadata_table |>
-        write_parquet(table_path)
+        write_dataset(table_path)
 }
 
 write_extra_metadata <- function(extra_table, dataset_name, conn) {
-    dbWriteTable(conn, paste0("extra_", dataset_name), extra_table, overwrite = TRUE)
+    write_parquet(extra_table, paste0(archive_path(dataset_name, "extra", "metadata"), ".parquet"))
 }
 
 write_correction_coefficients <- function(correction_table, dataset, conn, metadata) {
@@ -47,5 +47,22 @@ write_correction_coefficients <- function(correction_table, dataset, conn, metad
         left_join(metadata, by = c("key_x" = "key")) |>
         left_join(metadata, by = c("key_y" = "key"), suffix = c("_x", "_y")) |>
         select(!c(key_x, key_y))
-    dbWriteTable(conn, paste0("correction_", dataset), correction_table, overwrite = TRUE)
+    path <- paste0(archive_path(dataset, "extra", "corrections"), ".parquet")
+    if (!dir.exists(dirname(path))) {
+        dir.create(dirname(path), recursive = TRUE)
+    }
+    write_parquet(correction_table, path)
+}
+
+write_series_groups <- function(series_groups, dataset, conn, metadata) {
+    metadata <- metadata |> select(key, sensor_key, dataset)
+    series_groups <- series_groups |>
+        left_join(metadata, by = "key") |>
+        select(!c(key)) |>
+        mutate(from = "raw")
+    path <- paste0(archive_path(dataset, "extra", "series_groups"), ".parquet")
+    if (!dir.exists(dirname(path))) {
+        dir.create(dirname(path), recursive = TRUE)
+    }
+    write_parquet(series_groups, path)
 }

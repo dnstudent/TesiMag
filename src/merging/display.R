@@ -41,6 +41,7 @@ write_xlsx_analysis <- function(analysis, to, ...) {
         delH,
         distance,
         f0,
+        f0noint,
         fsameint,
         balance,
         delT,
@@ -70,6 +71,7 @@ write_xlsx_analysis <- function(analysis, to, ...) {
 
     class(analysis$strSym) <- "percentage"
     class(analysis$f0) <- "percentage"
+    class(analysis$f0noint) <- "percentage"
     class(analysis$fsameint) <- "percentage"
     class(analysis$overlap_min) <- "percentage"
     class(analysis$overlap_max) <- "percentage"
@@ -84,11 +86,11 @@ write_xlsx_analysis <- function(analysis, to, ...) {
     addStyle(wb, 1, integer_style, rows = 1:nrow(analysis), cols = (off + 12):(off + 14), gridExpand = TRUE)
 
     prec2_style <- createStyle(numFmt = "0.00")
-    addStyle(wb, 1, prec2_style, rows = 1:nrow(analysis), cols = (off + 17):(off + 23), gridExpand = TRUE)
+    addStyle(wb, 1, prec2_style, rows = 1:nrow(analysis), cols = (off + 18):(off + 24), gridExpand = TRUE)
 
     outTStyle <- createStyle(fontColour = "#9C0006", bgFill = "#FFC7CE")
-    conditionalFormatting(wb, 1, cols = c(off + 18, off + 23), rows = 1:nrow(analysis), rule = "<-0.5", style = outTStyle)
-    conditionalFormatting(wb, 1, cols = c(off + 18, off + 23), rows = 1:nrow(analysis), rule = ">0.5", style = outTStyle)
+    conditionalFormatting(wb, 1, cols = c(off + 19, off + 24), rows = 1:nrow(analysis), rule = "<-0.5", style = outTStyle)
+    conditionalFormatting(wb, 1, cols = c(off + 19, off + 24), rows = 1:nrow(analysis), rule = ">0.5", style = outTStyle)
 
     saveWorkbook(wb, to, overwrite = TRUE)
 }

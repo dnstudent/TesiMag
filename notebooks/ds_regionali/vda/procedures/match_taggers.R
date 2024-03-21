@@ -13,6 +13,7 @@ tag_same_series <- function(analysis) {
         tag_sseries_ivs = (dataset_x == "ISAC" & dataset_y == "SCIA") & (
             (valid_days_inters >= 160L & (f0 > 0.101 | distance < 100))
         ),
+        tag_dist = distance < 368,
         tag_same_series = tag_sseries_svs | tag_sseries_ivi | tag_sseries_ivs,
         tag_mergeable = TRUE
     )
@@ -20,6 +21,12 @@ tag_same_series <- function(analysis) {
 
 tag_manual <- function(tagged_analysis) {
     tagged_analysis |> mutate(
-        tag_same_series = tag_same_series
+        tag_same_series = tag_same_series &
+            !(dataset_x == "SCIA" & dataset_y == "ISAC" & (
+                (sensor_key_x == 862L & sensor_key_y == 859L) # Champorcer
+            )) &
+            !(dataset_x == "ISAC" & dataset_y == "ISAC" & (
+                (sensor_key_x == 858L & sensor_key_y == 859L) # Champorcer
+            ))
     )
 }
