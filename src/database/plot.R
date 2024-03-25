@@ -53,15 +53,16 @@ plot_diffs <- function(matches, data, ...) {
         collect() |>
         mutate(
             variable = factor(variable, levels = c(-1L, 1L), labels = c("T_MIN", "T_MAX")),
-            match_id = as.factor(paste0(dataset_x, " ", name_x, "\n", dataset_y, " ", name_y))
+            key_x = as.factor(paste0(dataset_x, "\n", name_x)),
+            key_y = as.factor(paste0(dataset_y, "\n", name_y))
         )
 
     dbExecute(dataconn, "DROP TABLE matches_plot_tmp")
 
-    ggplot(data = data |> arrange(match_id, variable, date)) +
+    ggplot(data) +
         geom_line(aes(x = date, y = delT, color = variable, linetype = variable, ...), na.rm = TRUE) +
         scale_color_manual(values = coolwarm(2)) +
-        facet_grid(match_id ~ ., scales = "free")
+        facet_grid(key_x + key_y ~ ., scales = "free")
 }
 
 plot_correction <- function(corrections, metadata, data, ...) {

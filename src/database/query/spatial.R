@@ -118,25 +118,30 @@ close_matches <- function(metadata, distance_threshold, statconn, key = "key") {
 
 query_elevations <- function(metadata, statconn) {
     copy_to(statconn, metadata, name = "stats_tmp", overwrite = TRUE)
-
+    # meta_cols <- colnames(metadata) |> paste(collapse = ", ")
+    # qualified_meta_cols <- colnames(metadata) |>
+    #     sapply(function(x) glue::glue("s.{x}")) |>
+    #     paste(collapse = ", ")
     query <- glue::glue_sql(
         "
         WITH s AS (
-            SELECT sensor_key, dataset, ST_SetSRID(ST_MakePoint(lon, lat), 4326) AS geom
+            SELECT *, ST_SetSRID(ST_MakePoint(lon, lat), 4326) AS geom
             FROM stats_tmp
         )
-        SELECT s.sensor_key, s.dataset, ST_Value(rast, s.geom, false) AS elevation_glo30
+        SELECT s.*, AVG(ST_Value(r.rast, s.geom, false)) AS elevation_glo30
         FROM s
-        JOIN cop30dem
-        ON ST_Intersects(rast, s.geom)
+        JOIN cop30dem r
+        ON ST_Intersects(r.rast, s.geom)
+        GROUP BY s.dataset, s.sensor_key
         ",
         .con = statconn
     )
-    elevations <- dbGetQuery(statconn, query)
+    melev <- dbGetQuery(statconn, query)
     statconn |> dbRemoveTable("stats_tmp")
-    metadata |>
-        left_join(elevations, by = c("sensor_key", "dataset")) |>
-        distinct(dataset, sensor_key, .keep_all = TRUE)
+    melev
+    # metadata |>
+    #     left_join(elevations, by = c("sensor_key", "dataset")) |>
+    #     distinct(dataset, sensor_key, .keep_all = TRUE)
 }
 
 closest_within <- function(x, y, distance_threshold, statconn) {
