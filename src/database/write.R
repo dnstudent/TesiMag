@@ -38,7 +38,11 @@ write_metadata <- function(metadata_table, dataset, step, check_schema = TRUE) {
 }
 
 write_extra_metadata <- function(extra_table, dataset_name, conn) {
-    write_parquet(extra_table, paste0(archive_path(dataset_name, "extra", "metadata"), ".parquet"))
+    path <- paste0(archive_path(dataset_name, "extra", "metadata"), ".parquet")
+    if (!dir.exists(dirname(path))) {
+        dir.create(dirname(path), recursive = TRUE)
+    }
+    write_parquet(extra_table, path)
 }
 
 write_correction_coefficients <- function(correction_table, dataset, conn, metadata) {
