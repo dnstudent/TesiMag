@@ -83,15 +83,22 @@ load_hexts <- function(dataconn, metadata) {
     #     mutate(dataset = "ARPALombardia") |>
     #     to_arrow() |>
     #     compute()
+    wider_spec <- tribble(
+        ~.name, ~.value, ~idOperatore,
+        "T_MIN", "value", 2L,
+        "T_MAX", "value", 3L,
+        "T_AVG", "value", 1L,
+    )
 
     query_parquet(list.files(file.path(path.lom, "dataset"), full.names = TRUE), conn = dataconn) |>
         rename(sensor_id = station_id) |>
         mutate(sensor_id = as.integer(sensor_id), time = time - sql("INTERVAL 1 MINUTES")) |>
         semi_join(metadata, by = "sensor_id") |>
+        filter(-35 < value, value < 50) |>
         group_by(sensor_id, idOperatore, date = as.Date(time), hour = hour(time)) |>
         summarise(value = mean(value, na.rm = TRUE), .groups = "drop") |>
         left_join(tibble(idOperatore = c(1L, 2L, 3L), variable = c("T_AVG", "T_MIN", "T_MAX")), by = "idOperatore", copy = TRUE) |>
-        pivot_wider(id_cols = c("sensor_id", "date", "hour"), names_from = "variable", values_from = "value") |>
+        dbplyr_pivot_wider_spec(wider_spec, id_cols = c("sensor_id", "date", "hour"), values_fill = NA_real_) |>
         mutate(T_MIN = round(coalesce(T_MIN, T_AVG, T_MAX), 1L), T_MAX = round(coalesce(T_MAX, T_AVG, T_MIN), 1L)) |>
         group_by(sensor_id, date) |>
         summarise(T_MIN = min(T_MIN, na.rm = TRUE), T_MAX = max(T_MAX, na.rm = TRUE), .groups = "drop") |>
