@@ -125,10 +125,10 @@ query_elevations <- function(metadata, statconn) {
     query <- glue::glue_sql(
         "
         WITH s AS (
-            SELECT *, ST_SetSRID(ST_MakePoint(lon, lat), 4326) AS geom
+            SELECT dataset, sensor_key, ST_SetSRID(ST_MakePoint(lon, lat), 4326) AS geom
             FROM stats_tmp
         )
-        SELECT s.*, AVG(ST_Value(r.rast, s.geom, false)) AS elevation_glo30
+        SELECT s.dataset, s.sensor_key, AVG(ST_Value(r.rast, s.geom, false)) AS elevation_glo30
         FROM s
         JOIN cop30dem r
         ON ST_Intersects(r.rast, s.geom)
@@ -138,10 +138,9 @@ query_elevations <- function(metadata, statconn) {
     )
     melev <- dbGetQuery(statconn, query)
     statconn |> dbRemoveTable("stats_tmp")
-    melev
-    # metadata |>
-    #     left_join(elevations, by = c("sensor_key", "dataset")) |>
-    #     distinct(dataset, sensor_key, .keep_all = TRUE)
+    metadata |>
+        left_join(melev, by = c("sensor_key", "dataset"))
+    # distinct(dataset, sensor_key, .keep_all = TRUE)
 }
 
 closest_within <- function(x, y, distance_threshold, statconn) {

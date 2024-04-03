@@ -25,6 +25,7 @@ stationsdb/
 .Renviron
 .DS_Store
 tokens
+kml_metadata/
 
 build/
 text/

@@ -7,14 +7,18 @@ tag_manual <- function(tagged_analysis) {
                 !(user_code_x == "VERZI" & user_code_y == "07LOAN0") &
                 !(dataset_x == "SCIA" & dataset_y == "SCIA" &
                     (
-                        (sensor_key_x == 1803L & sensor_key_y == 3118L) | # Mattarana / Tavarone
-                            (sensor_key_x == 1803L & sensor_key_y == 3119L) | # Mattarana / Tavarone
-                            (sensor_key_x == 1331L & sensor_key_y == 1333L) | # Giacopiane Diga / Lago
-                            (sensor_key_x == 681L & sensor_key_y == 2083L) | # Cairo Montenotte / Osiglia
-                            (sensor_key_x == 112L & sensor_key_y == 1867L) # Albenga / Molino Branca
+                        (sensor_key_x == 2299L & user_code_y == "07TAVRN") | # Mattarana / Tavarone
+                            (sensor_key_x == 2299L & sensor_key_y == 4003L) | # Mattarana / Tavarone
+                            (user_code_x == "07GPIA0" & sensor_key_y == 1689L) | # Giacopiane Diga / Lago
+                            (user_code_x == "07CAIR0" & user_code_y == "07OSID0") # Cairo Montenotte / Osiglia
                     )
                 ) |
-                ((dataset_x == "SCIA" & dataset_y == "SCIA") & (sensor_key_x == 29L & sensor_key_y == 126L))
+                ((dataset_x == "SCIA" & dataset_y == "SCIA") & (user_code_x == "01S2589" & user_code_y == "01615")) |
+                (
+                    (dataset_x == "ARPAL" & dataset_y == "SCIA" &
+                        (user_code_x == "CMELO" & user_code_y == "01S2892") # Colle Melogno / Settepani
+                    )
+                )
         )
 }
 

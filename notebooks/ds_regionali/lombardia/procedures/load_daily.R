@@ -99,7 +99,7 @@ load_hexts <- function(dataconn, metadata) {
         summarise(value = mean(value, na.rm = TRUE), .groups = "drop") |>
         left_join(tibble(idOperatore = c(1L, 2L, 3L), variable = c("T_AVG", "T_MIN", "T_MAX")), by = "idOperatore", copy = TRUE) |>
         dbplyr_pivot_wider_spec(wider_spec, id_cols = c("sensor_id", "date", "hour"), values_fill = NA_real_) |>
-        mutate(T_MIN = round(coalesce(T_MIN, T_AVG, T_MAX), 1L), T_MAX = round(coalesce(T_MAX, T_AVG, T_MIN), 1L)) |>
+        mutate(T_MIN = round(coalesce(T_AVG, (T_MAX + T_MIN) / 2, T_MIN, T_MAX), 1L), T_MAX = round(coalesce(T_AVG, (T_MAX + T_MIN) / 2, T_MAX, T_MIN), 1L)) |>
         group_by(sensor_id, date) |>
         summarise(T_MIN = min(T_MIN, na.rm = TRUE), T_MAX = max(T_MAX, na.rm = TRUE), .groups = "drop") |>
         pivot_longer(cols = c("T_MIN", "T_MAX"), names_to = "variable", values_to = "value") |>
