@@ -23,8 +23,14 @@ tag_same_series <- function(analysis) {
 tag_manual <- function(tagged_analysis) {
     tagged_analysis |> mutate(
         tag_same_series = tag_same_series |
+            (dataset_x == "ISAC" & dataset_y == "ISAC" & (
+                (sensor_key_x == 3831L & sensor_key_y == 4048L) # Plateu Rosa
+            )) |
             (dataset_x == "ISAC" & dataset_y == "SCIA" & (
                 (sensor_key_x == 472L & sensor_key_y == 551L) # Brusson
+            )) |
+            (dataset_x == "SCIA" & dataset_y == "SCIA" & (
+                (sensor_key_x == 69L & sensor_key_y == 3673L) # Saint Cristophe Aereoporto
             ))
         # &
         # !(dataset_x == "SCIA" & dataset_y == "ISAC" & (

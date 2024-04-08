@@ -53,8 +53,8 @@ plot_diffs <- function(matches, data, ...) {
         collect() |>
         mutate(
             variable = factor(variable, levels = c(-1L, 1L), labels = c("T_MIN", "T_MAX")),
-            key_x = as.factor(paste0(dataset_x, "\n", name_x)),
-            key_y = as.factor(paste0(dataset_y, "\n", name_y))
+            key_x = as.factor(paste0(dataset_x, "\n", name_x, " ", sensor_key_x)),
+            key_y = as.factor(paste0(dataset_y, "\n", name_y, " ", sensor_key_y))
         )
 
     dbExecute(dataconn, "DROP TABLE matches_plot_tmp")
