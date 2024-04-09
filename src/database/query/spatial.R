@@ -170,3 +170,21 @@ closest_within <- function(x, y, distance_threshold, statconn) {
         dbRemoveTable("y_tmp")
     matches |> as_tibble()
 }
+
+query_distance <- function(pairs, statconn) {
+    copy_to(statconn, pairs, name = "pairs_tmp", overwrite = TRUE)
+    query <- glue::glue_sql(
+        "
+        WITH pairs_geog AS (
+            SELECT key_x, key_y, ST_SetSRID(ST_MakePoint(lon_x, lat_x), 4326)::geography AS geog_x, ST_SetSRID(ST_MakePoint(lon_y, lat_y), 4326)::geography AS geog_y
+            FROM pairs_tmp
+        )
+        SELECT key_x, key_y, ST_Distance(geog_x, geog_y) AS distance
+        FROM pairs_geog
+        ",
+        .con = statconn
+    )
+    matches <- dbGetQuery(statconn, query)
+    statconn |> dbRemoveTable("pairs_tmp")
+    matches
+}
