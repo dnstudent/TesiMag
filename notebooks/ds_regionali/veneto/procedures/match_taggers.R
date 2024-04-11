@@ -23,13 +23,58 @@ tag_same_series <- function(analysis) {
             tag_same_sensor = FALSE,
             tag_same_station = FALSE,
             tag_mergeable = TRUE,
-            tag_same_series = (
-                valid_days_inters >= 160L & f0 > 0.1
-            ) |
-                valid_days_inters < 160L & (
-                    distance < 200 | strSym > 0.99
-                )
+            tag_sseries_as =
+                (((dataset_x %in% c("ARPAV", "SCIA") | network_x == "ISAC") & (dataset_y %in% c("ARPAV", "SCIA") | network_y == "ISAC"))) &
+                    (
+                        (
+                            valid_days_inters >= 160L & f0 > 0.1 & !is.na(f0noint) & f0noint > 0.01
+                        ) |
+                            (valid_days_inters < 160L & (
+                                distance < 200 | (!is.na(strSym) & strSym > 0.99)
+                            )) |
+                            distance < 500
+                    ),
+            tag_sseries_avd = dataset_x == "ARPAV" & network_y == "DPC" & (
+                (valid_days_inters >= 100L & (!is.na(f0noint) & f0noint > 0.12 & distance < 4000)) |
+                    distance < 160
+            ),
+            tag_sseries_dvs = network_x == "DPC" & dataset_y == "SCIA" & (
+                (valid_days_inters >= 100L & (!is.na(f0noint) & f0noint > 0.0854 & distance < 3000)) |
+                    distance < 300
+            ),
+            tag_sseries_dvd = network_x == "DPC" & network_y == "DPC" & (
+                (valid_days_inters >= 100L & (!is.na(f0noint) & f0noint > 0.9)) |
+                    (valid_days_inters < 100L & distance < 160)
+            ),
+            tag_sseries_ivi = dataset_x == "ISAC" & dataset_y == "ISAC" & (
+                valid_days_inters > 100L & f0 > 0.4
+            ),
+            tag_same_series = tag_sseries_as | tag_sseries_avd | tag_sseries_dvs | tag_sseries_dvd | tag_sseries_ivi,
         )
+}
+
+tag_manual <- function(tagged_analysis) {
+    tagged_analysis |> mutate(
+        tag_same_series = (
+            tag_same_series & !(
+                (dataset_x == "ARPAV" & network_y != "DPC" & sensor_key_x == 94L) |
+                    (network_x == "DPC" & dataset_y == "SCIA" & (
+                        sensor_key_x == 3881L # Venezia Sede
+                    ))
+            )) |
+            (
+                (dataset_x == "ARPAV" & dataset_y == "ISAC" & (
+                    (sensor_key_x == 7L & sensor_key_y == 121L) | # Andraz
+                        (sensor_key_x == 7L & sensor_key_y == 122L) | # Andraz
+                        (sensor_key_x == 22L & sensor_key_y == 306L) | # Belluno Aereoporto
+                        (sensor_key_x == 51L & sensor_key_y == 3716L) | # Venezia Treporti
+                        (sensor_key_x == 163L & sensor_key_y == 2499L) # Passo Falzarego
+                )) |
+                    (dataset_x == "ISAC" & dataset_y == "SCIA" & (
+                        (sensor_key_x == 2423L & sensor_key_y == 2668L) #  Padova
+                    ))
+            )
+    )
 }
 
 tag_pairable <- function(analysis) {

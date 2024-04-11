@@ -18,7 +18,7 @@ dataset_spec <- function() {
 }
 
 load_meta <- function() {
-    dem <- read_stars(file.path("temp", "dem", "dem30.tif"))
+    # dem <- read_stars(file.path("temp", "dem", "dem30.tif"))
     info <- vroom::vroom(file.path(path.ds, "ARPA", "UMBRIA", "stazioni_info.csv"), show_col_types = FALSE, col_types = "icddccccdc") |>
         as_tibble() |>
         select(station_id, elevation)
