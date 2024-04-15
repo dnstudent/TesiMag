@@ -137,6 +137,9 @@ periodicity_analysis <- function(paired_series) {
         )
 }
 
+
+# FUNZIONE PRINCIPALE
+#'
 series_matches_analysis <- function(series_matches, data, metadata, matches_offsets = c(-1L, 0L, 1L), epsilon = 1e-4, ...) {
     dbExecute(data$src$con, "DROP TABLE IF EXISTS paired_series")
     matches_offsets <- lag_analysis(data, series_matches, matches_offsets) |>

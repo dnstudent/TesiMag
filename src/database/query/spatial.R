@@ -116,6 +116,28 @@ close_matches <- function(metadata, distance_threshold, statconn, key = "key") {
     matches
 }
 
+#' Data una tabella di metadati
+close_matches.bruno <- function(metadata, distance_threshold) {
+    georef <- metadata |>
+        select(key, lon, lat) |>
+        st_as_sf(coords = c("lon", "lat"), crs = 4326, remove = F)
+
+    key_pairs <- georef |>
+        st_join(georef, join = st_is_within_distance, dist = units::set_units(distance_threshold, "m"), suffix = c("_x", "_y")) |>
+        st_drop_geometry() |>
+        filter(key_x < key_y)
+
+    sol <- key_pairs |>
+        mutate(
+            distance = st_distance(
+                st_as_sf(pick(lon_x, lat_x), crs = "EPSG:4326", coords = c("lon_x", "lat_x")),
+                st_as_sf(pick(lon_y, lat_y), crs = "EPSG:4326", coords = c("lon_y", "lat_y")),
+                by_element = TRUE
+            ) |> as.numeric()
+        ) |>
+        select(key_x, key_y, distance)
+}
+
 query_elevations <- function(metadata, statconn) {
     copy_to(statconn, metadata, name = "stats_tmp", overwrite = TRUE)
     # meta_cols <- colnames(metadata) |> paste(collapse = ", ")

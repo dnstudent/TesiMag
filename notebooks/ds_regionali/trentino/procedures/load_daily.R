@@ -143,16 +143,14 @@ load_data_bz <- function() {
 }
 
 load_meta_bz <- function() {
-    xlsx_meta <- load_bz_xlsx_meta()
-    api_meta <- load_bz_api_meta()
+    xlsx_meta <- load_bz_xlsx_meta() |> collect()
+    api_meta <- load_bz_api_meta() |> collect()
 
     common <- xlsx_meta |>
         select(!c(lon, lat, elevation, kind)) |>
-        inner_join(api_meta |> select(!c(name, network, dataset)), by = "station_id") |>
-        collect()
-    extra <- api_meta |>
-        anti_join(common, by = "station_id") |>
-        collect()
+        inner_join(api_meta |> select(!c(name, network, dataset)), by = "station_id")
+    extra <- bind_rows(xlsx_meta, api_meta) |>
+        anti_join(common, by = "station_id")
     bind_rows(
         common,
         extra
