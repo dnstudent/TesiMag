@@ -20,7 +20,6 @@ dataset_spec <- function() {
 
 load_meta <- function() {
     wfsreti_meta <- read.SCIA.metadata("T_MAX") |>
-        # filter(lat > 42) |>
         rename(id = identifier, network = rete, name = anagrafica)
     official_meta <- vroom::vroom(
         file.path(path.ds, "SCIA", "stazioni", "stazioni_reduced.csv"),

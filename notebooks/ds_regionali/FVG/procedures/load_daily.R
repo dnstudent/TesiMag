@@ -17,6 +17,7 @@ dataset_spec <- function() {
 
 path.base <- file.path(path.ds, "ARPA", "FVG")
 
+#  Non migliorano nulla! Lasciar perdere
 load_osmer_meta <- function() {
     path <- file.path(path.base, "osmer_metas.json")
     jsonlite::fromJSON(path, flatten = TRUE)$fvg |>

@@ -68,7 +68,8 @@ tag_manual <- function(tagged_analysis) {
                             (sensor_key_x == 88L & sensor_key_y == 1348L) | # Edolo
                             (sensor_key_x == 136L & sensor_key_y == 2269L) | # Mantova
                             (sensor_key_x == 255L & sensor_key_y == 4353L) | # Voghera
-                            (sensor_key_x == 255L & sensor_key_y == 3879L) # Voghera
+                            (sensor_key_x == 255L & sensor_key_y == 3879L) | # Voghera
+                            (sensor_key_x == 111L & sensor_key_y == 1946L) # Lanzada
 
                     ) |
                         (dataset_x == "SCIA" & dataset_y == "SCIA" &
@@ -79,7 +80,8 @@ tag_manual <- function(tagged_analysis) {
                                     (sensor_key_x == 136L & sensor_key_y == 2269L) | # Mantova
                                     (sensor_key_x == 135L & sensor_key_y == 2270L) | # Mantova Lunetta / Cerese
                                     (sensor_key_x == 3879L & sensor_key_y == 4352L) | # Voghera
-                                    (sensor_key_x == 4284L & sensor_key_y == 4285L) # Varzi / Nivione
+                                    (sensor_key_x == 4284L & sensor_key_y == 4285L) | # Varzi / Nivione
+                                    (sensor_key_x == 1347L & sensor_key_y == 1348L) # Edolo
                             )
                         ) |
                         (dataset_x == "ARPALombardia" & dataset_y == "ISAC" &
@@ -94,13 +96,12 @@ tag_manual <- function(tagged_analysis) {
                         ) |
                         (dataset_x == "ISAC" & dataset_y == "SCIA" &
                             (
-                                (sensor_key_x == 2885L & sensor_key_y == 3692L) | # Puegnago / Salò
-                                    (sensor_key_x == 2036L & sensor_key_y == 2473L) | # Milano parco nord / Parco Monza
+                                (sensor_key_x == 2036L & sensor_key_y == 2473L) | # Milano parco nord / Parco Monza
                                     (sensor_key_x == 321L & sensor_key_y == 473L) | # BG Via Goisis / Via S. Fermo
                                     (sensor_key_x == 3387L & sensor_key_y == 3862L) | # Sondrio
-                                    (sensor_key_x == 1347L & sensor_key_y == 1348L) | # Edolo
                                     (sensor_key_x == 3982L & sensor_key_y == 4352L) | # Voghera
                                     (sensor_key_x == 2528L & sensor_key_y == 2985L) | # Pavia
+                                    (sensor_key_x == 1236L & sensor_key_y == 1348L) | # Edolo
                                     (sensor_key_x == 286L & sensor_key_y == 244L) # Barni / Asso
                             )
                         ) |
@@ -114,13 +115,15 @@ tag_manual <- function(tagged_analysis) {
                     (
                         (sensor_key_x == 216L & sensor_key_y == 217L) | # Sondrio
                             (sensor_key_x == 142L & sensor_key_y == 210L) | # Milano Lambrate / Segrate 2
-                            (sensor_key_x == 84L & sensor_key_y == 85L) | # Darfo
                             (sensor_key_x == 6L & sensor_key_y == 7L) # Asola
                     )
                 ) |
                 (dataset_x == "ISAC" & dataset_y == "SCIA" &
                     (
-                        (sensor_key_x == 446L & sensor_key_y == 539L) # Brescia ITAS
+                        (sensor_key_x == 446L & sensor_key_y == 539L) | # Brescia ITAS
+                            (sensor_key_x == 1236L & sensor_key_y == 1348) | # Edolo Centrale
+                            (sensor_key_x == 174L & sensor_key_y == 235L) | # Arnoga
+                            (sensor_key_x == 2885L & sensor_key_y == 3692L) # Puegnago / Salo
                     )
                 ) |
                 (dataset_x == "ARPALombardia" & dataset_y == "SCIA" &
@@ -132,8 +135,8 @@ tag_manual <- function(tagged_analysis) {
                     (
                         (sensor_key_x == 15L & sensor_key_y == 321L) | # BG via Goisis
                             (sensor_key_x == 254L & sensor_key_y == 1903L) | # Mantova Cerese
-                            (sensor_key_x == 195L & sensor_key_y == 3129L) | # Samolaco
-                            (sensor_key_x == 20L & sensor_key_y == 340L) # Bienno
+                            (sensor_key_x == 20L & sensor_key_y == 340L) | # Bienno
+                            (sensor_key_x == 72L & sensor_key_y == 1062L) #  Como Geno
                     )
                 )
         )
