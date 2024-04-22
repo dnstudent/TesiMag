@@ -82,7 +82,8 @@ tag_manual <- function(tagged_analysis) {
                         ) |
                         (dataset_x == "ISAC" & dataset_y == "ISAC" &
                             (
-                                (sensor_key_x == 2244L & sensor_key_y == 2245L) # Monte Serra
+                                FALSE
+                                # (sensor_key_x == 2244L & sensor_key_y == 2245L) # Monte Serra
                             )
                         )
                 ) |
@@ -92,7 +93,8 @@ tag_manual <- function(tagged_analysis) {
                         (sensor_key_x == 146L & sensor_key_y == 147L) | # Follonica
                             (sensor_key_x == 426L & sensor_key_y == 427L) | # Viareggio
                             (sensor_key_x == 427L & sensor_key_y == 428L) | # Viareggio
-                            (sensor_key_x == 401L & sensor_key_y == 402L) # Suvereto
+                            (sensor_key_x == 401L & sensor_key_y == 402L) | # Suvereto
+                            (sensor_key_x == 219L & sensor_key_y == 221L) # Monte Serra
                     )
                 ) |
                 (dataset_x == "ISAC" & dataset_y == "SIRToscana" &

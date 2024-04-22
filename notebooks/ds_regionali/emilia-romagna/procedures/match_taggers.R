@@ -56,7 +56,8 @@ tag_manual <- function(tagged_analysis) {
                         (sensor_key_x == 466L & sensor_key_y == 468L) | # Copparo
                         (sensor_key_x == 576L & sensor_key_y == 577L) | # Finale Emilia
                         (sensor_key_x == 580L & sensor_key_y == 582L) | # Fiorenzuola
-                        (sensor_key_x == 877L & sensor_key_y == 880L) # Modena
+                        (sensor_key_x == 877L & sensor_key_y == 880L) | # Modena
+                        (sensor_key_x == 596L & sensor_key_y == 1066L) #  Foce / Passo Radici
                 )
             ) |
             (dataset_x == "SCIA" & dataset_y == "SCIA" &
