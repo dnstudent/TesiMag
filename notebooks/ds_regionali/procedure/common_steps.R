@@ -108,6 +108,27 @@ associate_dem_elevation <- function(metadata, statconn) {
     metadata |> query_elevations(statconn)
 }
 
+associate_dem_elevation.bruno <- function(metadata, glo30_dem_path) {
+    dst <- stars::st_mosaic(
+            list.files(
+                glo30_dem_path,
+                recursive = TRUE,
+                full.names = TRUE,
+                pattern = "*_DEM.tif$"
+            ))
+    dem <- stars::read_stars(dst, proxy = TRUE)
+    metadata |>
+        mutate(elevation_glo30 = stars::st_extract(dem, pick(lon, lat) |> as.matrix()) |> pull(1L))
+}
+
+associate_regional_info.bruno <- function(metadata, province_boundaries_path) {
+    province_boundaries <- sf::st_read(province_boundaries_path, quiet = TRUE)
+    metadata |>
+        st_md_to_sf() |>
+        st_join(province_boundaries |> select(province_full = shapeName), join = sf::st_intersects) |> 
+        sf::st_drop_geometry()
+}
+
 
 prepare_daily_data <- function(data_pack, statconn) {
     data_pack$meta <- data_pack$meta |>
