@@ -27,9 +27,10 @@ tag_same_series <- function(analysis) {
             ),
             tag_synopok = (network_x %in% c("ISAC", "Sinottica") & network_y == "Sinottica") | (network_y != "Sinottica"),
             tag_mareok = (network_x == "Mareografica" & network_y == "Mareografica") | (network_x != "Mareografica" & network_y != "Mareografica"),
+            tag_assamok = (network_x != "Regionale ASSAM Marche" & network_y != "Regionale ASSAM Marche"),
             tag_same_sensor = FALSE,
             tag_same_station = FALSE,
-            tag_same_series = tag_mareok & tag_synopok & (tag_sseries_ava | tag_sseries_avs | tag_sseries_avi | tag_sseries_ivs | tag_sseries_ivi),
+            tag_same_series = tag_mareok & tag_synopok & tag_assamok & (tag_sseries_ava | tag_sseries_avs | tag_sseries_avi | tag_sseries_ivs | tag_sseries_ivi),
             tag_mergeable = TRUE
         )
 }
@@ -38,8 +39,12 @@ tag_manual <- function(tagged_analysis) {
     tagged_analysis |> mutate(
         tag_same_series = tag_same_series & !(
             (dataset_x == "ARPAM" & dataset_y == "ISAC" &
-                (sensor_key_x == 75L & sensor_key_y == 2804L) # CADSEALAND / Porto Recanati
+                (sensor_key_x == 75L & sensor_key_y == 2804L) | # CADSEALAND / Porto Recanati
+                (sensor_key_x == 116L & sensor_key_y == 2705L) # Poggio Cancelli
             )
-        )
+        ) |
+            (dataset_x == "ARPAM" & dataset_y == "SCIA" &
+                FALSE
+            )
     )
 }
