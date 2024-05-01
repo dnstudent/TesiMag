@@ -42,16 +42,12 @@ tag_manual <- function(tagged_analysis) {
         mutate(
             tag_same_series = (tag_same_series & !(
                 (dataset_x == "ISAC" & dataset_y == "TAA" & (
-                    (sensor_key_x == 1214L & sensor_key_y == 71L) | # Dobbiaco MTX / Dobbiaco
-                        (sensor_key_x == 4044L & sensor_key_y == 71L) | # Dobbiaco Synop /
-                        (sensor_key_x == 1360L & sensor_key_y == 80L) | # Folgarida Alta / Bassa
+                    (sensor_key_x == 1360L & sensor_key_y == 80L) | # Folgarida Alta / Bassa
                         (sensor_key_x %in% c(1774L, 1775L) & sensor_key_y == 108L) | # Levico
                         # (sensor_key_y == 162L) | # Peio
                         (sensor_key_x == 645L) | # Capriana
                         (sensor_key_x == 3513L) | # S. Maddalena a Casies
-                        (sensor_key_y == 151L) | # Passo di Costalunga
-                        (sensor_key_y == 179L) | # Plata
-                        (sensor_key_x == 4042L) # Passo Rolle Synop
+                        (sensor_key_y == 151L) # Passo di Costalunga
                 )) |
                     (dataset_x == "ISAC" & dataset_y == "ISAC" &
                         ((sensor_key_x == 1775L & sensor_key_y == 3055L) | # Levico / Roncegno
@@ -71,8 +67,7 @@ tag_manual <- function(tagged_analysis) {
                             # (sensor_key_y == 2989L) | # Peio
                             (sensor_key_x == 1953L & sensor_key_y == 1313L) | # Martello / Diga Gioveretto
                             (sensor_key_x == 3513L) | # S. Maddalena a Casies
-                            (sensor_key_x == 4042L & sensor_key_y != 2730L) | # Passo Rolle Synop
-                            (sensor_key_x != 4042L & sensor_key_y == 2730L) # Passo Rolle Synop
+                            (sensor_key_x == 89L & sensor_key_y == 180L) # Alpe di Siusi new / old
                         )) |
                     (dataset_x == "SCIA" & dataset_y == "TAA" &
                         ((sensor_key_x == 3040L & sensor_key_y == 41L) | # Pieve Tesino / Castello Tesino
@@ -80,13 +75,10 @@ tag_manual <- function(tagged_analysis) {
                             # (sensor_key_x != 2989L & sensor_key_y == 162L) | # Peio
                             # (sensor_key_x == 2989L & sensor_key_y != 162L) | # Peio
                             (sensor_key_x == 1040L & sensor_key_y == 42L) | # Cavalese
-                            (sensor_key_x == 1275L & sensor_key_y == 71) | # Dobbiaco Synop /
                             (sensor_key_x == 2957L & sensor_key_y != 150L) | # Passo di Costalunga
                             (sensor_key_x != 2957L & sensor_key_y == 150L) | # Passo di Costalunga
                             (sensor_key_y == 151L) | # Passo di Costalunga
-                            (sensor_key_x == 3834L & sensor_key_y == 237L) | # Sesto
-                            (sensor_key_y == 179L) | # Plata
-                            (sensor_key_x == 2730L) # Passo Rolle Synop
+                            (sensor_key_x == 3834L & sensor_key_y == 237L) # Sesto
                         )) |
                     (dataset_x == "SCIA" & dataset_y == "SCIA" &
                         ((sensor_key_x == 1730L & sensor_key_y == 4237L) | # Grumes / Valda
@@ -100,7 +92,8 @@ tag_manual <- function(tagged_analysis) {
                 (dataset_x == "SCIA" & dataset_y == "TAA" & (
                     (sensor_key_x == 4277L & sensor_key_y == 285L) | # Vandoies di sopra
                         (sensor_key_x == 219L & sensor_key_y == 11L) | #  Arco
-                        (sensor_key_x == 4217L & sensor_key_y == 294L) # Vipiteno Aereoporto
+                        (sensor_key_x == 4217L & sensor_key_y == 294L) | # Vipiteno Aereoporto
+                        (sensor_key_x == 2674L & sensor_key_y == 48L) # Cima Paganella
                 )) |
                 (dataset_x == "ISAC" & dataset_y == "TAA" & (
                     (sensor_key_x == 2469L & sensor_key_y == 95L) | #  Grigno

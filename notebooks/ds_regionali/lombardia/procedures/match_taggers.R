@@ -69,7 +69,8 @@ tag_manual <- function(tagged_analysis) {
                             (sensor_key_x == 136L & sensor_key_y == 2269L) | # Mantova
                             (sensor_key_x == 255L & sensor_key_y == 4353L) | # Voghera
                             (sensor_key_x == 255L & sensor_key_y == 3879L) | # Voghera
-                            (sensor_key_x == 111L & sensor_key_y == 1946L) # Lanzada
+                            (sensor_key_x == 111L & sensor_key_y == 1946L) | # Lanzada
+                            (sensor_key_x == 89L & sensor_key_y == 2941L) # Edolo Pantano D'Avio / Diga Pantano
 
                     ) |
                         (dataset_x == "SCIA" & dataset_y == "SCIA" &
@@ -81,7 +82,8 @@ tag_manual <- function(tagged_analysis) {
                                     (sensor_key_x == 135L & sensor_key_y == 2270L) | # Mantova Lunetta / Cerese
                                     (sensor_key_x == 3879L & sensor_key_y == 4352L) | # Voghera
                                     (sensor_key_x == 4284L & sensor_key_y == 4285L) | # Varzi / Nivione
-                                    (sensor_key_x == 1347L & sensor_key_y == 1348L) # Edolo
+                                    (sensor_key_x == 1347L & sensor_key_y == 1348L) | # Edolo
+                                    (sensor_key_x == 2940L & sensor_key_y == 2941L) # Edolo Pantano D'Avio / Diga Pantano
                             )
                         ) |
                         (dataset_x == "ARPALombardia" & dataset_y == "ISAC" &
