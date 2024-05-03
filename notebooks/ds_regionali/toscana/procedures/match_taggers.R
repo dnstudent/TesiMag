@@ -54,7 +54,6 @@ tag_manual <- function(tagged_analysis) {
                                 (sensor_key_x != 3987L & sensor_key_y == 440L) | # Volterra
                                 (sensor_key_y %in% c(437L, 438L)) | # Volterra
                                 (sensor_key_x == 3928L & sensor_key_y != 431L) | # Villafranca
-                                (sensor_key_x == 2246L & sensor_key_y == 219L) | # Monte Serra
                                 (sensor_key_x == 2848L & sensor_key_y == 327L) | # Prato
                                 (sensor_key_x == 2846L & sensor_key_y == 325L) # Prato
                             )
@@ -63,8 +62,7 @@ tag_manual <- function(tagged_analysis) {
                             ((sensor_key_x == 136L & sensor_key_y == 141L) | #  Firenze Ximeniano
                                 (sensor_key_x == 436L & sensor_key_y != 439L) | # Volterra
                                 (sensor_key_x != 436L & sensor_key_y == 439L) | # Volterra
-                                (sensor_key_x %in% c(437L, 438L, 440L) | sensor_key_y %in% c(437L, 438L, 440L)) | # Volterra
-                                (sensor_key_x == 221L | sensor_key_y == 221) # Monte Serra
+                                (sensor_key_x %in% c(437L, 438L, 440L) | sensor_key_y %in% c(437L, 438L, 440L)) # Volterra
                             )
                         ) |
                         (dataset_x == "SCIA" & dataset_y == "SIRToscana" &
@@ -83,7 +81,6 @@ tag_manual <- function(tagged_analysis) {
                         (dataset_x == "ISAC" & dataset_y == "ISAC" &
                             (
                                 FALSE
-                                # (sensor_key_x == 2244L & sensor_key_y == 2245L) # Monte Serra
                             )
                         )
                 ) |
@@ -93,8 +90,8 @@ tag_manual <- function(tagged_analysis) {
                         (sensor_key_x == 146L & sensor_key_y == 147L) | # Follonica
                             (sensor_key_x == 426L & sensor_key_y == 427L) | # Viareggio
                             (sensor_key_x == 427L & sensor_key_y == 428L) | # Viareggio
-                            (sensor_key_x == 401L & sensor_key_y == 402L) | # Suvereto
-                            (sensor_key_x == 219L & sensor_key_y == 221L) # Monte Serra
+                            (sensor_key_x == 437L & sensor_key_y == 439L) | # Volterra
+                            (sensor_key_x == 401L & sensor_key_y == 402L) # Suvereto
                     )
                 ) |
                 (dataset_x == "ISAC" & dataset_y == "SIRToscana" &
