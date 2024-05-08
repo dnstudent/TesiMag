@@ -1,8 +1,8 @@
 setwd(fs::path_abs("~/Local_Workspace/TesiMag"))
 library(arrow, warn.conflicts = FALSE)
 library(dplyr, warn.conflicts = FALSE)
-library(tsibble, warn.conflicts = FALSE)
 library(tidyr, warn.conflicts = FALSE)
+library(lubridate, warn.conflicts = FALSE)
 
 source("src/paths/paths.R")
 source("src/database/tools.R")

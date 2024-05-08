@@ -57,7 +57,9 @@ tag_manual <- function(tagged_analysis) {
                                 (sensor_key_x == 53L) | # Tolmezzo
                                 (sensor_key_x == 19L & sensor_key_y == 1268L) | # Fagagna
                                 (sensor_key_x == 55L & sensor_key_y == 3733L) | # Trieste
-                                (sensor_key_x == 35L & sensor_key_y == 2973L) # Zoncolan
+                                (sensor_key_x == 36L & sensor_key_y == 2290L) | # Muggia
+                                (sensor_key_x == 35L) | # Zoncolan
+                                (sensor_key_x == 11L) #  Cave del Predil
                         )
                     ) &
                     !(dataset_x == "ISAC" & dataset_y == "SCIA" &
@@ -69,7 +71,7 @@ tag_manual <- function(tagged_analysis) {
                                 (sensor_key_x == 1268L & sensor_key_y == 1464L) | # Fagagna
                                 (sensor_key_x == 999L & sensor_key_y == 813L) | # Claut - Lesis
                                 (sensor_key_x == 2097L & sensor_key_y == 2137L) | # Monfalcone
-                                (sensor_key_x == 2973L & sensor_key_y == 2425L) # Rifugio Zoncolan
+                                (sensor_key_x == 953L & sensor_key_y == 793L) # Chiusaforte / Raccolana
                         )
                     ) &
                     !(dataset_x == "ARPAFVG" & dataset_y == "SCIA" &
@@ -78,8 +80,11 @@ tag_manual <- function(tagged_analysis) {
                                 (sensor_key_x == 20L & sensor_key_y == 62L) | # Forni di Sopra
                                 (sensor_key_x == 20L & sensor_key_y == 1442L) | # Forni di Sopra
                                 (sensor_key_x == 30L & sensor_key_y == 1872L) | # Lignano
+                                (sensor_key_x == 36L & sensor_key_y == 2221L) | # Muggia
                                 (sensor_key_x == 53L) | #  Tolmezzo
-                                (sensor_key_x == 55L & sensor_key_y == 4083L) # Trieste
+                                (sensor_key_x == 35L) | # Zoncolan
+                                (sensor_key_x == 55L & sensor_key_y == 4083L) | # Trieste
+                                (sensor_key_x == 11L) # Cave del Predil
                         )
                     ) &
                     !(dataset_x == "ISAC" & dataset_y == "ISAC" &
