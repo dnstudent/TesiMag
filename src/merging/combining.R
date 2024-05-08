@@ -62,9 +62,13 @@ series_groups <- function(series_matches, metadata, data, tag) {
     )
 }
 
-set_dataset_priority <- function(metadata, dataset_priority) {
+set_dataset_rank <- function(metadata, dataset_priority) {
     metadata |> mutate(dataset = factor(dataset, levels = rev(dataset_priority), ordered = TRUE))
 }
+
+# set_dataset_rank <- function(metadata, dataset_rank) {
+#     metadata |> mutate(dataset = factor(dataset, levels = rev(dataset_rank), ordered = TRUE))
+# }
 
 sin_coeffs <- function(delmonthlyT, t) {
     if (length(delmonthlyT > 0)) {
@@ -90,15 +94,51 @@ diff_coeffs <- function(delmonthlyT, t) {
     as_tibble_row(coeffs)
 }
 
-rank_series_groups <- function(series_groups, metadata, dataset_priority, ...) {
+rank_series_groups <- function(series_groups, metadata, dataset_rankings, ...) {
     series_groups |>
         left_join(metadata, by = "key") |>
-        set_dataset_priority(dataset_priority) |>
+        set_dataset_rank(dataset_rankings) |>
         arrange(...) |>
         group_by(gkey, variable) |>
         mutate(priority = -row_number()) |>
         ungroup() |>
         select(gkey, variable, key, priority)
+}
+
+rank_metadata <- function(series_groups, metadata, dataset_rankings, ...) {
+    # Metadata ranking is tunable
+    series_groups |>
+        left_join(metadata, by = "key") |>
+        set_dataset_rank(dataset_rankings) |>
+        arrange(...) |>
+        group_by(gkey, variable) |>
+        mutate(metadata_rank = row_number()) |>
+        ungroup() |>
+        select(gkey, variable, key, metadata_rank)
+}
+
+rank_data <- function(series_groups, metadata) {
+    #  Data ranking is fixed: ISAC > ARPA > SCIA > DPC
+    network_rank_table <- tribble(
+        ~dataset, ~network, ~network_rank,
+        "ISAC", "ISAC", 1L, # ISAC series are always ranked first
+        "ISAC", "DPC", 4L #  DPC series are always ranked last
+    ) |>
+        bind_rows(
+            metadata |> filter(dataset == "SCIA") |> distinct(dataset, network) |> mutate(network_rank = 3L) #  SCIA series are ranked second to last
+        ) |>
+        bind_rows(
+            metadata |> filter(!dataset %in% c("SCIA", "ISAC")) |> distinct(dataset, network) |> mutate(network_rank = 2L) # ARPA series are ranked second
+        )
+
+    series_groups |>
+        left_join(metadata |> select(key, dataset, sensor_key, network, sensor_last), by = "key") |>
+        left_join(network_rank_table, by = c("dataset", "network")) |>
+        group_by(gkey, variable) |>
+        arrange(network_rank, desc(sensor_last), .by_group = TRUE) |>
+        mutate(data_rank = row_number(), skip_correction = "ISAC" %in% network) |>
+        ungroup() |>
+        select(!c(sensor_last, network_rank, network))
 }
 
 pairs_corrections <- function(pairs_list, data, ignore_corrections) {

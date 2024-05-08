@@ -110,12 +110,13 @@ associate_dem_elevation <- function(metadata, statconn) {
 
 associate_dem_elevation.bruno <- function(metadata, glo30_dem_path) {
     dst <- stars::st_mosaic(
-            list.files(
-                glo30_dem_path,
-                recursive = TRUE,
-                full.names = TRUE,
-                pattern = "*_DEM.tif$"
-            ))
+        list.files(
+            glo30_dem_path,
+            recursive = TRUE,
+            full.names = TRUE,
+            pattern = "*_DEM.tif$"
+        )
+    )
     dem <- stars::read_stars(dst, proxy = TRUE)
     metadata |>
         mutate(elevation_glo30 = stars::st_extract(dem, pick(lon, lat) |> as.matrix()) |> pull(1L))
@@ -125,7 +126,7 @@ associate_regional_info.bruno <- function(metadata, province_boundaries_path) {
     province_boundaries <- sf::st_read(province_boundaries_path, quiet = TRUE)
     metadata |>
         st_md_to_sf() |>
-        st_join(province_boundaries |> select(province_full = shapeName), join = sf::st_intersects) |> 
+        st_join(province_boundaries |> select(province_full = shapeName), join = sf::st_intersects) |>
         sf::st_drop_geometry()
 }
 
@@ -200,12 +201,23 @@ spatial_availabilities <- function(ymonthly_avail, stations, map, ...) {
     list("plot" = p, "data" = spatav)
 }
 
-merge_same_series <- function(tagged_analysis, metadata, data, ...) {
+merge_same_series.old <- function(tagged_analysis, metadata, data, ...) {
     gs <- series_groups(tagged_analysis, metadata, data, tag_same_series, group_by_component, FALSE)
     ranked_series_groups <- gs$table |>
         rank_series_groups(metadata, ...)
     merged <- dynamic_merge(data, ranked_series_groups, tagged_analysis)
     list("series_groups" = ranked_series_groups, "data" = merged, "graph" = gs$graph)
+}
+
+merge_same_series <- function(path_from, path_to, set, tagged_analysis, metadata, data, correction_threshold, contribution_threshold, dataset_rankings, ...) {
+    source("notebooks/merging/correzioni_manuali.R")
+    gs <- series_groups(tagged_analysis, metadata, data, tag_same_series)
+    ranked_series_groups <- gs$table |>
+        rank_metadata(metadata, dataset_rankings, ...) |>
+        rank_data(metadata) |>
+        mutate(set = set)
+    dynamic_merge.full(path_from, path_to, ranked_series_groups, correction_threshold, contribution_threshold)
+    list("series_groups" = ranked_series_groups, "data" = path_to, "graph" = gs$graph)
 }
 
 merged_checkpoint <- function(merge_results, metadata, dataset_name, statconn, series_groups) {
