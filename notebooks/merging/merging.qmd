@@ -1,0 +1,13 @@
+---
+title: "Merging"
+format: html
+editor: visual
+---
+
+## Merging datasets
+
+```{r}
+setwd(fs::path_abs("~/Local_Workspace/TesiMag"))
+Sys.setlocale("LC_ALL", "UTF-8")
+library(dplyr, warn.conflicts = FALSE)
+```

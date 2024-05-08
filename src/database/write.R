@@ -50,7 +50,8 @@ write_correction_coefficients <- function(correction_table, dataset, conn, metad
     correction_table <- correction_table |>
         left_join(metadata, by = c("key_x" = "key")) |>
         left_join(metadata, by = c("key_y" = "key"), suffix = c("_x", "_y")) |>
-        select(!c(key_x, key_y))
+        select(!c(key_x, key_y)) |>
+        mutate(dataset = !!dataset)
     path <- paste0(archive_path(dataset, "extra", "corrections"), ".parquet")
     if (!dir.exists(dirname(path))) {
         dir.create(dirname(path), recursive = TRUE)
