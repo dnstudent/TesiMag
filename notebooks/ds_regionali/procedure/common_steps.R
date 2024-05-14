@@ -10,6 +10,7 @@ library(stringr, warn.conflicts = FALSE)
 source("src/database/tools.R")
 source("src/database/test.R")
 source("src/database/write.R")
+source("src/database/query/data.R")
 source("src/database/data_model.R")
 source("src/database/query/spatial.R")
 source("src/analysis/data/quality_check.R")
@@ -201,56 +202,113 @@ spatial_availabilities <- function(ymonthly_avail, stations, map, ...) {
     list("plot" = p, "data" = spatav)
 }
 
-merge_same_series.old <- function(tagged_analysis, metadata, data, ...) {
-    gs <- series_groups(tagged_analysis, metadata, data, tag_same_series, group_by_component, FALSE)
-    ranked_series_groups <- gs$table |>
-        rank_series_groups(metadata, ...)
-    merged <- dynamic_merge(data, ranked_series_groups, tagged_analysis)
-    list("series_groups" = ranked_series_groups, "data" = merged, "graph" = gs$graph)
+prepare_data_for_merge <- function(dataconn, ds_root = fs::path("db", "tmp", "dataset_for_merge"), regenerate = FALSE) {
+    if (regenerate || !fs::dir_exists(ds_root)) {
+        datasets <- fs::dir_ls(fs::path_dir(archive_path("*", "data", "qc1")), type = "directory") |> fs::path_file()
+        query_checkpoint_data(datasets, "qc1", dataconn, hive_types = list("valid" = "BOOLEAN", "variable" = "INT")) |>
+            filter(valid) |>
+            select(!c(starts_with("qc_"), valid)) |>
+            to_arrow() |>
+            write_dataset(ds_root, format = "parquet", partitioning = c("dataset", "sensor_key", "variable"))
+    }
+    ds_root
 }
 
-merge_same_series <- function(path_from, path_to, set, tagged_analysis, metadata, data, correction_threshold, contribution_threshold, dataset_rankings, ...) {
-    source("notebooks/merging/correzioni_manuali.R")
+merge_same_series <- function(path_from, path_to, set_name, tagged_analysis, metadata, data, correction_threshold, contribution_threshold, dataset_rankings, ...) {
     gs <- series_groups(tagged_analysis, metadata, data, tag_same_series)
     ranked_series_groups <- gs$table |>
+        mutate(set = set_name) |>
         rank_metadata(metadata, dataset_rankings, ...) |>
         rank_data(metadata) |>
-        mutate(set = set)
+        left_join(metadata |> select(dataset, sensor_key, key), by = "key")
+    # cross_join(tibble(variable = c(-1L, 1L))) #  Non è il massimo gestire così, ma per ora va bene. Necessario per gestire le situazioni in cui alcune serie non hanno una delle variabili
     dynamic_merge.full(path_from, path_to, ranked_series_groups, correction_threshold, contribution_threshold)
-    list("series_groups" = ranked_series_groups, "data" = path_to, "graph" = gs$graph)
+    path_to
 }
 
-merged_checkpoint <- function(merge_results, metadata, dataset_name, statconn, series_groups) {
-    write_correction_coefficients(merge_results$coeffs, dataset_name, statconn, metadata)
-    write_series_groups(series_groups, dataset_name, statconn, metadata)
+merged_checkpoint <- function(set_name, merge_results_path, metadata) {
+    # Saving the merging specs: correction coefficients, merged status, series groups
+    merging_specs <- open_dataset(fs::path(merge_results_path, "meta", str_glue("set={set_name}")), format = "parquet") |>
+        select(-key) |>
+        collect() |>
+        relocate(set, gkey, .before = 1L)
 
-    data <- merge_results$data |>
-        left_join(metadata |> select(key, from_sensor_key = sensor_key, from_dataset = dataset), by = c("from_key" = "key")) |>
-        rename(sensor_key = key) |>
-        mutate(dataset = dataset_name)
+    specs_path <- fs::path(archive_path(set_name, "extra", "merge_specs"), ext = "parquet")
+    if (!fs::dir_exists(fs::path_dir(specs_path))) {
+        fs::dir_create(fs::path_dir(specs_path), recurse = TRUE)
+    }
+    merging_specs |>
+        write_parquet(specs_path)
 
-    stats90 <- data |>
-        filter(year(date) >= 1990L) |>
+    data <- open_dataset(fs::path(merge_results_path, "data", str_glue("set={set_name}")), format = "parquet") |>
+        rename(dataset = set, sensor_key = gkey)
+
+    datestats90 <- data |>
+        filter(year(date) >= 1990L, !is.na(value)) |>
+        count(dataset, sensor_key, variable) |>
         group_by(dataset, sensor_key) |>
-        summarise(valid90 = as.integer(n() %/% 2L), .groups = "drop")
+        summarise(valid90 = max(n), .groups = "drop") |>
+        compute()
 
-    date_stats <- data |>
+    datestats <- data |>
+        filter(!is.na(value)) |>
+        count(dataset, sensor_key, variable) |>
         group_by(dataset, sensor_key) |>
-        summarise(series_first = min(date, na.rm = FALSE), series_last = max(date, na.rm = FALSE), valid_days = as.integer(n() %/% 2L), .groups = "drop") |>
-        left_join(stats90, by = c("dataset", "sensor_key")) |>
-        mutate(valid90 = coalesce(valid90, 0L))
+        summarise(valid_days = max(n), .groups = "drop") |>
+        full_join(datestats90, by = c("dataset", "sensor_key")) |>
+        collect()
 
     metadata <- metadata |>
-        mutate(dataset = dataset_name) |>
-        inner_join(merge_results$meta |> select(-gkey, -variable) |> distinct(key, .keep_all = TRUE), by = "key") |>
-        mutate(sensor_key = key) |>
-        select(!c(key, from_keys, ends_with("_first"), ends_with("_last"), )) |>
-        left_join(date_stats, by = c("dataset", "sensor_key")) |>
-        filter(valid_days >= 30L)
+        select(-any_of("key")) |>
+        inner_join(merging_specs |> select(dataset, sensor_key, set, gkey, metadata_rank, data_rank, merged) |> distinct(), by = c("dataset", "sensor_key"), relationship = "one-to-one") |>
+        filter(merged) |>
+        group_by(set, gkey) |>
+        arrange(metadata_rank, .by_group = TRUE) |>
+        summarise(
+            across(!c(ends_with("_first"), ends_with("_last"), dataset, sensor_key, data_rank), ~ first(.)),
+            from_sensor_keys = list(sensor_key),
+            from_datasets = list(dataset),
+            data_ranks = list(data_rank),
+            series_first = min(series_first, na.rm = TRUE),
+            series_last = max(series_last, na.rm = TRUE),
+            .groups = "drop"
+        ) |>
+        select(
+            dataset = set, sensor_key = gkey, name, user_code, network, state, province_code, town, lon, lat, elevation, elevation_glo30, kind, series_first, series_last,
+            from_datasets, from_sensor_keys, data_ranks
+        ) |>
+        left_join(datestats, by = c("dataset", "sensor_key"), relationship = "one-to-one") |>
+        filter(valid_days >= 30L) |>
+        as_arrow_table(
+            schema = schema(
+                dataset = utf8(),
+                sensor_key = int32(),
+                name = utf8(),
+                user_code = utf8(),
+                network = utf8(),
+                state = utf8(),
+                province_code = utf8(),
+                town = utf8(),
+                lon = float64(),
+                lat = float64(),
+                elevation = float64(),
+                elevation_glo30 = float64(),
+                kind = utf8(),
+                series_first = date32(),
+                series_last = date32(),
+                from_datasets = list_of(utf8()),
+                from_sensor_keys = list_of(int32()),
+                data_ranks = list_of(int32()),
+                valid_days = int32(),
+                valid90 = int32()
+            )
+        )
 
-    data <- data |> semi_join(metadata, by = c("dataset", "sensor_key"))
-    # metadata |> select(!c(ends_with("_first"), ends_with("_last"), ))
+    # Filtering out short series
+    data <- data |>
+        semi_join(metadata |> select(dataset, sensor_key), by = c("dataset", "sensor_key"))
 
-    checkpoint <- as_checkpoint(meta = metadata, data = data, check_schema = FALSE)
-    save_checkpoint(checkpoint, dataset_name, "merged", check_schema = FALSE)
+    # return(list(compute(metadata), data))
+
+    list(meta = compute(metadata), data = compute(data)) |> save_checkpoint(set_name, "merged", check_schema = FALSE)
 }
