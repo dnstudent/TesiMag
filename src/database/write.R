@@ -45,7 +45,7 @@ write_extra_metadata <- function(extra_table, dataset_name, conn) {
     write_parquet(extra_table, path)
 }
 
-write_correction_coefficients <- function(correction_table, dataset, conn, metadata) {
+write_correction_coefficients <- function(correction_table, dataset, metadata) {
     metadata <- metadata |> select(key, sensor_key, dataset)
     correction_table <- correction_table |>
         left_join(metadata, by = c("key_x" = "key")) |>
@@ -59,7 +59,7 @@ write_correction_coefficients <- function(correction_table, dataset, conn, metad
     write_parquet(correction_table, path)
 }
 
-write_series_groups <- function(series_groups, dataset, conn, metadata) {
+write_series_groups <- function(series_groups, dataset, metadata) {
     metadata <- metadata |> select(key, sensor_key, dataset)
     series_groups <- series_groups |>
         left_join(metadata, by = "key") |>
