@@ -3,8 +3,8 @@ library(dplyr, warn.conflicts = FALSE)
 tag_manual <- function(tagged_analysis) {
     tagged_analysis |>
         mutate(
-            tag_same_series = tag_same_series &
-                !(user_code_x == "VERZI" & user_code_y == "07LOAN0") &
+            tag_same_series = (tag_same_series &
+                !(!is.na(user_code_x) & !is.na(user_code_y) & user_code_x == "VERZI" & user_code_y == "07LOAN0") &
                 !(dataset_x == "SCIA" & dataset_y == "SCIA" &
                     (
                         (sensor_key_x == 2299L & user_code_y == "07TAVRN") | # Mattarana / Tavarone
@@ -16,9 +16,12 @@ tag_manual <- function(tagged_analysis) {
                 ((dataset_x == "SCIA" & dataset_y == "SCIA") & (user_code_x == "01S2589" & user_code_y == "01615")) |
                 (
                     (dataset_x == "ARPAL" & dataset_y == "SCIA" &
-                        (user_code_x == "CMELO" & user_code_y == "01S2892") # Colle Melogno / Settepani
+                        FALSE # (user_code_x == "CMELO" & user_code_y == "01S2892") # Colle Melogno / Settepani
                     )
-                )
+                ) |
+                ((dataset_x == "ISAC" & dataset_y == "SCIA") &
+                    (sensor_key_x == 3351L & sensor_key_y == 3601L) # Settepani
+                )) |> coalesce(FALSE)
         )
 }
 

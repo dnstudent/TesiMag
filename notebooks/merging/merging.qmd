@@ -99,6 +99,6 @@ merged_data |> slice_head(n = 5L) |> collect()
 query_checkpoint_meta(sets, "merged", conns$data) |> select(name, network, state, province_code, lon, lat, elevation, user_code)
 ```
 ```{r}
-read_parquet(fs::path_wd("db", "extra", "series_groups", "ER", ext = "parquet")) |> collect())
+read_parquet(fs::path_wd("db", "extra", "series_groups", "ER", ext = "parquet"))
 ```
 
