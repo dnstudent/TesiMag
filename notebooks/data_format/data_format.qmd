@@ -1,0 +1,75 @@
+---
+title: "Converting the merged dataset format"
+author: "Davide Nicoli"
+format: html
+---
+
+## Init
+```{r}
+Sys.setlocale("LC_ALL", "UTF-8")
+library(dplyr, warn.conflicts = FALSE)
+library(arrow, warn.conflicts = FALSE)
+library(zeallot, warn.conflicts = FALSE)
+
+source("src/database/startup.R")
+source("src/database/query/data.R")
+source("src/merging/combining.R")
+
+conns <- load_dbs()
+datasets <- c("ARPAPiemonte", "ARPAL", "ARPALombardia", "ARPAV", "TAA", "ARPAFVG", "Dext3r", "SIRToscana", "ARPAUmbria", "ARPAM", "SCIA", "ISAC")
+```
+
+```{r}
+merged_ds <- query_checkpoint("full", "merged_corrected", conns$data, all_stations = FALSE)
+merge_specs <- open_dataset(fs::path("db", "extra", "merge_specs"))
+```
+
+
+```{r}
+merged_ds$data |>
+  to_arrow() |>
+  write_dataset(fs::path("db", "tmp", "dataset_for_conv"), partitioning = c("dataset", "sensor_key", "variable"))
+print("✅")
+```
+
+
+```{r}
+merge_specs |> filter(set == "TAA2", gkey == 144L) |> collect()
+```
+
+```{r}
+
+```
+
+
+```{r}
+base <- fs::path_abs(".")
+integrators_root <- fs::path(base, "db", "tmp", "dataset_for_merge")
+save_to_root <- fs::path(base, "db", "conv", "merged_corrected")
+variable_name <- list("-1" = "TMND", "1" = "TMXD")
+unlink(save_to_root, recursive = TRUE)
+
+merge_specs |>
+  collect() |>
+  group_split(set, gkey, variable) |>
+  purrr::walk(~ {
+    set <- .x$set |> first()
+    gkey <- .x$gkey |> first()
+    variable <- .x$variable |> first()
+    master_path <- fs::path(base, "db", "tmp", "dataset_for_conv", str_glue("dataset={set}"), str_glue("sensor_key={gkey}"), str_glue("variable={variable}"), "part-0.parquet")
+    master_series <- read_parquet(master_path)
+    c(integrators, cols) %<-% load_data.group.1(integrators_root, .x)
+    save_to_path <- fs::path(save_to_root, str_glue("{variable_name[[variable]]}_{set}_{gkey}.csv"))
+    if (!fs::dir_exists(fs::path_dir(save_to_path))) fs::dir_create(fs::path_dir(save_to_path), recurse = TRUE)
+    full_join(master_series |> rename(master = value), integrators, by = "date") |>
+      arrange(date) |>
+      write_csv_arrow(save_to_path, write_options = csv_write_options(quoting_style = "AllValid"))
+  }, .progress = TRUE)
+print("done")
+```
+
+```{r}
+
+```
+
+

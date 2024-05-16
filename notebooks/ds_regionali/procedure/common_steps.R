@@ -260,8 +260,8 @@ merged_checkpoint <- function(set_name, merge_results_path, metadata) {
 
     metadata <- metadata |>
         select(-any_of("key")) |>
-        inner_join(merging_specs |> select(dataset, sensor_key, set, gkey, metadata_rank, data_rank, merged) |> distinct(), by = c("dataset", "sensor_key"), relationship = "one-to-one") |>
-        filter(merged) |>
+        inner_join(merging_specs |> select(dataset, sensor_key, set, gkey, metadata_rank, data_rank) |> distinct(), by = c("dataset", "sensor_key"), relationship = "one-to-one") |>
+        # filter(merged) |>
         group_by(set, gkey) |>
         arrange(metadata_rank, .by_group = TRUE) |>
         summarise(
@@ -278,7 +278,7 @@ merged_checkpoint <- function(set_name, merge_results_path, metadata) {
             from_datasets, from_sensor_keys, data_ranks
         ) |>
         left_join(datestats, by = c("dataset", "sensor_key"), relationship = "one-to-one") |>
-        filter(valid_days >= 30L) |>
+        # filter(valid_days >= 30L) |>
         as_arrow_table(
             schema = schema(
                 dataset = utf8(),

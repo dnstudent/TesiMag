@@ -57,7 +57,7 @@ query_checkpoint_meta <- function(datasets, step = "raw", conn = NULL, filename 
     query_dataset(archive_path(datasets, "metadata", step), conn, filename, hive_types)
 }
 
-query_checkpoint <- function(datasets, step, conn = NULL, all_stations = TRUE, filename = FALSE) {
+query_checkpoint <- function(datasets, step, conn = NULL, all_stations = FALSE, filename = FALSE) {
     meta_step <- if (all_stations) "raw" else step
     list(
         "meta" = query_checkpoint_meta(datasets, meta_step, conn, filename),
