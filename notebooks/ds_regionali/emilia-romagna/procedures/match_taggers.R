@@ -39,6 +39,7 @@ tag_manual <- function(tagged_analysis) {
                             (sensor_key_x == 130L & sensor_key_y == 134L) | # Bologna urbana / meteo
                             (sensor_key_x == 696L & sensor_key_y == 707L) | # Imola / 2
                             (sensor_key_x == 1294L & sensor_key_y == 1295L) | # Rimini
+                            (sensor_key_x == 1099L & sensor_key_y == 1100L) | # Pianello Val Tidone
                             (sensor_key_y == 73L) # Bardi Centrale
                     )) |
                     (dataset_x == "Dext3r" & dataset_y == "ISAC" &
