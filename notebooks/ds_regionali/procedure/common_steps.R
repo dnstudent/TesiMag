@@ -204,12 +204,36 @@ spatial_availabilities <- function(ymonthly_avail, stations, map, ...) {
 
 prepare_data_for_merge <- function(dataconn, ds_root = fs::path("db", "tmp", "dataset_for_merge"), regenerate = FALSE) {
     if (regenerate || !fs::dir_exists(ds_root)) {
+        save_ds <- function(ds) {
+            fragment_dir <- fs::path(
+                ds_root,
+                str_glue("dataset={first(ds$dataset)}"),
+                str_glue("sensor_key={first(ds$sensor_key)}"),
+                str_glue("variable={first(ds$variable)}")
+            )
+            if (!fs::dir_exists(fragment_dir)) {
+                fs::dir_create(fragment_dir, recurse = TRUE)
+            }
+            write_parquet(ds |> arrange(date), fs::path(fragment_dir, "part-0.parquet"))
+        }
+
         datasets <- fs::dir_ls(fs::path_dir(archive_path("*", "data", "qc1")), type = "directory") |> fs::path_file()
+
         query_checkpoint_data(datasets, "qc1", dataconn, hive_types = list("valid" = "BOOLEAN", "variable" = "INT")) |>
-            filter(valid) |>
+            filter(valid, variable == -1L) |>
             select(!c(starts_with("qc_"), valid)) |>
-            to_arrow() |>
-            write_dataset(ds_root, format = "parquet", partitioning = c("dataset", "sensor_key", "variable"))
+            collect() |>
+            group_split(dataset, sensor_key, variable) |>
+            purrr::walk(save_ds, .progress = TRUE)
+
+        query_checkpoint_data(datasets, "qc1", dataconn, hive_types = list("valid" = "BOOLEAN", "variable" = "INT")) |>
+            filter(valid, variable == 1L) |>
+            select(!c(starts_with("qc_"), valid)) |>
+            collect() |>
+            group_split(dataset, sensor_key, variable) |>
+            purrr::walk(save_ds, .progress = TRUE)
+        # to_arrow() |>
+        # write_dataset(ds_root, format = "parquet", partitioning = c("dataset", "sensor_key", "variable")) BUGGED: too many files
     }
     ds_root
 }

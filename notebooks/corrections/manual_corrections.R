@@ -4,25 +4,43 @@ library(assertr, warn.conflicts = FALSE)
 
 source("src/database/query/spatial.R")
 
+load_corrections <- function(from_path) {
+  from_path |>
+    fs::dir_ls(regex = regex("^[^\\~]+_edit.xlsx")) |>
+    purrr::map(
+      .f = \(path) read.xlsx(path) |>
+        select(dataset, from_sensor_keys, from_datasets, ends_with("_ok"), ends_with("_precision"), keep, note) |>
+        mutate(
+          across(
+            c(dataset, note), ~ as.character(.)
+          ),
+          across(
+            c(lon_ok, lat_ok, ele_ok, ends_with("_precision")), ~ as.numeric(.)
+          )
+        )
+    ) |>
+    bind_rows()
+}
+
 prepare_corrections <- function(corrections, metadata) {
   corrections |>
     mutate(
       sensor_key = as.integer(sensor_key),
       from_datasets = str_split(from_datasets, regex(";|\\*")),
       from_sensor_keys = str_split(from_sensor_keys, regex(";|\\*")) |> purrr::map(as.integer),
-      keep = coalesce(keep, TRUE),
       manual_loc_correction = !is.na(lon_ok) | !is.na(lat_ok),
       manual_elev_correction = !is.na(ele_ok),
     ) |>
-    left_join(metadata |> select(dataset, from_datasets, from_sensor_keys, series_last), by = c("dataset", "from_datasets", "from_sensor_keys"), relationship = "one-to-one") |>
+    left_join(metadata |> select(dataset, from_datasets, from_sensor_keys, series_last, valid90), by = c("dataset", "from_datasets", "from_sensor_keys"), relationship = "one-to-one") |>
     mutate(
       loc_precision = if_else(manual_loc_correction, coalesce(loc_precision, -1), coalesce(loc_precision, if_else(year(series_last) <= 2010L, 1, 0))),
-      elev_precision = if_else(manual_elev_correction | (loc_precision == -1), coalesce(elev_precision, -1), coalesce(elev_precision, if_else(year(series_last) <= 2010L, 1, 0)))
+      elev_precision = if_else(manual_elev_correction | (loc_precision == -1), coalesce(elev_precision, -1), coalesce(elev_precision, if_else(year(series_last) <= 2010L, 1, 0))),
+      keep = coalesce(keep, valid90 >= 5L*365L)
     ) |>
     assert(within_bounds(3, 19), lon_ok) |>
     assert(within_bounds(41, 49), lat_ok) |>
     assert(within_bounds(-10, 4900), ele_ok) |>
-    select(-series_last, -sensor_key)
+    select(-series_last, -sensor_key, -valid90)
 }
 
 
