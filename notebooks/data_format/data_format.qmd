@@ -10,13 +10,17 @@ Sys.setlocale("LC_ALL", "UTF-8")
 library(dplyr, warn.conflicts = FALSE)
 library(arrow, warn.conflicts = FALSE)
 library(zeallot, warn.conflicts = FALSE)
+library(openxlsx, warn.conflicts = FALSE)
+library(tidyr, warn.conflicts = FALSE)
 
 source("src/database/startup.R")
 source("src/database/query/data.R")
 source("src/merging/combining.R")
+source("notebooks/corrections/manual_corrections.R")
 
 conns <- load_dbs()
 datasets <- c("ARPAPiemonte", "ARPAL", "ARPALombardia", "ARPAV", "TAA", "ARPAFVG", "Dext3r", "SIRToscana", "ARPAUmbria", "ARPAM", "SCIA", "ISAC")
+sets <- c("PIE", "LIG", "LOM", "VEN", "TAA2", "FVG", "ER", "TOS", "UMB", "MAR", "VDA")
 ```
 
 ```{r}
@@ -26,29 +30,32 @@ merge_specs <- open_dataset(fs::path("db", "extra", "merge_specs"))
 
 
 ```{r}
-merged_ds$data |>
-  to_arrow() |>
-  write_dataset(fs::path("db", "tmp", "dataset_for_conv"), partitioning = c("dataset", "sensor_key", "variable"))
+ds4conv_dir <- fs::path("db", "tmp", "dataset_for_conv")
+
+# if (fs::dir_exists(ds4merge_dir)) unlink(ds4merge_dir, recursive = TRUE)
+# merged_ds$data |>
+#   collect() |>
+#   group_split(dataset, sensor_key, variable) |>
+#   purrr::walk(~ {
+#     dataset <- .x$dataset |> first()
+#     sensor_key <- .x$sensor_key |> first()
+#     variable <- .x$variable |> first()
+#     path <- fs::path(ds4merge_dir, str_glue("dataset={dataset}"), str_glue("sensor_key={sensor_key}"), str_glue("variable={variable}"))
+#     if (!fs::dir_exists(path)) fs::dir_create(path, recurse = TRUE)
+#     .x |> write_parquet(fs::path(path, "part-0.parquet"))
+#   }, .progress = TRUE)
+# to_arrow() |>
+# write_dataset(fs::path("db", "tmp", "dataset_for_conv"), partitioning = c("dataset", "sensor_key", "variable"))
 print("✅")
 ```
-
-
-```{r}
-merge_specs |> filter(set == "TAA2", gkey == 144L) |> collect()
-```
-
-```{r}
-
-```
-
 
 ```{r}
 base <- fs::path_abs(".")
 integrators_root <- fs::path(base, "db", "tmp", "dataset_for_merge")
 save_to_root <- fs::path(base, "db", "conv", "merged_corrected")
 variable_name <- list("-1" = "TMND", "1" = "TMXD")
-unlink(save_to_root, recursive = TRUE)
 
+unlink(fs::path(save_to_root, "data"), recursive = TRUE)
 merge_specs |>
   collect() |>
   group_split(set, gkey, variable) |>
@@ -59,17 +66,63 @@ merge_specs |>
     master_path <- fs::path(base, "db", "tmp", "dataset_for_conv", str_glue("dataset={set}"), str_glue("sensor_key={gkey}"), str_glue("variable={variable}"), "part-0.parquet")
     master_series <- read_parquet(master_path)
     c(integrators, cols) %<-% load_data.group.1(integrators_root, .x)
-    save_to_path <- fs::path(save_to_root, str_glue("{variable_name[[variable]]}_{set}_{gkey}.csv"))
+    save_to_path <- fs::path(save_to_root, "data", str_glue("{variable_name[[variable]]}_{set}_{gkey}.csv"))
     if (!fs::dir_exists(fs::path_dir(save_to_path))) fs::dir_create(fs::path_dir(save_to_path), recurse = TRUE)
     full_join(master_series |> rename(master = value), integrators, by = "date") |>
       arrange(date) |>
+      select(date, master, all_of(cols), from_dataset, from_sensor_key) |>
+      complete(date = seq.Date(min(date), max(date), by = "day")) |>
+      arrange(date) |>
       write_csv_arrow(save_to_path, write_options = csv_write_options(quoting_style = "AllValid"))
   }, .progress = TRUE)
-print("done")
+
+
+print("Converted merged dataset to csv")
+```
+
+
+```{r}
+if (!fs::dir_exists(fs::path("db", "conv", "merged_corrected", "metadata"))) {
+  fs::dir_create(fs::path("db", "conv", "merged_corrected", "metadata"), recurse = TRUE)
+}
+
+query_checkpoint_meta("full", "merged_corrected", conns$data) |>
+  collect() |>
+  rowwise() |>
+  mutate(across(where(is.list), ~ paste0(., collapse = ";"))) |>
+  ungroup() |>
+  write_csv_arrow(fs::path("db", "conv", "merged_corrected", "metadata", "metadata.csv"), write_options = csv_write_options(quoting_style = "AllValid"))
+
+open_dataset(fs::path("db", "extra", "merge_specs")) |>
+  collect() |>
+  rename(from_dataset = dataset, from_sensor_key = sensor_key, dataset = set, sensor_key = gkey) |>
+  write_csv_arrow(fs::path("db", "conv", "merged_corrected", "metadata", "merge_specs.csv"), write_options = csv_write_options(quoting_style = "AllValid"))
 ```
 
 ```{r}
+merged_metadata <- query_checkpoint_meta(sets, "merged", conns$data) |>
+  collect() |>
+  as.data.frame()
 
+corrections <- load_corrections(fs::path("external", "correzioni"))
+
+corrections1 <- merged_metadata |>
+  select(dataset, sensor_key, from_datasets, from_sensor_keys, name, lon, lat, elevation) |>
+  rowwise() |>
+  mutate(across(where(is.list), ~ paste0(., collapse = ";"))) |>
+  ungroup() |>
+  left_join(corrections, by = c("dataset", "from_datasets", "from_sensor_keys"), relationship = "one-to-one") |>
+  prepare_corrections(merged_metadata)
+
+corrections_path <- fs::path("db", "conv", "merged_corrected", "metadata", "manual_corrections.csv")
+if (!fs::dir_exists(fs::path_dir(corrections_path))) fs::dir_create(fs::path_dir(corrections_path), recurse = TRUE)
+corrections1 |>
+  rowwise() |>
+  mutate(across(where(is.list), ~ paste0(., collapse = ";"))) |>
+  ungroup() |>
+  rename(original_lon = lon, original_lat = lat, original_elevation = elevation, manual_lon = lon_ok, manual_lat = lat_ok, manual_elevation = ele_ok, manual_name = name_ok, manual_user_code = user_code_ok) |>
+  readr::write_csv(fs::path("db", "conv", "merged_corrected", "metadata", "manual_corrections.csv"), na = "")
 ```
 
-
+```{r}
+```
