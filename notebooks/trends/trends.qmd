@@ -1,0 +1,60 @@
+---
+title: "Trends"
+format: html
+server: shiny
+---
+
+## Shiny Documents
+
+This Quarto document is made interactive using Shiny. Interactive documents allow readers to modify parameters and see the results immediately. Learn more about Shiny interactive documents at <https://quarto.org/docs/interactive/shiny/>.
+
+## Inputs and Outputs
+
+You can embed Shiny inputs and outputs in your document. Outputs are automatically updated whenever inputs change. This demonstrates how a standard R plot can be made interactive:
+
+```{r}
+sliderInput("bins", "Number of bins:",
+  min = 1, max = 50, value = 30
+)
+plotOutput("distPlot")
+```
+
+```{r}
+Sys.setlocale("LC_ALL", "UTF-8")
+source("notebooks/trends/pettitt.R")
+library(dplyr, warn.conflicts = FALSE)
+library(arrow, warn.conflicts = FALSE)
+library(lubridate, warn.conflicts = FALSE)
+
+airole_data <- open_dataset(fs::path("db", "data", "merged_corrected")) |>
+  filter(dataset == "LIG", sensor_key == 1L)
+airole_tmax <- airole_data |>
+  filter(variable == 1L) |>
+  collect() |>
+  arrange(date) |>
+  group_by(year = year(date), month = month(date)) |>
+  summarise(date = mean(date), value = mean(value), .groups = "drop")
+  
+airole_tmin <- airole_data |>
+  filter(variable == -1L) |>
+  collect() |>
+  arrange(date) |>
+  mutate(P_k = pettitt_ranks(value))
+
+Pt_test <- pettit_test(airole_tmax$value)
+
+
+```
+
+```{r}
+#| context: server
+output$distPlot <- renderPlot({
+  x <- faithful[, 2] # Old Faithful Geyser data
+  bins <- seq(min(x), max(x), length.out = input$bins + 1)
+  hist(x,
+    breaks = bins, col = "darkgray", border = "white",
+    xlab = "Waiting time to next eruption (in mins)",
+    main = "Histogram of waiting times"
+  )
+})
+```
