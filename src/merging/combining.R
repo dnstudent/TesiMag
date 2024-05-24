@@ -109,8 +109,8 @@ rank_data <- function(series_groups, metadata) {
 }
 
 sin_coeffs <- function(sample, t) {
-  coeffs <- lm(sample ~ sin(t / 2) + sin(t) + sin(2 * t))$coefficients |> as.list()
-  names(coeffs) <- c("k0", "k1", "k2", "k3")
+  coeffs <- lm(sample ~ sin(t) + sin(2 * t) + cos(t) + cos(2 * t))$coefficients |> as.list()
+  names(coeffs) <- c("k0", "a1", "a2", "b1", "b2")
   coeffs
 }
 
@@ -128,11 +128,11 @@ maybe_load <- function(path, as_data_frame = TRUE) {
 
 load_data.group <- function(data_root, series_specs) {
   series_tags <- series_specs |>
-    mutate(col_names = str_c(dataset, sensor_key, sep = "/")) |>
+    mutate(col_names = str_c(from_dataset, from_sensor_key, sep = "/")) |>
     pull(col_names)
   data <- series_specs |>
     rowwise() |>
-    reframe(data = maybe_load(file.path(data_root, str_glue("dataset={dataset}"), str_glue("sensor_key={sensor_key}"), str_glue("variable={variable}"), "part-0.parquet")) |> mutate(dataset = dataset, sensor_key = sensor_key)) |> # read_parquet(file.path(data_root, str_glue("dataset={dataset}"), str_glue("sensor_key={sensor_key}"), str_glue("variable={variable}"), "part-0.parquet")) |> mutate(dataset = dataset, sensor_key = sensor_key)) |>
+    reframe(data = maybe_load(file.path(data_root, str_glue("dataset={from_dataset}"), str_glue("sensor_key={from_sensor_key}"), str_glue("variable={variable}"), "part-0.parquet")) |> mutate(dataset = from_dataset, sensor_key = from_sensor_key)) |> # read_parquet(file.path(data_root, str_glue("dataset={dataset}"), str_glue("sensor_key={sensor_key}"), str_glue("variable={variable}"), "part-0.parquet")) |> mutate(dataset = dataset, sensor_key = sensor_key)) |>
     unnest(everything()) |>
     pivot_wider(id_cols = date, names_from = c(dataset, sensor_key), names_sep = "/", values_from = value) |>
     relocate(all_of(series_tags), date)
@@ -142,11 +142,13 @@ load_data.group <- function(data_root, series_specs) {
 load_data.group.1 <- function(data_root, series_specs) {
   series_tags <- series_specs |>
     arrange(data_rank) |>
-    mutate(col_names = str_c(dataset, sensor_key, sep = "/")) |>
+    mutate(col_names = str_c(from_dataset, from_sensor_key, sep = "/")) |>
     pull(col_names)
   data <- series_specs |>
     rowwise() |>
-    reframe(data = maybe_load(file.path(data_root, str_glue("dataset={dataset}"), str_glue("sensor_key={sensor_key}"), str_glue("variable={variable}"), "part-0.parquet")) |> mutate(dataset = dataset, sensor_key = sensor_key, date = date + days(offset))) |> # read_parquet(file.path(data_root, str_glue("dataset={dataset}"), str_glue("sensor_key={sensor_key}"), str_glue("variable={variable}"), "part-0.parquet")) |> mutate(dataset = dataset, sensor_key = sensor_key)) |>
+    reframe(data = maybe_load(fs::path(data_root, str_glue("dataset={from_dataset}"), str_glue("sensor_key={from_sensor_key}"), str_glue("variable={variable}"), "part-0.parquet")) |>
+              mutate(dataset = from_dataset, sensor_key = from_sensor_key, date = date + days(offset))
+    ) |> 
     unnest(everything()) |>
     pivot_wider(id_cols = date, names_from = c(dataset, sensor_key), names_sep = "/", values_from = value) |>
     relocate(all_of(series_tags), date)
@@ -201,7 +203,7 @@ merge_columns <- function(table, integrator, correction_threshold, contribution_
     filter(abs(correction_sample) < 5, !is.na(correction_sample))
 
   if (skip_correction) {
-    correction_coeffs <- list(k0 = 0, k1 = 0, k2 = 0, k3 = 0)
+    correction_coeffs <- list(k0 = 0, a1 = 0, a2 = 0, b1 = 0, b2 = 0)
     mean_correction <- 0
   } else {
     available_months <- DELT |>
@@ -213,12 +215,12 @@ merge_columns <- function(table, integrator, correction_threshold, contribution_
       # t is computed here to avoid problems when joining with a shifted integrator
       ts <- annual_index(DELT$date)
       correction_coeffs <- sin_coeffs(DELT$correction_sample, ts) # DELT$t)
-      mean_correction <- abs(correction_coeffs$k0 + 2 * correction_coeffs$k1 / pi)
+      mean_correction <- abs(correction_coeffs$k0 + 2 * correction_coeffs$a1 / pi)
     } else if (available_months > 2L) {
-      correction_coeffs <- list(k0 = mean(DELT$correction_sample, na.rm = TRUE), k1 = 0, k2 = 0, k3 = 0)
+      correction_coeffs <- list(k0 = mean(DELT$correction_sample, na.rm = TRUE), a1 = 0, a2 = 0, b1 = 0, b2 = 0)
       mean_correction <- abs(correction_coeffs$k0)
     } else {
-      correction_coeffs <- list(k0 = 0, k1 = 0, k2 = 0, k3 = 0)
+      correction_coeffs <- list(k0 = 0, a1 = 0, a2 = 0, b1 = 0, b2 = 0)
       mean_correction <- 0
     }
   }
@@ -232,9 +234,23 @@ merge_columns <- function(table, integrator, correction_threshold, contribution_
     table <- table |>
       mutate(
         t = annual_index(date),
-        master = coalesce(master, {{ integrator }} + correction_coeffs$k0 + sin(t / 2) * correction_coeffs$k1 + sin(t) * correction_coeffs$k2 + sin(2 * t) * correction_coeffs$k3),
-        from = coalesce(from, if_else(is.na({{ integrator }}), NA_character_, integrator |> ensym() |> as.character()))
+        correction = correction_coeffs$k0 + correction_coeffs$a1 * sin(t) + correction_coeffs$a2 * sin(2 * t) + correction_coeffs$b1 * cos(t) + correction_coeffs$b2 * cos(2 * t),
       )
+
+    # Evito di correggere le serie che si scostano di poco
+    if (mean_correction <= 0.1 && table |>
+      filter(abs(correction) > 0.2) |>
+      nrow() == 0L) {
+      table <- table |> mutate(correction = 0)
+      correction_coeffs <- list(k0 = 0, a1 = 0, a2 = 0, b1 = 0, b2 = 0)
+      mean_correction <- 0
+    }
+    table <- table |>
+      mutate(
+        master = coalesce(master, {{ integrator }} + correction),
+        from = coalesce(from, if_else(is.na({{ integrator }}), NA_character_, integrator |> ensym() |> as.character()))
+      ) |>
+      select(-correction)
     merged <- TRUE
   }
 
@@ -246,17 +262,17 @@ dynamic_merge.group <- function(data_root, group_rankings, correction_threshold,
     arrange(data_rank) |>
     mutate(skip_correction = skip_correction | data_rank == min(data_rank), force_merge = data_rank == min(data_rank))
 
-  set <- series_specs |>
-    pull(set) |>
+  dataset <- series_specs |>
+    pull(dataset) |>
     first()
-  gkey <- series_specs |>
-    pull(gkey) |>
+  sensor_key <- series_specs |>
+    pull(sensor_key) |>
     first()
   variable <- series_specs |>
     pull(variable) |>
     first()
 
-  c(data, series) %<-% load_data.group(data_root, series_specs |> mutate(variable = variable))
+  c(data, series) %<-% load_data.group(data_root, series_specs)
   table <- data |>
     mutate(from = NA_character_, master = NA_real_)
 
@@ -281,14 +297,14 @@ dynamic_merge.group <- function(data_root, group_rankings, correction_threshold,
     # Due to the way the merge is done (time offsets), there may be some missing values in the master column
     filter(!is.na(value), !is.na(from)) |>
     separate_wider_delim(from, delim = "/", names = c("from_dataset", "from_sensor_key"), names_repair = "minimal", cols_remove = TRUE) |>
-    mutate(from_sensor_key = as.integer(from_sensor_key), set = set, gkey = gkey, variable = variable)
+    mutate(from_sensor_key = as.integer(from_sensor_key))
 
   list(table = table, meta = meta)
 }
 
 dynamic_merge.full <- function(path_from, path_to, ranked_series_groups, correction_threshold, contribution_threshold, n_workers = future::availableCores() - 1L) {
   sets <- ranked_series_groups |>
-    pull(set) |>
+    pull(dataset) |>
     unique()
   for (set in sets) {
     dp <- fs::path(path_to, "data", str_glue("set={set}"))
@@ -300,19 +316,19 @@ dynamic_merge.full <- function(path_from, path_to, ranked_series_groups, correct
   future::plan(future::multisession, workers = n_workers)
 
   ranked_series_groups |>
-    group_split(set, gkey, variable) |>
+    group_split(dataset, sensor_key, variable) |>
     furrr::future_walk(
       ~ {
-        set <- .x$set |> first()
-        gkey <- .x$gkey |> first()
+        dataset <- .x$dataset |> first()
+        sensor_key <- .x$sensor_key |> first()
         variable <- .x$variable |> first()
         c(table, meta) %<-% dynamic_merge.group(path_from, .x, correction_threshold, contribution_threshold)
-        data_path <- file.path(path_to, "data", str_glue("set={set}"), str_glue("gkey={gkey}"), str_glue("variable={variable}"))
+        data_path <- file.path(path_to, "data", str_glue("dataset={dataset}"), str_glue("sensor_key={sensor_key}"), str_glue("variable={variable}"))
         if (!dir.exists(data_path)) {
           dir.create(data_path, recursive = TRUE)
         }
         write_parquet(table |> arrange(date), file.path(data_path, "part-0.parquet"))
-        meta_path <- file.path(path_to, "meta", str_glue("set={set}"), str_glue("gkey={gkey}"), str_glue("variable={variable}"))
+        meta_path <- file.path(path_to, "meta", str_glue("dataset={dataset}"), str_glue("sensor_key={sensor_key}"), str_glue("variable={variable}"))
         if (!dir.exists(meta_path)) {
           dir.create(meta_path, recursive = TRUE)
         }

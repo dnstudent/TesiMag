@@ -65,17 +65,29 @@ plot_diffs <- function(matches, data, ...) {
         facet_grid(key_x + key_y ~ ., scales = "free")
 }
 
-plot_correction <- function(corrections, metadata, data, ...) {
-    if (!("offset_days" %in% colnames(corrections))) {
-        corrections <- corrections |>
-            mutate(offset_days = 0L)
-    }
-    corrections <- corrections |>
-        select(key_x, key_y, variable, k0, k1, k2, k3, offset_days)
+plot_correction <- function(correction_specs, metadata, data, ...) {
+    # correction_specs <- correction_specs |>
+    #     select(key_x, key_y, variable, k0, k1, k2, k3, k4, k5, k6, offset_days)
+    correction_specs <- correction_specs |>
+        arrange(data_rank)
 
-    diffs <- pair_common_series(data, corrections, by = c("key_x", "key_y", "variable")) |>
+    dataset <- series_specs |>
+        pull(dataset) |>
+        first()
+    sensor_key <- series_specs |>
+        pull(sensor_key) |>
+        first()
+    variable <- series_specs |>
+        pull(variable) |>
+        first()
+
+    c(data, series) %<-% load_data.group.1(data_root, series_specs)
+    stop("not implemented")
+
+
+    diffs <- pair_common_series(data, correction_specs, by = c("key_x", "key_y", "variable")) |>
         collect() |>
-        left_join(corrections |> select(-offset_days), by = c("key_x", "key_y", "variable")) |>
+        left_join(correction_specs |> select(-offset_days), by = c("key_x", "key_y", "variable")) |>
         left_join(metadata |> select(key, dataset, name), by = c("key_x" = "key")) |>
         left_join(metadata |> select(key, dataset, name), by = c("key_y" = "key"), suffix = c("_x", "_y")) |>
         mutate(
@@ -99,7 +111,7 @@ plot_correction <- function(corrections, metadata, data, ...) {
 
     ggplot() +
         geom_point(data = monthly, aes(x = date, y = delT, color = variable, shape = valid, ...), na.rm = TRUE) +
-        geom_line(data = diffs, aes(x = date, y = correction, color = variable, ...), na.rm = TRUE) +
+        geom_line(data = diffs, aes(x = date, y = correction_specs, color = variable, ...), na.rm = TRUE) +
         scale_color_manual(values = coolwarm(2L)) +
         facet_grid(match_id ~ ., scales = "free")
 }

@@ -244,7 +244,8 @@ merge_same_series <- function(path_from, path_to, set_name, tagged_analysis, met
         mutate(set = set_name) |>
         rank_metadata(metadata, dataset_rankings, ...) |>
         rank_data(metadata) |>
-        left_join(metadata |> select(dataset, sensor_key, key), by = "key")
+        left_join(metadata |> select(dataset, sensor_key, key), by = "key") |>
+        rename(from_dataset = dataset, from_sensor_key = sensor_key, dataset = set, sensor_key = gkey)
     # cross_join(tibble(variable = c(-1L, 1L))) #  Non è il massimo gestire così, ma per ora va bene. Necessario per gestire le situazioni in cui alcune serie non hanno una delle variabili
     dynamic_merge.full(path_from, path_to, ranked_series_groups, correction_threshold, contribution_threshold)
     path_to
@@ -252,10 +253,10 @@ merge_same_series <- function(path_from, path_to, set_name, tagged_analysis, met
 
 merged_checkpoint <- function(set_name, merge_results_path, metadata) {
     # Saving the merging specs: correction coefficients, merged status, series groups
-    merging_specs <- open_dataset(fs::path(merge_results_path, "meta", str_glue("set={set_name}")), format = "parquet") |>
+    merging_specs <- open_dataset(fs::path(merge_results_path, "meta", str_glue("dataset={set_name}")), format = "parquet") |>
         select(-key) |>
         collect() |>
-        relocate(set, gkey, .before = 1L)
+        relocate(dataset, sensor_key, .before = 1L)
 
     specs_path <- fs::path(archive_path(set_name, "extra", "merge_specs"), ext = "parquet")
     if (!fs::dir_exists(fs::path_dir(specs_path))) {
@@ -264,8 +265,11 @@ merged_checkpoint <- function(set_name, merge_results_path, metadata) {
     merging_specs |>
         write_parquet(specs_path)
 
-    data <- open_dataset(fs::path(merge_results_path, "data", str_glue("set={set_name}")), format = "parquet") |>
-        rename(dataset = set, sensor_key = gkey)
+    data <- open_dataset(
+        fs::path(merge_results_path, "data", str_glue("dataset={set_name}")),
+        format = "parquet",
+        partitioning = hive_partition(sensor_key = int32(), variable = int32())
+    ) |> mutate(dataset = set_name)
 
     datestats90 <- data |>
         filter(year(date) >= 1990L, !is.na(value)) |>
@@ -283,22 +287,23 @@ merged_checkpoint <- function(set_name, merge_results_path, metadata) {
         collect()
 
     metadata <- metadata |>
+        rename(from_dataset = dataset, from_sensor_key = sensor_key) |>
         select(-any_of("key")) |>
-        inner_join(merging_specs |> select(dataset, sensor_key, set, gkey, metadata_rank, data_rank) |> distinct(), by = c("dataset", "sensor_key"), relationship = "one-to-one") |>
+        inner_join(merging_specs |> select(from_dataset, from_sensor_key, dataset, sensor_key, metadata_rank, data_rank) |> distinct(), by = c("from_dataset", "from_sensor_key"), relationship = "one-to-one") |>
         # filter(merged) |>
-        group_by(set, gkey) |>
+        group_by(dataset, sensor_key) |>
         arrange(metadata_rank, .by_group = TRUE) |>
         summarise(
-            across(!c(ends_with("_first"), ends_with("_last"), dataset, sensor_key, data_rank), ~ first(.)),
-            from_sensor_keys = list(sensor_key),
-            from_datasets = list(dataset),
+            across(!c(ends_with("_first"), ends_with("_last"), from_dataset, from_sensor_key, data_rank), ~ first(.)),
+            from_sensor_keys = list(from_sensor_key),
+            from_datasets = list(from_dataset),
             data_ranks = list(data_rank),
             series_first = min(series_first, na.rm = TRUE),
             series_last = max(series_last, na.rm = TRUE),
             .groups = "drop"
         ) |>
         select(
-            dataset = set, sensor_key = gkey, name, user_code, network, state, province_code, town, lon, lat, elevation, elevation_glo30, kind, series_first, series_last,
+            dataset, sensor_key, name, user_code, network, state, province_code, town, lon, lat, elevation, elevation_glo30, kind, series_first, series_last,
             from_datasets, from_sensor_keys, data_ranks
         ) |>
         left_join(datestats, by = c("dataset", "sensor_key"), relationship = "one-to-one") |>
