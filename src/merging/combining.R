@@ -147,8 +147,7 @@ load_data.group.1 <- function(data_root, series_specs) {
   data <- series_specs |>
     rowwise() |>
     reframe(data = maybe_load(fs::path(data_root, str_glue("dataset={from_dataset}"), str_glue("sensor_key={from_sensor_key}"), str_glue("variable={variable}"), "part-0.parquet")) |>
-              mutate(dataset = from_dataset, sensor_key = from_sensor_key, date = date + days(offset))
-    ) |> 
+      mutate(dataset = from_dataset, sensor_key = from_sensor_key, date = date + days(offset))) |>
     unnest(everything()) |>
     pivot_wider(id_cols = date, names_from = c(dataset, sensor_key), names_sep = "/", values_from = value) |>
     relocate(all_of(series_tags), date)
@@ -215,7 +214,7 @@ merge_columns <- function(table, integrator, correction_threshold, contribution_
       # t is computed here to avoid problems when joining with a shifted integrator
       ts <- annual_index(DELT$date)
       correction_coeffs <- sin_coeffs(DELT$correction_sample, ts) # DELT$t)
-      mean_correction <- abs(correction_coeffs$k0 + 2 * correction_coeffs$a1 / pi)
+      mean_correction <- abs(correction_coeffs$k0)
     } else if (available_months > 2L) {
       correction_coeffs <- list(k0 = mean(DELT$correction_sample, na.rm = TRUE), a1 = 0, a2 = 0, b1 = 0, b2 = 0)
       mean_correction <- abs(correction_coeffs$k0)
@@ -238,9 +237,9 @@ merge_columns <- function(table, integrator, correction_threshold, contribution_
       )
 
     # Evito di correggere le serie che si scostano di poco
-    if (mean_correction <= 0.1 && table |>
+    if ((mean_correction <= 0.1) && (table |>
       filter(abs(correction) > 0.2) |>
-      nrow() == 0L) {
+      nrow() == 0L)) {
       table <- table |> mutate(correction = 0)
       correction_coeffs <- list(k0 = 0, a1 = 0, a2 = 0, b1 = 0, b2 = 0)
       mean_correction <- 0
@@ -302,15 +301,19 @@ dynamic_merge.group <- function(data_root, group_rankings, correction_threshold,
   list(table = table, meta = meta)
 }
 
+dynamic_merge.both_var <- function(data_root, group_rankings, correction_threshold, contribution_threshold) {
+
+}
+
 dynamic_merge.full <- function(path_from, path_to, ranked_series_groups, correction_threshold, contribution_threshold, n_workers = future::availableCores() - 1L) {
   sets <- ranked_series_groups |>
     pull(dataset) |>
     unique()
   for (set in sets) {
-    dp <- fs::path(path_to, "data", str_glue("set={set}"))
+    dp <- fs::path(path_to, "data", str_glue("dataset={set}"))
     if (dir.exists(dp)) {
       unlink(dp, recursive = TRUE)
-      unlink(fs::path(path_to, "meta", str_glue("set={set}")), recursive = TRUE)
+      unlink(fs::path(path_to, "meta", str_glue("dataset={set}")), recursive = TRUE)
     }
   }
   future::plan(future::multisession, workers = n_workers)
