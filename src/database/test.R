@@ -2,9 +2,9 @@ library(dplyr, warn.conflicts = FALSE)
 library(assertr, warn.conflicts = FALSE)
 library(arrow, warn.conflicts = FALSE)
 
-assert_data_uniqueness <- function(checkpoint) {
+assert_data_uniqueness <- function(checkpoint, keys) {
     if (checkpoint$data |>
-        group_by(station_id, variable, date) |>
+        group_by(across(all_of(keys)), variable, date) |>
         tally() |>
         filter(n > 1L) |>
         compute() |>
@@ -14,14 +14,24 @@ assert_data_uniqueness <- function(checkpoint) {
     checkpoint
 }
 
-assert_metadata_uniqueness <- function(checkpoint) {
+assert_metadata_uniqueness <- function(checkpoint, keys) {
     if (checkpoint$meta |>
-        group_by(original_dataset, original_id) |>
+        group_by(across(all_of(keys))) |>
         tally() |>
         filter(n > 1L) |>
         compute() |>
         nrow() > 0L) {
         stop("Metadata entries are not unique")
+    }
+    checkpoint
+}
+
+warn_more_entries <- function(checkpoint, keys) {
+    if (checkpoint$data |> select(all_of(keys)) |> anti_join(checkpoint$meta |> select(all_of(keys)), by = keys) |> compute() |> nrow() > 0L) {
+        warn("More entries in data than in metadata")
+    }
+    if (checkpoint$meta |> select(all_of(keys)) |> anti_join(checkpoint$data |> select(all_of(keys)), by = keys) |> compute() |> nrow() > 0L) {
+        warn("More entries in metadata than in data")
     }
     checkpoint
 }

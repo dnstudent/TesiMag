@@ -20,6 +20,10 @@ save_checkpoint <- function(checkpoint, dataset, step, check_schema = TRUE, part
     # checkpoint |>
     #     assert_data_uniqueness() |>
     #     assert_metadata_uniqueness()
+    checkpoint |>
+        assert_data_uniqueness(c("dataset", key)) |>
+        assert_metadata_uniqueness(c("dataset", key)) |>
+        warn_more_entries(c("dataset", key))
     write_data(checkpoint$data, dataset, step, check_schema, partitioning, key)
     write_metadata(checkpoint$meta, dataset, step, check_schema)
 }
