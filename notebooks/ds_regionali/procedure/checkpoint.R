@@ -16,11 +16,10 @@ as_checkpoint <- function(meta, data, check_schema = TRUE) {
     }
 }
 
-save_checkpoint <- function(checkpoint, dataset, step, check_schema = TRUE, partitioning = "variable") {
-    checkpoint$data <- arrange(checkpoint$data, sensor_key, variable, date)
+save_checkpoint <- function(checkpoint, dataset, step, check_schema = TRUE, partitioning = "variable", key = "sensor_key") {
     # checkpoint |>
     #     assert_data_uniqueness() |>
     #     assert_metadata_uniqueness()
-    write_data(checkpoint$data, dataset, step, check_schema, partitioning)
+    write_data(checkpoint$data, dataset, step, check_schema, partitioning, key)
     write_metadata(checkpoint$meta, dataset, step, check_schema)
 }

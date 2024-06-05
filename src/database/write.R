@@ -10,7 +10,7 @@ library(DBI, warn.conflicts = FALSE)
 source("src/database/data_model.R")
 source("src/database/tools.R")
 
-write_data <- function(data_table, dataset, step, check_schema = TRUE, partitioning = "variable") {
+write_data <- function(data_table, dataset, step, check_schema = TRUE, partitioning = "variable", key = "sensor_key") {
   table_path <- archive_path(dataset, "data", step)
   if (!dir.exists(dirname(table_path))) {
     dir.create(dirname(table_path), recursive = TRUE)
@@ -20,24 +20,8 @@ write_data <- function(data_table, dataset, step, check_schema = TRUE, partition
       as_arrow_table2(schema = data_schema)
   }
   data_table |>
-    arrange(sensor_key, variable, date) |>
+    arrange(!!sym(key), variable, date) |>
     write_dataset(table_path, partitioning = partitioning)
-}
-
-write_fragment_dataset <- function(from_path, to_path, hive_types, to_partitioning, dataconn) {
-  if (!dir.exists(dirname(to_path))) {
-    dir.create(dirname(to_path), recursive = TRUE)
-  }
-  DBI::dbExecute(
-    dataconn,
-    "
-                   CREATE VIEW ds AS (
-                     SELECT
-                       *
-                     FROM read_parquet(?, hive_partitioning = true, hive_types = ?)
-                   )
-    ", fs::path(from_path, "**", "*.parquet"), hive_types
-  )
 }
 
 write_metadata <- function(metadata_table, dataset, step, check_schema = TRUE) {
@@ -61,19 +45,6 @@ write_extra_metadata <- function(extra_table, dataset_name, conn) {
   write_parquet(extra_table, path)
 }
 
-write_correction_coefficients <- function(correction_table, dataset, metadata) {
-  metadata <- metadata |> select(key, sensor_key, dataset)
-  correction_table <- correction_table |>
-    left_join(metadata, by = c("key_x" = "key")) |>
-    left_join(metadata, by = c("key_y" = "key"), suffix = c("_x", "_y")) |>
-    select(!c(key_x, key_y)) |>
-    mutate(dataset = !!dataset)
-  path <- paste0(archive_path(dataset, "extra", "corrections"), ".parquet")
-  if (!dir.exists(dirname(path))) {
-    dir.create(dirname(path), recursive = TRUE)
-  }
-  write_parquet(correction_table, path)
-}
 
 write_series_groups <- function(series_groups, dataset, metadata) {
   metadata <- metadata |> select(key, sensor_key, dataset)
