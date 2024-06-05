@@ -22,7 +22,7 @@ ui <- page_navbar(
   ),
   nav_panel(
     "Impostazioni",
-    textInput("rootPath", "Cartella del dataset", width = "100%", value = fs::path_expand("./merged_corrected"))
+    textInput("rootPath", "Cartella del dataset", width = "100%", value = fs::path_expand("../../db/conv/merged_corrected"))
   )
   # nav_panel("Impostazioni", card(full_screen = TRUE, textInput("rootPath", "Dataset path", width = "100%", value = fs::path_expand("~/Local_Workspace/TesiMag/db/conv/merged_corrected")))),
 )

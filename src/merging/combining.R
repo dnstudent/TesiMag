@@ -9,6 +9,7 @@ library(stringr, warn.conflicts = FALSE)
 
 source("src/database/write.R")
 source("src/merging/pairing.R")
+source("src/merging/tools.R")
 
 annual_index <- function(date) {
   2 * pi * (yday(date) / yday(make_date(year(date), 12L, 31L)))
@@ -101,8 +102,8 @@ rank_data <- function(series_groups, metadata) {
     left_join(network_rank_table, by = c("dataset", "network")) |>
     group_by(set, gkey) |>
     arrange(network_rank, desc(sensor_last), .by_group = TRUE) |>
-    mutate(data_rank = row_number(), skip_correction = "ISAC" %in% network) |>
-    select(set, gkey, key, data_rank, skip_correction) |>
+    mutate(data_rank = row_number(), force_zero_correction = "ISAC" %in% network) |>
+    select(set, gkey, key, data_rank, force_zero_correction) |>
     ungroup()
   series_groups |>
     left_join(gkey_rank, by = c("set", "gkey", "key"))
@@ -126,13 +127,26 @@ maybe_load <- function(path, as_data_frame = TRUE) {
   }
 }
 
+load_series_data <- function(data_root, series_specs) {
+  series_tags <- series_specs |>
+    mutate(col_names = str_c(from_dataset, from_sensor_key, sep = "/")) |>
+    pull(col_names)
+
+  series_specs |>
+    rowwise() |>
+    reframe(data = maybe_load(fs::path(data_root, str_glue("dataset={from_dataset}"), str_glue("sensor_key={from_sensor_key}"), str_glue("variable={variable}"), "part-0.parquet"))) |>
+    unnest(everything()) |>
+    pivot_wider(id_cols = c(date, variable), names_from = c(dataset, sensor_key), names_sep = "/", values_from = value) |>
+    relocate(all_of(series_tags), date, variable)
+}
+
 load_data.group <- function(data_root, series_specs) {
   series_tags <- series_specs |>
     mutate(col_names = str_c(from_dataset, from_sensor_key, sep = "/")) |>
     pull(col_names)
   data <- series_specs |>
     rowwise() |>
-    reframe(data = maybe_load(file.path(data_root, str_glue("dataset={from_dataset}"), str_glue("sensor_key={from_sensor_key}"), str_glue("variable={variable}"), "part-0.parquet")) |> mutate(dataset = from_dataset, sensor_key = from_sensor_key)) |> # read_parquet(file.path(data_root, str_glue("dataset={dataset}"), str_glue("sensor_key={sensor_key}"), str_glue("variable={variable}"), "part-0.parquet")) |> mutate(dataset = dataset, sensor_key = sensor_key)) |>
+    reframe(data = maybe_load(file.path(data_root, str_glue("dataset={from_dataset}"), str_glue("sensor_key={from_sensor_key}"), str_glue("variable={variable}"), "part-0.parquet")) |> mutate(dataset = from_dataset, sensor_key = from_sensor_key)) |>
     unnest(everything()) |>
     pivot_wider(id_cols = date, names_from = c(dataset, sensor_key), names_sep = "/", values_from = value) |>
     relocate(all_of(series_tags), date)
@@ -163,48 +177,72 @@ rank_f0 <- function(f0) {
   )
 }
 
-optimal_offset <- function(table, col1, col2) {
-  if (table |> mutate(common = !is.na({{ col1 }}) & !is.na({{ col2 }})) |> filter(common) |> nrow() < 365L) {
+optimal_offset <- function(table, col1, col2, epsilon) {
+  if (n_common_nnas(pull(table, {{ col1 }}), pull(table, {{ col2 }})) < 365L) {
     return(0L)
   }
 
-  master <- select(table, date, {{ col1 }}) |>
-    filter(!is.na({{ col1 }}))
-  integrator <- select(table, date, {{ col2 }}) |>
-    filter(!is.na({{ col2 }})) |>
+  fixed <- table |>
+    select(date, variable, value = {{ col1 }}) |>
+    filter(!is.na(value))
+
+  to_shift <- table |>
+    select(date, variable, value = {{ col2 }}) |>
+    filter(!is.na(value))
+
+  to_shift <- to_shift |>
     cross_join(tibble(offset = c(-1L, 0L, 1L))) |>
     mutate(date = date + days(offset))
 
-  master |>
-    inner_join(integrator, by = "date") |>
-    mutate(adiff = abs({{ col1 }} - {{ col2 }})) |>
+  fixed |>
+    inner_join(to_shift, by = c("date", "variable"), suffix = c("_fixed", "_shifting"), relationship = "one-to-many") |>
+    mutate(adiff = abs(value_fixed - value_shifting)) |>
     group_by(offset) |>
-    summarise(f0 = mean(as.numeric(adiff < 0.1), na.rm = TRUE), maeT = mean(adiff, na.rm = TRUE), .groups = "drop") |>
+    summarise(f0 = mean(as.numeric(adiff < epsilon), na.rm = TRUE), maeT = mean(adiff, na.rm = TRUE), .groups = "drop") |>
     mutate(rank_f0 = rank_f0(f0)) |>
     arrange(rank_f0, maeT) |>
     pull(offset) |>
     first()
 }
 
-merge_columns <- function(table, integrator, correction_threshold, contribution_threshold, skip_correction, force_merge) {
-  offset <- optimal_offset(table, master, {{ integrator }})
-
-  master_table <- table |>
-    select(date, !{{ integrator }})
-  integrator_table <- table |>
-    select(date, {{ integrator }}) |>
+#' Offset a column by a given number of days.
+offset_column_by <- function(table, column, offset, ids = c("variable")) {
+  to_shift <- table |>
+    select(date, all_of(ids), {{ column }}) |>
     mutate(date = date + days(offset))
-  table <- master_table |>
-    full_join(integrator_table, by = "date")
+  table |>
+    select(-{{ column }}) |>
+    full_join(to_shift, by = c("date", ids), relationship = "one-to-one")
+}
+
+insert_integrations <- function(table, integrator_column, correction_threshold, contribution_threshold, force_zero_correction, force_merge, epsilon) {
+  offset <- optimal_offset(table, master, {{ integrator_column }}, epsilon)
+
+  table <- table |>
+    offset_column_by({{ integrator_column }}, offset, ids = "variable")
+
+  merge_meta <- list(
+    merged = NULL,
+    few_data = FALSE,
+    no_data = FALSE,
+    minor_correction = FALSE,
+    offset = offset,
+    coeffs = NULL,
+    would_integrate = (is.na(table$master) & !is.na(pull(table, {{ integrator_column }}))) |>
+      as.integer() |>
+      sum(),
+    n_joint_days = n_common_nnas(table$master, pull(table, {{ integrator_column }})),
+    mean_correction = NULL,
+    failed_integrations_threshold = NULL,
+    failed_correction_threshold = NULL
+  )
+  merge_meta$failed_integrations_threshold <- merge_meta$would_integrate < contribution_threshold
 
   DELT <- table |>
-    mutate(correction_sample = master - {{ integrator }}, month = month(date)) |>
+    mutate(correction_sample = master - !!sym(integrator_column), month = month(date)) |>
     filter(abs(correction_sample) < 5, !is.na(correction_sample))
 
-  if (skip_correction) {
-    correction_coeffs <- list(k0 = 0, a1 = 0, a2 = 0, b1 = 0, b2 = 0)
-    mean_correction <- 0
-  } else {
+  if (!force_zero_correction) {
     available_months <- DELT |>
       count(month) |>
       filter(n >= 20L) |>
@@ -213,99 +251,129 @@ merge_columns <- function(table, integrator, correction_threshold, contribution_
     if (available_months >= 8L) {
       # t is computed here to avoid problems when joining with a shifted integrator
       ts <- annual_index(DELT$date)
-      correction_coeffs <- sin_coeffs(DELT$correction_sample, ts) # DELT$t)
-      mean_correction <- abs(correction_coeffs$k0)
+      merge_meta$coeffs <- sin_coeffs(DELT$correction_sample, ts) # DELT$t)
+      merge_meta$mean_correction <- merge_meta$coeffs$k0
     } else if (available_months > 2L) {
-      correction_coeffs <- list(k0 = mean(DELT$correction_sample, na.rm = TRUE), a1 = 0, a2 = 0, b1 = 0, b2 = 0)
-      mean_correction <- abs(correction_coeffs$k0)
+      merge_meta$coeffs <- list(k0 = mean(DELT$correction_sample, na.rm = TRUE), a1 = 0, a2 = 0, b1 = 0, b2 = 0)
+      merge_meta$mean_correction <- merge_meta$coeffs$k0
+      merge_meta$few_data <- TRUE
     } else {
-      correction_coeffs <- list(k0 = 0, a1 = 0, a2 = 0, b1 = 0, b2 = 0)
-      mean_correction <- 0
+      merge_meta$coeffs <- list(k0 = 0, a1 = 0, a2 = 0, b1 = 0, b2 = 0)
+      merge_meta$mean_correction <- 0
+      merge_meta$no_data <- TRUE
     }
+  } else {
+    merge_meta$coeffs <- list(k0 = 0, a1 = 0, a2 = 0, b1 = 0, b2 = 0)
+    merge_meta$mean_correction <- 0
   }
 
-  if (!force_merge &&
-    ((table |> mutate(integrates = is.na(master) & !is.na({{ integrator }})) |> filter(integrates) |> nrow() < contribution_threshold) ||
-      (mean_correction >= correction_threshold))
-  ) {
-    merged <- FALSE
-  } else {
+  merge_meta$failed_correction_threshold <- abs(merge_meta$mean_correction) >= correction_threshold
+  merge_meta$merged <- force_merge || (!merge_meta$failed_integrations_threshold && !merge_meta$failed_correction_threshold)
+
+  if (merge_meta$merged) {
     table <- table |>
       mutate(
         t = annual_index(date),
-        correction = correction_coeffs$k0 + correction_coeffs$a1 * sin(t) + correction_coeffs$a2 * sin(2 * t) + correction_coeffs$b1 * cos(t) + correction_coeffs$b2 * cos(2 * t),
+        correction = merge_meta$coeffs$k0 + merge_meta$coeffs$a1 * sin(t) + merge_meta$coeffs$a2 * sin(2 * t) + merge_meta$coeffs$b1 * cos(t) + merge_meta$coeffs$b2 * cos(2 * t),
       )
 
     # Evito di correggere le serie che si scostano di poco
-    if ((mean_correction <= 0.1) && (table |>
-      filter(abs(correction) > 0.2) |>
-      nrow() == 0L)) {
+    if ((abs(merge_meta$mean_correction) <= 0.1) && all(abs(table$correction) <= 0.2, na.rm = TRUE)) {
       table <- table |> mutate(correction = 0)
-      correction_coeffs <- list(k0 = 0, a1 = 0, a2 = 0, b1 = 0, b2 = 0)
-      mean_correction <- 0
+      merge_meta$coeffs <- list(k0 = 0, a1 = 0, a2 = 0, b1 = 0, b2 = 0)
+      merge_meta$mean_correction <- 0
+      merge_meta$minor_correction <- TRUE
     }
     table <- table |>
       mutate(
-        master = coalesce(master, {{ integrator }} + correction),
-        from = coalesce(from, if_else(is.na({{ integrator }}), NA_character_, integrator |> ensym() |> as.character()))
+        master = coalesce(master, !!sym(integrator_column) + correction),
+        from = coalesce(from, if_else(is.na(master), NA_character_, integrator_column))
       ) |>
       select(-correction)
-    merged <- TRUE
   }
 
-  list(table = table, meta = c(correction_coeffs, merged = merged, offset = offset))
+  merge_meta$coeffs <- list(merge_meta$coeffs)
+  list(table = table, meta = as_tibble_row(merge_meta))
 }
 
-dynamic_merge.group <- function(data_root, group_rankings, correction_threshold, contribution_threshold) {
-  series_specs <- group_rankings |>
+merge_sensor <- function(table, integrator_column, correction_threshold, contribution_threshold, force_zero_correction, force_merge, epsilon) {
+  tmin_results <- table |>
+    filter(variable == -1L) |>
+    insert_integrations({{ integrator_column }}, correction_threshold, contribution_threshold, force_zero_correction, force_merge, epsilon)
+
+  tmax_results <- table |>
+    filter(variable == 1L) |>
+    insert_integrations({{ integrator_column }}, correction_threshold, contribution_threshold, force_zero_correction, force_merge, epsilon)
+
+  meta <- bind_rows(tmin_results$meta |> mutate(variable = -1L), tmax_results$meta |> mutate(variable = 1L)) |>
+    rename(would_merge = merged) |>
+    mutate(only_some_var_failed = !all(would_merge) & any(would_merge), merged = all(would_merge))
+
+  if (all(meta$merged)) {
+    table <- bind_rows(tmin_results$table, tmax_results$table)
+  }
+
+  list(data = table, meta = meta)
+}
+
+dynamic_merge.series <- function(data_root, dataset, series_key, specs, correction_threshold, contribution_threshold, epsilon) {
+  specs <- specs |>
+    group_by(variable) |>
+    mutate(force_zero_correction = force_zero_correction | (data_rank == min(data_rank)), force_merge = data_rank == min(data_rank)) |>
+    ungroup()
+
+  specs_list <- specs |>
+    tidyr::nest(variables = variable) |>
+    mutate(tag = str_c(from_dataset, from_sensor_key, sep = "/")) |>
     arrange(data_rank) |>
-    mutate(skip_correction = skip_correction | data_rank == min(data_rank), force_merge = data_rank == min(data_rank))
+    rowwise() |>
+    group_split()
 
-  dataset <- series_specs |>
-    pull(dataset) |>
-    first()
-  sensor_key <- series_specs |>
-    pull(sensor_key) |>
-    first()
-  variable <- series_specs |>
-    pull(variable) |>
-    first()
+  data <- load_series_data(data_root, specs)
 
-  c(data, series) %<-% load_data.group(data_root, series_specs)
-  table <- data |>
-    mutate(from = NA_character_, master = NA_real_)
-
-  skips <- series_specs |> pull(skip_correction)
-  force_merge <- series_specs |> pull(force_merge)
-  params <- series_specs |> select(skip_correction, force_merge)
-
-  merge_result <- purrr::reduce2(
-    series,
-    params |> purrr::transpose(),
-    \(merge_result, integrator, param) {
-      c(table, merge_meta) %<-% merge_result
-      merge_result <- merge_columns(table, !!sym(integrator), correction_threshold, contribution_threshold, param$skip_correction, param$force_merge)
-      list(table = merge_result$table, merge_meta = bind_rows(merge_meta, merge_result$meta |> as_tibble_row()))
+  series_merge_results <- purrr::reduce(
+    specs_list,
+    \(results, spec) {
+      sensor_merge_results <- merge_sensor(results$data, spec$tag, correction_threshold, contribution_threshold, spec$force_zero_correction, spec$force_merge, epsilon)
+      sensor_merge_results$meta <- sensor_merge_results$meta |> mutate(dataset = dataset, series_key = series_key, from_dataset = spec$from_dataset, from_sensor_key = spec$from_sensor_key)
+      list(
+        data = sensor_merge_results$data,
+        meta = bind_rows(results$meta, sensor_merge_results$meta)
+      )
     },
-    .init = list(table = table, meta = NULL)
+    .init = list(
+      data = data |>
+        mutate(master = NA_real_, from = NA_character_),
+      meta = tibble()
+    )
   )
 
-  meta <- bind_cols(series_specs, merge_result$merge_meta)
-  table <- merge_result$table |>
-    select(date, from, value = master) |>
-    # Due to the way the merge is done (time offsets), there may be some missing values in the master column
-    filter(!is.na(value), !is.na(from)) |>
-    separate_wider_delim(from, delim = "/", names = c("from_dataset", "from_sensor_key"), names_repair = "minimal", cols_remove = TRUE) |>
-    mutate(from_sensor_key = as.integer(from_sensor_key))
+  merge_result <- list(
+    data = series_merge_results$data |>
+      select(variable, date, value = master, from) |>
+      # Due to the way the merge is done (time offsets), there may be some missing values in the master column
+      filter(!is.na(value)) |>
+      separate_wider_delim(from, delim = "/", names = c("from_dataset", "from_sensor_key"), names_repair = "minimal", cols_remove = TRUE) |>
+      mutate(from_sensor_key = as.integer(from_sensor_key)),
+    meta = full_join(specs, series_merge_results$meta, by = c("from_dataset", "from_sensor_key", "variable"), relationship = "one-to-one") |> unnest_wider(coeffs)
+  )
 
-  list(table = table, meta = meta)
+  # consistency tests
+  merge_result$data |>
+    assert(not_na, date, variable, value, from_dataset, from_sensor_key, description = "Absence of missing entries in the merged table")
+
+  if (nrow(merge_result$data) < length(pull(data, specs_list[[1]]$tag[[1]]) |> na.omit())) {
+    stop("There are fewer data than at the beginning")
+  }
+
+  merge_result$meta |>
+    assert(not_na, everything(), description = "Absence of missing metadata in the merged table")
+
+  merge_result
 }
 
-dynamic_merge.both_var <- function(data_root, group_rankings, correction_threshold, contribution_threshold) {
 
-}
-
-dynamic_merge.full <- function(path_from, path_to, ranked_series_groups, correction_threshold, contribution_threshold, n_workers = future::availableCores() - 1L) {
+dynamic_merge <- function(path_from, path_to, ranked_series_groups, correction_threshold, contribution_threshold, f0_epsilon, n_workers = future::availableCores() - 1L) {
   sets <- ranked_series_groups |>
     pull(dataset) |>
     unique()
@@ -316,26 +384,31 @@ dynamic_merge.full <- function(path_from, path_to, ranked_series_groups, correct
       unlink(fs::path(path_to, "meta", str_glue("dataset={set}")), recursive = TRUE)
     }
   }
+
+  # Controllo che le serie abbiano tutte sia le minime che le massime
+  ranked_series_groups |>
+    count(dataset, series_key, from_dataset, from_sensor_key) |>
+    assert(in_set(2L, allow.na = FALSE), n, description = "Presence of both minimum and maximum series for each pair of series")
+
   future::plan(future::multisession, workers = n_workers)
 
   ranked_series_groups |>
-    group_split(dataset, sensor_key, variable) |>
+    tidyr::nest(.by = c(dataset, series_key)) |>
+    rowwise() |>
+    group_split() |>
     furrr::future_walk(
       ~ {
-        dataset <- .x$dataset |> first()
-        sensor_key <- .x$sensor_key |> first()
-        variable <- .x$variable |> first()
-        c(table, meta) %<-% dynamic_merge.group(path_from, .x, correction_threshold, contribution_threshold)
-        data_path <- file.path(path_to, "data", str_glue("dataset={dataset}"), str_glue("sensor_key={sensor_key}"), str_glue("variable={variable}"))
-        if (!dir.exists(data_path)) {
-          dir.create(data_path, recursive = TRUE)
-        }
-        write_parquet(table |> arrange(date), file.path(data_path, "part-0.parquet"))
-        meta_path <- file.path(path_to, "meta", str_glue("dataset={dataset}"), str_glue("sensor_key={sensor_key}"), str_glue("variable={variable}"))
-        if (!dir.exists(meta_path)) {
-          dir.create(meta_path, recursive = TRUE)
-        }
-        write_parquet(meta, file.path(meta_path, "part-0.parquet"))
+        dataset <- .x$dataset
+        series_key <- .x$series_key
+
+        c(table, meta) %<-% dynamic_merge.series(path_from, dataset, series_key, .x$data[[1]], correction_threshold, contribution_threshold, f0_epsilon)
+        data_path <- file.path(path_to, "data", str_glue("dataset={dataset}"), str_glue("series_key={series_key}"))
+        dir.create(data_path, recursive = TRUE)
+        write_dataset(table |> arrange(variable, date), data_path, partitioning = "variable")
+        # write_parquet(table |> arrange(date), file.path(data_path, "part-0.parquet"))
+        meta_path <- file.path(path_to, "meta", str_glue("dataset={dataset}"), str_glue("series_key={series_key}"))
+        dir.create(meta_path, recursive = TRUE)
+        write_dataset(meta, meta_path, partitioning = "variable")
       },
       .progress = FALSE
     )

@@ -37,3 +37,21 @@ contains_symmetric_duplicates <- function(table, col1, col2) {
         compute() |>
         nrow()) > 0L
 }
+
+
+group_reduce <- function(.x, .f, ..., .init) {
+    .x |>
+        group_split() |>
+        purrr::reduce(.f, ..., .init = .init)
+}
+
+join_and_concat <- function(.x, .y, by, join = left_join) {
+    list(
+        .x[[1]] |> join(.y[[1]], by = by),
+        bind_rows(.x[[2]], .y[[2]])
+    )
+}
+
+n_common_nnas <- function(x, y) {
+    sum(!is.na(x) & !is.na(y))
+}
