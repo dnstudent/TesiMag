@@ -25,7 +25,6 @@ load_corrections <- function(from_path) {
 prepare_corrections <- function(corrections, metadata) {
   corrections |>
     mutate(
-      sensor_key = as.integer(sensor_key),
       from_datasets = str_split(from_datasets, regex(";|\\*")),
       from_sensor_keys = str_split(from_sensor_keys, regex(";|\\*")) |> purrr::map(as.integer),
       manual_loc_correction = !is.na(lon_ok) | !is.na(lat_ok),
@@ -40,7 +39,7 @@ prepare_corrections <- function(corrections, metadata) {
     assert(within_bounds(3, 19), lon_ok) |>
     assert(within_bounds(41, 49), lat_ok) |>
     assert(within_bounds(-10, 4900), ele_ok) |>
-    select(-series_last, -sensor_key, -valid90)
+    select(-series_last, -valid90)
 }
 
 
@@ -48,7 +47,7 @@ integrate_corrections <- function(merged_metadata, raw_corrections, statconn) {
   corrections <- prepare_corrections(raw_corrections, merged_metadata)
   merged_metadata |>
     full_join(corrections, by = c("from_sensor_keys", "from_datasets", "dataset"), relationship = "one-to-one") |>
-    assert(not_na, c(dataset, sensor_key, network, from_sensor_keys, from_datasets)) |>
+    assert(not_na, c(dataset, network, from_sensor_keys, from_datasets)) |>
     mutate(
       lon = coalesce(lon_ok, lon),
       lat = coalesce(lat_ok, lat),
@@ -58,5 +57,7 @@ integrate_corrections <- function(merged_metadata, raw_corrections, statconn) {
       .keep = "unused"
     ) |>
     select(-elevation_glo30) |>
-    query_elevations(statconn)
+    rename(sensor_key = series_key) |> 
+    query_elevations(statconn) |>
+    rename(series_key = sensor_key)
 }

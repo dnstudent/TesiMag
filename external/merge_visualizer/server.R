@@ -7,27 +7,30 @@ library(stringr)
 source("R/read.R")
 source("R/utils.R")
 
-server <- function(input, output, session) {
-  merge_specs <- reactive({
-    read_merge_specs(input$rootPath)
-  })
-  
-  # metadata <- reactive({
-  #   read_metadata(input$rootPath)
-  # })
+root_path <- fs::path_expand("./merged_corrected")
+merge_specs <- read_merge_specs(root_path) |> relocate(merged)
+# metadata <- read_metadata(root_path)
+tconv <- tibble(variable = c(-1L, 1L), variable_name = factor(c("TMND", "TMXD")))
 
-  observeEvent(input$rootPath, {
-    updateSelectInput(inputId = "masterDSSelect", choices = unique(merge_specs()$dataset))
-    updateSelectInput(inputId = "masterSNSelect", choices = unique(merge_specs()$sensor_key))
+plot_diffs <- function(df) {
+  df |>
+    plot_ly(x = ~date, split = ~variable_name) |>
+    add_trace(y = ~diff, type = "scatter", mode = "markers", color = ~variable_name, colors = c("TMND" = "blue", "TMXD" = "red")) |>
+    add_trace(y = ~correction, type = "scatter", mode = "lines", color = I("gray")) |>
+    layout(yaxis = list(title = "Correction"), xaxis = list(title = "Date"))
+}
+
+server <- function(input, output, session) {
+  observeEvent(root_path, {
+    updateSelectInput(inputId = "masterDSSelect", choices = unique(merge_specs$dataset))
+    updateSelectInput(inputId = "masterSNSelect", choices = unique(merge_specs$series_key))
   })
 
   integ_series <- reactive({
     cat("Recomputing integ_series\n")
-    if (is.null(input$masterDSSelect) || is.null(input$masterSNSelect)) {
-      return(merge_specs())
-    }
-    merge_specs() |>
-      filter(dataset == input$masterDSSelect, sensor_key == input$masterSNSelect)
+    merge_specs |>
+      filter(dataset == input$masterDSSelect, series_key == input$masterSNSelect) |>
+      arrange(data_rank)
   })
 
   observeEvent(input$masterDSSelect, {
@@ -39,46 +42,51 @@ server <- function(input, output, session) {
 
   merge_data <- reactive({
     cat("Recomputing merge_data\n")
-    read_data_tables(input$rootPath, input$masterDSSelect, input$masterSNSelect)
+    req(input$masterDSSelect, input$masterSNSelect)
+    read_data_tables(root_path, input$masterDSSelect, input$masterSNSelect) |> left_join(tconv, by = "variable")
   })
 
-  output$distPlot <- renderPlot({
-    integrator_colname <- input$integratorSelect
-    iser <- integ_series() |> unite("colnames", from_dataset, from_sensor_key, sep = "/")
+  integ_data <- reactive({
+    cat("Recomputing integ_data\n")
+    req(input$masterDSSelect, input$masterSNSelect, input$integratorSelect)
 
-    correction_coeffs <- iser |>
-      filter(colnames == integrator_colname) |>
-      select(variable, k0, a1, b1, a2, b2, data_rank_integr = data_rank)
+    data_ranks <- integ_series() |> select(from_dataset, from_sensor_key, variable, data_rank)
+    integrator_infos <- integ_series() |>
+      unite(series_tag, from_dataset, from_sensor_key, sep = "/") |>
+      filter(series_tag == input$integratorSelect) |>
+      select(variable, k0, a1, b1, a2, b2, integrator_data_rank = data_rank)
 
-    data <- merge_data() |>
-      left_join(correction_coeffs, by = "variable", relationship = "many-to-many") |>
-      left_join(iser |> select(variable, data_rank), by = "variable", relationship = "many-to-many") |>
-      filter(data_rank <= data_rank_integr) |>
+    m <- merge_data() |>
+      left_join(data_ranks, by = c("from_dataset", "from_sensor_key", "variable"), relationship = "many-to-one") |>
+      left_join(integrator_infos, by = "variable", relationship = "many-to-one") |>
+      complete(date = seq.Date(min(date), max(date), by = "day")) |>
       mutate(
-        diff = master - !!sym(integrator_colname),
+        diff = if_else((data_rank == 1L) | (data_rank < integrator_data_rank), master - !!sym(input$integratorSelect), NA),
         t = annual_index(date),
         correction = k0 + a1 * sin(t) + b1 * cos(t) + a2 * sin(2 * t) + b2 * cos(2 * t)
       )
-    
-    date_range <- input$date_range
-    
-    bps <- brushedPoints(data, input$plot_brush, xvar = "date", yvar = "diff")
-    if (nrow(bps) > 0L) {
-      bps <- bps |> summarise(first_date = min(date, na.rm = TRUE), last_date = max(date, na.rm = TRUE), min_diff = min(diff, na.rm = TRUE), max_diff = max(diff, na.rm = TRUE))
-      data <- data |> filter(between(date, bps$first_date, bps$last_date), between(diff, bps$min_diff, bps$max_diff))
-    }
-      
-    ggplot(data) +
-      geom_point(aes(date, diff, color = factor(variable)), na.rm = TRUE) +
-      geom_line(aes(date, correction, color = factor(variable))) +
-      facet_grid(variable ~ ., scales = "free_y") +
-      scale_color_manual(values = c("1" = "red", "-1" = "blue"))
+
+    integrator_timespan <- m |>
+      filter(!is.na(diff)) |>
+      summarise(min_date = min(date, na.rm = TRUE), max_date = max(date, na.rm = TRUE))
+
+    m |> filter(between(date, integrator_timespan$min_date, integrator_timespan$max_date))
   })
 
-  # output$tableOut <- renderTable({
-  #   integrator_colname <- input$integratorSelect
-  #   master_colname <- integ_series() |> slice_min(data_rank) |> unite("colnames", from_dataset, from_sensor_key, sep = "/") |> pull(colnames) |> first()
-  #
-  #   merge_data() |> mutate(diff = !!sym(master_colname) - !!sym(integrator_colname)) |> slice_head(n = 5L)
-  # })
+  output$distPlot <- renderPlotly({
+    cat("Redrawing plot\n")
+    integ_data() |>
+      group_by(variable_name) |>
+      do(mafig = plot_diffs(.)) |>
+      subplot(nrows = 2L)
+  })
+
+  output$mergeTable <- renderTable(
+    {
+      integ_series()
+    },
+    striped = TRUE,
+    hover = TRUE,
+    bordered = TRUE
+  )
 }

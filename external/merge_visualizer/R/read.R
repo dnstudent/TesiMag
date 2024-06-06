@@ -8,16 +8,18 @@ read_merge_specs <- function(root_path) {
     vroom(
       col_types = cols(
         dataset = col_character(),
-        sensor_key = col_integer(),
+        series_key = col_integer(),
         from_dataset = col_character(),
         from_sensor_key = col_integer(),
         variable = col_integer(),
         metadata_rank = col_integer(),
         data_rank = col_integer(),
         offset = col_integer(),
-        skip_correction = col_logical(),
+        force_zero_correction = col_logical(),
         force_merge = col_logical(),
         merged = col_logical(),
+        would_integrate = col_integer(),
+        n_joint_days = col_integer(),
         .default = col_guess()
       )
     )
@@ -29,7 +31,7 @@ read_metadata <- function(root_path) {
     vroom(
       col_types = cols(
         dataset = col_character(),
-        sensor_key = col_integer(),
+        series_key = col_integer(),
         user_code = col_character(),
         from_dataset = col_character(),
         from_sensor_key = col_integer(),
@@ -47,8 +49,8 @@ read_metadata <- function(root_path) {
     )
 }
 
-read_data_tables <- function(root_path, dataset, sensor_key) {
-  paths <- fs::path(root_path, "data", str_c(c("TMND", "TMXD"), dataset, str_pad(sensor_key, 3L, side = "left", pad = "0"), sep = "_"), ext = "csv")
+read_data_tables <- function(root_path, dataset, series_key) {
+  paths <- fs::path(root_path, "data", str_c(c("TMND", "TMXD"), dataset, str_pad(series_key, 3L, side = "left", pad = "0"), sep = "_"), ext = "csv")
   cat("Reading ", paths, "\n")
   vroom(
     paths,
@@ -62,6 +64,6 @@ read_data_tables <- function(root_path, dataset, sensor_key) {
     id = "file"
   ) |>
     mutate(file = fs::path_file(file) |> fs::path_ext_remove()) |>
-    separate_wider_delim(file, "_", names = c("variable", "dataset", "sensor_key")) |>
+    separate_wider_delim(file, "_", names = c("variable", "dataset", "series_key")) |>
     mutate(variable = case_match(variable, "TMND" ~ -1L, "TMXD" ~ 1L))
 }
