@@ -35,12 +35,12 @@ ds4conv_dir <- fs::path("db", "tmp", "dataset_for_conv")
 if (fs::dir_exists(ds4conv_dir)) unlink(ds4conv_dir, recursive = TRUE)
 merged_ds$data |>
   collect() |>
-  group_split(dataset, sensor_key, variable) |>
+  group_split(dataset, series_key, variable) |>
   purrr::walk(~ {
     dataset <- .x$dataset |> first()
-    sensor_key <- .x$sensor_key |> first()
+    series_key <- .x$series_key |> first()
     variable <- .x$variable |> first()
-    path <- fs::path(ds4conv_dir, str_glue("dataset={dataset}"), str_glue("sensor_key={sensor_key}"), str_glue("variable={variable}"))
+    path <- fs::path(ds4conv_dir, str_glue("dataset={dataset}"), str_glue("series_key={series_key}"), str_glue("variable={variable}"))
     if (!fs::dir_exists(path)) fs::dir_create(path, recurse = TRUE)
     .x |> write_parquet(fs::path(path, "part-0.parquet"))
   }, .progress = TRUE)
@@ -57,16 +57,16 @@ unlink(fs::path(save_to_root, "data"), recursive = TRUE)
 merge_specs |>
   collect() |>
   left_join(variable_names, by = "variable", relationship = "many-to-one") |>
-  group_split(dataset, sensor_key, variable) |>
+  group_split(dataset, series_key, variable) |>
   purrr::walk(~ {
     dataset <- .x$dataset |> first()
-    sensor_key <- .x$sensor_key |> first()
+    series_key <- .x$series_key |> first()
     variable <- .x$variable |> first()
     variable_name <- .x$variable_name |> first()
-    master_path <- fs::path(ds4conv_dir, str_glue("dataset={dataset}"), str_glue("sensor_key={sensor_key}"), str_glue("variable={variable}"), "part-0.parquet")
+    master_path <- fs::path(ds4conv_dir, str_glue("dataset={dataset}"), str_glue("series_key={series_key}"), str_glue("variable={variable}"), "part-0.parquet")
     master_series <- read_parquet(master_path)
     c(integrators, cols) %<-% load_data.group.1(integrators_root, .x)
-    save_to_path <- fs::path(save_to_root, "data", str_glue("{variable_name}_{dataset}_{stringr::str_pad(sensor_key, 3L, side = 'left', pad = '0')}.csv"))
+    save_to_path <- fs::path(save_to_root, "data", str_glue("{variable_name}_{dataset}_{stringr::str_pad(series_key, 3L, side = 'left', pad = '0')}.csv"))
     if (!fs::dir_exists(fs::path_dir(save_to_path))) fs::dir_create(fs::path_dir(save_to_path), recurse = TRUE)
     full_join(master_series |> rename(master = value), integrators, by = "date") |>
       arrange(date) |>
@@ -106,7 +106,7 @@ merged_metadata <- query_checkpoint_meta(sets, "merged", conns$data) |>
 corrections <- load_corrections(fs::path("external", "correzioni"))
 
 corrections1 <- merged_metadata |>
-  select(dataset, sensor_key, from_datasets, from_sensor_keys, name, lon, lat, elevation) |>
+  select(dataset, series_key, from_datasets, from_sensor_keys, name, lon, lat, elevation) |>
   rowwise() |>
   mutate(across(where(is.list), ~ paste0(., collapse = ";"))) |>
   ungroup() |>

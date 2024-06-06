@@ -18,6 +18,7 @@ library(assertr, warn.conflicts = FALSE)
 source("src/database/startup.R")
 source("src/database/query/data.R")
 source("notebooks/corrections/manual_corrections.R")
+source("notebooks/ds_regionali/procedure/checkpoint.R")
 
 conns <- load_dbs()
 sets <- c("ER", "FVG", "LOM", "MAR", "TAA2", "TOS", "UMB", "VDA", "PIE", "LIG", "VEN")
@@ -31,21 +32,7 @@ merged_metadata <- query_checkpoint_meta(sets, "merged", conns$data) |>
   as.data.frame()
 
 corrections <- fs::path_abs("./external/correzioni") |>
-  fs::dir_ls(regex = regex("^[^\\~]+_edit.xlsx")) |>
-  purrr::map(
-    .f = \(path) read.xlsx(path) |>
-      select(sensor_key, dataset, from_sensor_keys, from_datasets, ends_with("_ok"), ends_with("_precision"), keep, note) |>
-      mutate(
-        across(
-          c(dataset, note), ~ as.character(.)
-        ),
-        across(
-          c(lon_ok, lat_ok, ele_ok, ends_with("_precision")), ~ as.numeric(.)
-        ),
-        sensor_key = as.integer(sensor_key)
-      )
-  ) |>
-  bind_rows()
+  load_corrections()
 
 to_integr_cols <- corrections |>
   colnames() |>
@@ -57,9 +44,31 @@ integrator_cols <- corrections |>
 to_integr_cols
 ```
 
+```{r}
+co <- prepare_corrections(corrections, merged_metadata)
+```
+
+```{r}
+s <- merged_metadata |>
+    full_join(co, by = c("from_sensor_keys", "from_datasets", "dataset"), relationship = "one-to-one") |>
+    filter(is.na(network)) |>
+    select(dataset, series_key, from_datasets, from_sensor_keys, name) |>
+    unnest_longer(c(from_datasets, from_sensor_keys))
+s
+```
+
+```{r}
+query_checkpoint_data(c("SCIA", "ISAC"), "qc1", conns$data, hive_types = list("valid" = "BOOLEAN", "variable" = "INT")) |>
+  semi_join(s, by = c("dataset" = "from_datasets", "sensor_key" = "from_sensor_keys"), copy = T) |>
+  distinct(dataset, sensor_key, variable) |>
+  collect()
+
+```
+
 Integrazione delle correzioni
 
 ```{r}
+source("notebooks/corrections/manual_corrections.R")
 corrected_metadata <- integrate_corrections(merged_metadata, corrections, conns$stations)
 ```
 
@@ -69,10 +78,11 @@ Salvataggio in formato checkpoint
 source("notebooks/ds_regionali/procedure/checkpoint.R")
 data <- query_checkpoint_data(sets, "merged", conns$data) |> to_arrow()
 chkpt <- as_checkpoint(corrected_metadata, data, check_schema = FALSE)
-save_checkpoint(chkpt, "full", "merged_corrected", check_schema = FALSE, partitioning = c("variable"))
+save_checkpoint(chkpt, "full", "merged_corrected", check_schema = FALSE, partitioning = c("variable"), key = "series_key")
 print("done")
 ```
 
 ```{r}
 query_checkpoint_data("full", "merged_corrected", conns$data)
 ```
+
