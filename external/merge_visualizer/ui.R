@@ -1,5 +1,6 @@
 library(bslib)
 library(shiny)
+library(plotly)
 
 ui <- page_sidebar(
   # card(card_header("Plot"), plotlyOutput("distPlot")),
@@ -7,8 +8,7 @@ ui <- page_sidebar(
   plotlyOutput("distPlot"),
   card(card_header("Specifiche merging"), tableOutput("mergeTable")),
   sidebar = sidebar(
-    selectInput("masterDSSelect", "Dataset", choices = NULL),
-    selectInput("masterSNSelect", "Sensor key", choices = NULL),
-    selectInput("integratorSelect", "Serie", choices = NULL)
+    selectizeInput("masterSelect", "Serie master", choices = NULL),
+    selectInput("integratorSelect", "Serie integrante", choices = NULL)
   )
 )

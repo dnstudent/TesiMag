@@ -3,12 +3,13 @@ library(plotly)
 library(vroom)
 library(dplyr)
 library(stringr)
+library(zeallot)
 
 source("R/read.R")
 source("R/utils.R")
 
 root_path <- fs::path_expand("./merged_corrected")
-merge_specs <- read_merge_specs(root_path) |> relocate(merged)
+merge_specs <- read_merge_specs(root_path) |> relocate(merged) |> unite(master_tag, dataset, series_key, sep = "/")
 # metadata <- read_metadata(root_path)
 tconv <- tibble(variable = c(-1L, 1L), variable_name = factor(c("TMND", "TMXD")))
 
@@ -20,35 +21,37 @@ plot_diffs <- function(df) {
     layout(yaxis = list(title = "Correction"), xaxis = list(title = "Date"))
 }
 
+master_specs <- function(master_tag) {
+  pieces <- str_split_fixed(master_tag, "/", 2L)
+  list(dataset = pieces[1L, 1L], series_key = pieces[1L, 2L])
+}
+
 server <- function(input, output, session) {
-  observeEvent(root_path, {
-    updateSelectInput(inputId = "masterDSSelect", choices = unique(merge_specs$dataset))
-    updateSelectInput(inputId = "masterSNSelect", choices = unique(merge_specs$series_key))
-  })
+  build_master_list <- observe({
+    cat("Building master list\n")
+    updateSelectizeInput(inputId = "masterSelect", choices = unique(merge_specs$master_tag), server = TRUE)
+  }, priority = 10L)
 
   integ_series <- reactive({
-    cat("Recomputing integ_series\n")
+    cat(str_glue("Recomputing integ_series with master '{input$masterSelect}'"), "\n")
     merge_specs |>
-      filter(dataset == input$masterDSSelect, series_key == input$masterSNSelect) |>
+      filter(master_tag == input$masterSelect) |>
       arrange(data_rank)
-  })
+  }) |> bindEvent(input$masterSelect, ignoreInit = TRUE, ignoreNULL = FALSE)
 
-  observeEvent(input$masterDSSelect, {
+  observe({
+    cat("Updating integratorSelect\n")
     updateSelectInput(inputId = "integratorSelect", choices = unique(str_c(integ_series()$from_dataset, integ_series()$from_sensor_key, sep = "/")))
-  })
-  observeEvent(input$masterSNSelect, {
-    updateSelectInput(inputId = "integratorSelect", choices = unique(str_c(integ_series()$from_dataset, integ_series()$from_sensor_key, sep = "/")))
-  })
+  }) |> bindEvent(integ_series())
 
   merge_data <- reactive({
-    cat("Recomputing merge_data\n")
-    req(input$masterDSSelect, input$masterSNSelect)
-    read_data_tables(root_path, input$masterDSSelect, input$masterSNSelect) |> left_join(tconv, by = "variable")
-  })
+    cat(str_glue("Recomputing merge_data with master '{input$masterSelect}'"), "\n")
+    c(master_ds, master_key) %<-% master_specs(input$masterSelect)
+    read_data_tables(root_path, master_ds, master_key) |> left_join(tconv, by = "variable")
+  }) |> bindEvent(input$masterSelect, ignoreInit = TRUE, ignoreNULL = FALSE)
 
   integ_data <- reactive({
     cat("Recomputing integ_data\n")
-    req(input$masterDSSelect, input$masterSNSelect, input$integratorSelect)
 
     data_ranks <- integ_series() |> select(from_dataset, from_sensor_key, variable, data_rank)
     integrator_infos <- integ_series() |>
@@ -71,7 +74,7 @@ server <- function(input, output, session) {
       summarise(min_date = min(date, na.rm = TRUE), max_date = max(date, na.rm = TRUE))
 
     m |> filter(between(date, integrator_timespan$min_date, integrator_timespan$max_date))
-  })
+  }) |> bindEvent(merge_data(), input$integratorSelect, ignoreNULL = FALSE, ignoreInit = TRUE)
 
   output$distPlot <- renderPlotly({
     cat("Redrawing plot\n")
@@ -79,14 +82,15 @@ server <- function(input, output, session) {
       group_by(variable_name) |>
       do(mafig = plot_diffs(.)) |>
       subplot(nrows = 2L)
-  })
+  }) |> bindEvent(integ_data(), ignoreNULL = FALSE)
 
   output$mergeTable <- renderTable(
     {
+      cat("Redrawing table\n")
       integ_series()
     },
     striped = TRUE,
     hover = TRUE,
     bordered = TRUE
-  )
+  ) |> bindEvent(integ_series(), ignoreNULL = FALSE)
 }
