@@ -37,7 +37,7 @@ write_xlsx_analysis <- function(analysis, to, ..., .format = TRUE) {
       "variable",
       "offset_days", # 10
       "strSym",
-      "elevation_x",
+      "H",
       "delH",
       "distance",
       "f0",
@@ -54,8 +54,9 @@ write_xlsx_analysis <- function(analysis, to, ..., .format = TRUE) {
       "valid_days_inters",
       "valid_days_x",
       "valid_days_y",
-      "overlap_x",
-      "overlap_y",
+      "overlap_min",
+      "overlap_max",
+      "overlap_union",
       "sensor_first_x",
       "sensor_first_y",
       "common_period", # 32
@@ -75,13 +76,15 @@ write_xlsx_analysis <- function(analysis, to, ..., .format = TRUE) {
     class(analysis$f0) <- "percentage"
     class(analysis$f0noint) <- "percentage"
     class(analysis$fsameint) <- "percentage"
-    options("openxlsx.numFmt" = "#.##")
+    
   if (.format) {
     class(analysis$overlap_min) <- "percentage"
     class(analysis$overlap_max) <- "percentage"
     class(analysis$overlap_union) <- "percentage"
     class(analysis$common_period_vs_x) <- "percentage"
     class(analysis$common_period_vs_y) <- "percentage"
+  } else {
+    options("openxlsx.numFmt" = "#.##")
   }
   wb <- createWorkbook()
   addWorksheet(wb, "data")

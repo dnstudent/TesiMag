@@ -5,7 +5,8 @@ library(RPostgres, warn.conflicts = FALSE)
 load_dbs <- function() {
     connpost <- dbConnect(Postgres(), dbname = "georefs", user = "davidenicoli", host = "localhost")
     connquack <- dbConnect(duckdb())
-    dbExecute(connquack, "PRAGMA temp_directory='db/tmp' max_temp_directory_size='50GiB'")
+    dbExecute(connquack, "PRAGMA temp_directory='db/tmp/duckdb'")
+    dbExecute(connquack, "PRAGMA max_temp_directory_size='100GiB'")
     dbExecute(
         connquack,
         "
