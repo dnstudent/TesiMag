@@ -104,16 +104,11 @@ daily_statistics <- function(paired_series, epsilon) {
 }
 
 metadata_analysis <- function(series_matches, metadata) {
-    # metadata <- metadata |> select(
-    #     key, name, elevation # , glo30m_elevation, glo30asec_elevation
-    # )
     series_matches |>
         left_join(metadata, join_by(key_x == key)) |>
         left_join(metadata, join_by(key_y == key), suffix = c("_x", "_y")) |>
         mutate(
             delH = elevation_y - elevation_x,
-            # delZm = glo30m_elevation_y - glo30m_elevation_x,
-            # delZsec = glo30asec_elevation_y - glo30asec_elevation_x,
             norm_name_x = name_x |> lower() |> replace("_", " ") |> nfc_normalize() |> strip_accents() |> trim(),
             norm_name_y = name_y |> lower() |> replace("_", " ") |> nfc_normalize() |> strip_accents() |> trim(),
             strSym = jaro_winkler_similarity(norm_name_y, norm_name_x),

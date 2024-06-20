@@ -8,7 +8,7 @@ library(zeallot)
 source("R/read.R")
 source("R/utils.R")
 
-root_path <- fs::path_expand("./merged_corrected")
+root_path <- fs::path_expand("../../db/conv/merged_corrected")
 merge_specs <- read_merge_specs(root_path) |> relocate(merged) |> unite(master_tag, dataset, series_key, sep = "/")
 # metadata <- read_metadata(root_path)
 tconv <- tibble(variable = c(-1L, 1L), variable_name = factor(c("TMND", "TMXD")))

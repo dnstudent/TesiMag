@@ -95,7 +95,7 @@ filter_stations_inside <- function(metadata, boundary, statconn, buffer_m = 0) {
 }
 
 close_matches <- function(metadata, distance_threshold, statconn, key = "key") {
-    copy_to(statconn, metadata, name = "stats_tmp", overwrite = TRUE)
+    copy_to(statconn, metadata |> select(key, lon, lat), name = "stats_tmp", overwrite = TRUE)
 
     query <- glue::glue_sql(
         "
