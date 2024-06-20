@@ -24,7 +24,7 @@ meta <- query_checkpoint_meta("full", "merged_corrected", conn = conns$data) |>
   window_order(dataset, series_key) |>
   mutate(key = row_number(), sensor_key = series_key, sensor_first = NA_Date_, sensor_last = NA_Date_) |>
   compute()
-data <- query_checkpoint_data("full", "merged_corrected", conn = conns$data, hive_types = list()) |>
+data <- query_checkpoint_data("full", "merged_corrected", conn = conns$data, hive_types = list("variable" = "INT")) |>
   inner_join(meta |> select(dataset, series_key, key), by = c("dataset", "series_key"))
 ```
 
@@ -39,10 +39,11 @@ involved_series <- var_matches |> pivot_longer(cols = c(key_x, key_y), names_to 
 metaf <- meta |>
   semi_join(involved_series, by = "key", copy = T) |>
   compute()
-dataf <- data |> semi_join(involved_series, by = c("key", "variable"), copy = T) |>
-  compute()
+# dataf <- data |> semi_join(involved_series, by = c("key", "variable"), copy = T) |>
+#   to_arrow() |>
+#   write_parquet("temp.parquet")
 analysis <- series_matches_analysis(var_matches,
-  dataf,
+  query_parquet("temp.parquet", conns$data),
   metaf,
   matches_offsets = c(-1L, 0L, 1L)
 )
@@ -91,5 +92,13 @@ tagged_analysis |>
 
 ```{r}
 pivot_spec
+```
+
+```{r}
+data |> to_arrow() |> write_csv_arrow("full.csv")
+```
+
+```{r}
+data
 ```
 
