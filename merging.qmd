@@ -1,0 +1,95 @@
+---
+title: "merging"
+author: "Davide Nicoli"
+format: html
+editor: visual
+---
+
+```{r}
+setwd(fs::path_abs("~/Local_Workspace/TesiMag"))
+Sys.setlocale("LC_ALL", "UTF-8")
+library(dplyr, warn.conflicts = FALSE)
+library(openxlsx, warn.conflicts = FALSE)
+source("src/database/query/data.R")
+source("src/database/startup.R")
+source("src/merging/analysis.R")
+source("src/merging/display.R")
+source("notebooks/ds_regionali/procedure/common_steps.R")
+conns <- load_dbs()
+```
+
+
+```{r}
+meta <- query_checkpoint_meta("full", "merged_corrected", conn = conns$data) |>
+  window_order(dataset, series_key) |>
+  mutate(key = row_number(), sensor_key = series_key, sensor_first = NA_Date_, sensor_last = NA_Date_) |>
+  compute()
+data <- query_checkpoint_data("full", "merged_corrected", conn = conns$data, hive_types = list()) |>
+  inner_join(meta |> select(dataset, series_key, key), by = c("dataset", "series_key"))
+```
+
+
+```{r}
+sensor_matches <- close_matches(meta, 20000, conns$stations)
+var_matches <- series_matches(data, sensor_matches, meta)
+```
+
+```{r}
+involved_series <- var_matches |> pivot_longer(cols = c(key_x, key_y), names_to = "key_type", values_to = "key")
+metaf <- meta |>
+  semi_join(involved_series, by = "key", copy = T) |>
+  compute()
+dataf <- data |> semi_join(involved_series, by = c("key", "variable"), copy = T) |>
+  compute()
+analysis <- series_matches_analysis(var_matches,
+  dataf,
+  metaf,
+  matches_offsets = c(-1L, 0L, 1L)
+)
+```
+
+```{r}
+analysis |> write_xlsx_analysis(file.path("notebooks", "ds_nazionali", "TESIDB", "raw_analysis.xlsx"), name_x, name_y, .format = FALSE)
+```
+
+```{r}
+analysis <- read.xlsx(file.path("notebooks", "ds_nazionali", "TESIDB", "raw_analysis.xlsx"))
+tagged_analysis <- analysis |>
+  mutate(
+    tag_dupe = ((dataset_x != dataset_y) &
+      (distance < 170 |
+        ((valid_days_inters > 100L &
+          ((!is.na(f0noint) & f0noint > 0.12) | (dataset_x != dataset_y & fsameint > 0.9))
+        )))) |
+      (
+        (sensor_key_x == 139L & sensor_key_y == 183L) | # Monte Zoncolan
+          (sensor_key_x == 150L & sensor_key_y == 190L) | # Busalla
+          (sensor_key_x == 193L & sensor_key_y == 196L) | # Cabanne
+          (sensor_key_x == 172L & sensor_key_y == 336L) # Santa Maddalena in Casies
+      )
+  ) |>
+  group_by(dataset_x, dataset_y, sensor_key_x, sensor_key_y) |>
+  mutate(
+    tag_anydupe = any(tag_dupe)
+  )
+tagged_analysis |> write_xlsx_analysis(file.path("notebooks", "ds_nazionali", "TESIDB", "tagged_analysis.xlsx"), name_x, name_y, tag_dupe, tag_anydupe, tag_alldupe, .format = FALSE)
+```
+
+```{r}
+pivot_spec <- tibble(
+  .name = c("dataset_x", "dataset_y", "sensor_key_x", "sensor_key_y"),
+  .value = c("dataset", "dataset", "sensor_key", "sensor_key"),
+  dataset = c("dataset_x", "dataset_y", NA_character_, NA_character_),
+  sensor_key = c(NA_character_, NA_character_, "sensor_key_x", "sensor_key_y")
+)
+
+tagged_analysis |>
+  filter(tag_dupe) |>
+  select(dataset_x, sensor_key_x, dataset_y, sensor_key_y) |>
+  pivot_longer_spec(pivot_spec)
+```
+
+```{r}
+pivot_spec
+```
+
