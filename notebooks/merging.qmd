@@ -18,7 +18,6 @@ source("notebooks/ds_regionali/procedure/common_steps.R")
 conns <- load_dbs()
 ```
 
-
 ```{r}
 meta <- query_checkpoint_meta("full", "merged_corrected", conn = conns$data) |>
   window_order(dataset, series_key) |>
@@ -27,7 +26,6 @@ meta <- query_checkpoint_meta("full", "merged_corrected", conn = conns$data) |>
 data <- query_checkpoint_data("full", "merged_corrected", conn = conns$data, hive_types = list("variable" = "INT")) |>
   inner_join(meta |> select(dataset, series_key, key), by = c("dataset", "series_key"))
 ```
-
 
 ```{r}
 sensor_matches <- close_matches(meta, 20000, conns$stations)
@@ -54,7 +52,10 @@ analysis |> write_xlsx_analysis(file.path("notebooks", "ds_nazionali", "TESIDB",
 ```
 
 ```{r}
-analysis <- read.xlsx(file.path("notebooks", "ds_nazionali", "TESIDB", "raw_analysis.xlsx"))
+analysis <- read.xlsx(file.path("notebooks", "ds_nazionali", "TESIDB", "raw_analysis.xlsx")) |>
+  left_join(meta |> select(dataset, sensor_key, key), by = c("dataset_x" = "dataset", "sensor_key_x" = "sensor_key"), copy = T) |>
+  left_join(meta |> select(dataset, sensor_key, key), by = c("dataset_y" = "dataset", "sensor_key_y" = "sensor_key"), copy = T, suffix = c("_x", "_y"))
+
 tagged_analysis <- analysis |>
   mutate(
     tag_dupe = ((dataset_x != dataset_y) &
@@ -72,33 +73,72 @@ tagged_analysis <- analysis |>
   group_by(dataset_x, dataset_y, sensor_key_x, sensor_key_y) |>
   mutate(
     tag_anydupe = any(tag_dupe)
-  )
-tagged_analysis |> write_xlsx_analysis(file.path("notebooks", "ds_nazionali", "TESIDB", "tagged_analysis.xlsx"), name_x, name_y, tag_dupe, tag_anydupe, tag_alldupe, .format = FALSE)
+  ) |>
+  ungroup()
+tagged_analysis |> write_xlsx_analysis(file.path("notebooks", "ds_nazionali", "TESIDB", "tagged_analysis.xlsx"), name_x, name_y, tag_dupe, tag_anydupe, .format = FALSE)
 ```
 
 ```{r}
-pivot_spec <- tibble(
-  .name = c("dataset_x", "dataset_y", "sensor_key_x", "sensor_key_y"),
-  .value = c("dataset", "dataset", "sensor_key", "sensor_key"),
-  dataset = c("dataset_x", "dataset_y", NA_character_, NA_character_),
-  sensor_key = c(NA_character_, NA_character_, "sensor_key_x", "sensor_key_y")
+gs <- series_groups(tagged_analysis, collect(meta), data, tag_anydupe)
+```
+
+```{r}
+regional_dataset <- tribble(
+  ~dataset, ~dataset_state,
+  "PIE", "Piemonte",
+  "TOS", "Toscana",
+  "VEN", "Veneto",
+  "LOM", "Lombardia",
+  "VDA", "Valle D'Aosta",
+  "FVG", "Friuli Venezia Giulia",
+  "ER", "Emilia-Romagna",
+  "LIG", "Liguria",
+  "TAA2", "Trentino-Alto Adige",
+  "MAR", "Marche",
 )
+```
 
-tagged_analysis |>
-  filter(tag_dupe) |>
-  select(dataset_x, sensor_key_x, dataset_y, sensor_key_y) |>
-  pivot_longer_spec(pivot_spec)
+````{r}
+ranked_series_groups <- gs$table |>
+  left_join(collect(meta) |> select(from_dataset = dataset, from_sensor_key = sensor_key, key, state_in = state), by = "key") |>
+  left_join(regional_dataset, by = c("from_dataset" = "dataset")) |>
+  mutate(set = "tesidb", right_state = state_in == dataset_state) |>
+  rank_metadata(collect(meta), dataset_rankings = NULL, desc(right_state), desc(valid90))
 ```
 
 ```{r}
-pivot_spec
+ranked_series_groups |> filter(gkey == 11L)
 ```
 
 ```{r}
-data |> to_arrow() |> write_csv_arrow("full.csv")
+meta |> semi_join(ranked_series_groups |> filter(gkey == 11L), by = c("dataset" = "from_dataset", "series_key" = "from_sensor_key"), copy = T) |> collect()
+```
+
+
+```{r}
+duplications <- ranked_series_groups |>
+  group_by(gkey) |>
+  arrange(metadata_rank) |>
+  mutate(duplicate_of = if_else(metadata_rank == 1L, "", first(str_c(from_dataset, from_sensor_key, sep = "/")))) |>
+  ungroup() |>
+  select(dataset = from_dataset, series_key = from_sensor_key, duplicate_of) |>
+  distinct()
+duplications |>
+  left_join(meta |> select(dataset, series_key, name, series_first, series_last, valid90, lon, lat, elevation, state), by = c("dataset", "series_key"), copy = T) |>
+  readr::write_csv(file.path("notebooks", "ds_nazionali", "TESIDB", "merge_duplicates.csv"))
 ```
 
 ```{r}
-data
+anti_join(meta, duplications, by = c("dataset", "series_key"), copy = T) |> collect()
+```
+
+
+
+```{r}
+meta |> filter(dataset == "FVG", series_key == 184L) |> collect() |> View()
+```
+
+```{r}
+query_checkpoint_meta("ARPAFVG", "raw") |> filter(sensor_key == 36L)
 ```
 

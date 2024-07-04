@@ -29,11 +29,11 @@ show_merge <- function(merged_meta, unmerged_meta, ...) {
 
 write_xlsx_analysis <- function(analysis, to, ..., .format = TRUE) {
   analysis <- analysis |> select(
-      starts_with("sensor_key"),
-      starts_with("dataset"),
-      starts_with("network"),
-      starts_with("name"),
-      any_of(c(
+    starts_with("sensor_key"),
+    starts_with("dataset"),
+    starts_with("network"),
+    starts_with("name"),
+    any_of(c(
       "variable",
       "offset_days", # 10
       "strSym",
@@ -72,17 +72,19 @@ write_xlsx_analysis <- function(analysis, to, ..., .format = TRUE) {
   } else {
     off <- 0L
   }
-    class(analysis$strSym) <- "percentage"
-    class(analysis$f0) <- "percentage"
-    class(analysis$f0noint) <- "percentage"
-    class(analysis$fsameint) <- "percentage"
-    
+  class(analysis$strSym) <- "percentage"
+  class(analysis$f0) <- "percentage"
+  class(analysis$f0noint) <- "percentage"
+  class(analysis$fsameint) <- "percentage"
+
   if (.format) {
     class(analysis$overlap_min) <- "percentage"
     class(analysis$overlap_max) <- "percentage"
     class(analysis$overlap_union) <- "percentage"
-    class(analysis$common_period_vs_x) <- "percentage"
-    class(analysis$common_period_vs_y) <- "percentage"
+    if ("common_period_vs_x" %in% colnames(analysis)) {
+      class(analysis$common_period_vs_x) <- "percentage"
+      class(analysis$common_period_vs_y) <- "percentage"
+    }
   } else {
     options("openxlsx.numFmt" = "#.##")
   }

@@ -6,6 +6,10 @@ query_boundary <- function(conn, name, kind) {
     st_read(conn, query = stringr::str_glue("SELECT * FROM boundary WHERE name = '{name}' AND kind = '{kind}'"), geometry_column = "geom")
 }
 
+query_boundaries <- function(conn, of) {
+  copy_to(conn, of, name = "meta_bounds_tmp", overwrite = TRUE)
+}
+
 query_state_matches <- function(statconn, state_name, distance_threshold, buffer_m, cmp = "<") {
     query <- glue::glue(
         "

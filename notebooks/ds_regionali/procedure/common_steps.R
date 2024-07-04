@@ -202,40 +202,63 @@ spatial_availabilities <- function(ymonthly_avail, stations, map, ...) {
     list("plot" = p, "data" = spatav)
 }
 
-prepare_data_for_merge <- function(dataconn, ds_root = fs::path("db", "tmp", "dataset_for_merge"), regenerate = FALSE) {
+prepare_data_for_merge.old <- function(dataconn, ds_root, regenerate = FALSE) {
     if (regenerate || !fs::dir_exists(ds_root)) {
-        save_ds <- function(ds) {
-            fragment_dir <- fs::path(
-                ds_root,
-                str_glue("dataset={first(ds$dataset)}"),
-                str_glue("sensor_key={first(ds$sensor_key)}"),
-                str_glue("variable={first(ds$variable)}")
-            )
-            if (!fs::dir_exists(fragment_dir)) {
-                fs::dir_create(fragment_dir, recurse = TRUE)
-            }
-            write_parquet(ds |> arrange(date), fs::path(fragment_dir, "part-0.parquet"))
-        }
+        # save_ds <- function(ds) {
+        #     fragment_dir <- fs::path(
+        #         ds_root,
+        #         str_glue("dataset={first(ds$dataset)}"),
+        #         str_glue("sensor_key={first(ds$sensor_key)}"),
+        #         str_glue("variable={first(ds$variable)}")
+        #     )
+        #     if (!fs::dir_exists(fragment_dir)) {
+        #         fs::dir_create(fragment_dir, recurse = TRUE)
+        #     }
+        #     write_parquet(ds |> arrange(date), fs::path(fragment_dir, "part-0.parquet"))
+        # }
 
-        datasets <- fs::dir_ls(fs::path_dir(archive_path("*", "data", "qc1")), type = "directory") |> fs::path_file()
+        # datasets <- fs::dir_ls(fs::path_dir(archive_path("*", "data", "raw")), type = "directory") |> fs::path_file()
 
-        query_checkpoint_data(datasets, "qc1", dataconn, hive_types = list("valid" = "BOOLEAN", "variable" = "INT")) |>
-            filter(valid, variable == -1L) |>
-            select(!c(starts_with("qc_"), valid)) |>
-            collect() |>
-            group_split(dataset, sensor_key, variable) |>
-            purrr::walk(save_ds, .progress = TRUE)
+        # query_checkpoint_data(datasets, "raw", dataconn, hive_types = list("variable" = "INT")) |>
+        #     filter(variable == -1L) |>
+        #     collect() |>
+        #     group_split(dataset, sensor_key, variable) |>
+        #     purrr::walk(save_ds, .progress = TRUE)
 
-        query_checkpoint_data(datasets, "qc1", dataconn, hive_types = list("valid" = "BOOLEAN", "variable" = "INT")) |>
-            filter(valid, variable == 1L) |>
-            select(!c(starts_with("qc_"), valid)) |>
-            collect() |>
-            group_split(dataset, sensor_key, variable) |>
-            purrr::walk(save_ds, .progress = TRUE)
+        # query_checkpoint_data(datasets, "raw", dataconn, hive_types = list("valid" = "BOOLEAN", "variable" = "INT")) |>
+        #     filter(valid, variable == 1L) |>
+        #     select(!c(starts_with("qc_"), valid)) |>
+        #     collect() |>
+        #     group_split(dataset, sensor_key, variable) |>
+        #     purrr::walk(save_ds, .progress = TRUE)
         # to_arrow() |>
         # write_dataset(ds_root, format = "parquet", partitioning = c("dataset", "sensor_key", "variable")) BUGGED: too many files
+        DBI::dbExecute(dataconn, "COPY")
     }
     ds_root
+}
+
+prepare_data_for_merge <- function(dataconn, from_raw_root, to_ds_root, regenerate = FALSE, test = FALSE) {
+    if (regenerate || !fs::dir_exists(to_ds_root)) {
+        ds_files <- fs::path(from_raw_root, "**", "*.parquet")
+        DBI::dbExecute(conns$data, stringr::str_glue("CREATE OR REPLACE VIEW ds_4merge_tmp AS SELECT * FROM read_parquet('{ds_files}', hive_partitioning = true, hive_types = {{'variable': INT}})"))
+        DBI::dbExecute(conns$data, stringr::str_glue("COPY ds_4merge_tmp TO '{to_ds_root}' (FORMAT PARQUET, PARTITION_BY (dataset, sensor_key, variable), FILENAME_PATTERN 'part-{{i}}')", con = dataconn))
+    }
+
+    if (test) {
+        if (query_dataset(from_raw_root, dataconn, hive_types = list("variable" = "INT")) |>
+            anti_join(
+                query_dataset(to_ds_root, dataconn, hive_types = list("dataset" = "VARCHAR", "sensor_key" = "INT", "variable" = "INT")),
+                by = c("dataset", "sensor_key", "variable", "date")
+            ) |>
+            count() |>
+            collect() |>
+            pull(n) > 0L) {
+            stop("Data was not correctly copied")
+        }
+    }
+
+    to_ds_root
 }
 
 merge_same_series <- function(path_from, path_to, set_name, tagged_analysis, metadata, data, correction_threshold, contribution_threshold, dataset_rankings, ..., .f0_epsilon = 0.05) {
