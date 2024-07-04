@@ -184,11 +184,11 @@ optimal_offset <- function(table, col1, col2, epsilon) {
 
   fixed <- table |>
     select(date, variable, value = {{ col1 }}) |>
-    filter(!is.na(value))
+    filter(!is.na(value), between(value, -50, 50))
 
   to_shift <- table |>
     select(date, variable, value = {{ col2 }}) |>
-    filter(!is.na(value))
+    filter(!is.na(value), between(value, -50, 50))
 
   to_shift <- to_shift |>
     cross_join(tibble(offset = c(-1L, 0L, 1L))) |>
@@ -239,8 +239,9 @@ insert_integrations <- function(table, integrator_column, correction_threshold, 
   merge_meta$failed_integrations_threshold <- merge_meta$would_integrate < contribution_threshold
 
   DELT <- table |>
+    filter(between(master, -50, 50), between(!!sym(integrator_column), -50, 50)) |>
     mutate(correction_sample = master - !!sym(integrator_column), month = month(date)) |>
-    filter(abs(correction_sample) < 5, !is.na(correction_sample))
+    filter(abs(correction_sample) < 10, !is.na(correction_sample))
 
   if (!force_zero_correction) {
     available_months <- DELT |>
