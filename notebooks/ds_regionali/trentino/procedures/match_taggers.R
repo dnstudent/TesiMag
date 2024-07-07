@@ -41,14 +41,15 @@ tag_manual <- function(tagged_analysis) {
     tagged_analysis |>
         mutate(
             tag_same_series = (tag_same_series & !(
-                (dataset_x == "ISAC" & dataset_y == "TAA" & (
-                    (sensor_key_x == 1360L & sensor_key_y == 80L) | # Folgarida Alta / Bassa
-                        (sensor_key_x %in% c(1774L, 1775L) & sensor_key_y == 108L) | # Levico
-                        # (sensor_key_y == 162L) | # Peio
-                        (sensor_key_x == 645L) | # Capriana
-                        (sensor_key_x == 3513L) | # S. Maddalena a Casies
-                        (sensor_key_y == 151L) # Passo di Costalunga
-                )) |
+                (!is.na(user_code_x) & !is.na(user_code_y) & ((str_detect(user_code_x, "41000MS") & !str_detect(user_code_y, "41000MS")) | (!str_detect(user_code_x, "41000MS") & str_detect(user_code_y, "41000MS")))) | # Dobbiaco
+                    (dataset_x == "ISAC" & dataset_y == "TAA" & (
+                        (sensor_key_x == 1360L & sensor_key_y == 80L) | # Folgarida Alta / Bassa
+                            (sensor_key_x %in% c(1774L, 1775L) & sensor_key_y == 108L) | # Levico
+                            # (sensor_key_y == 162L) | # Peio
+                            (sensor_key_x == 645L) | # Capriana
+                            (sensor_key_x == 3513L) | # S. Maddalena a Casies
+                            (sensor_key_y == 151L) # Passo di Costalunga
+                    )) |
                     (dataset_x == "ISAC" & dataset_y == "ISAC" &
                         ((sensor_key_x == 1775L & sensor_key_y == 3055L) | # Levico / Roncegno
                             (sensor_key_x == 734L & sensor_key_y == 1888L) | #  Cima / Malga Casies
@@ -101,7 +102,8 @@ tag_manual <- function(tagged_analysis) {
                         (sensor_key_x == 583L & sensor_key_y == 28L) | # Campo Tures / Molini Tures
                         (sensor_key_x == 966L & sensor_key_y == 51L) | # Cimego
                         (sensor_key_x == 1876L & sensor_key_y == 112L) | # Malè
-                        (sensor_key_x == 3239L & sensor_key_y == 229L) # Sarentino
+                        (sensor_key_x == 3239L & sensor_key_y == 229L) | # Sarentino
+                        (sensor_key_x == 1213L & sensor_key_y == 71L) # Dobbiaco
                 )) |
                 (dataset_x == "TAA" & dataset_y == "TAA" & (
                     # sensor_key_x == 14L & sensor_key_y == 15L #  Bezzecca

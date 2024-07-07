@@ -37,7 +37,7 @@ write_xlsx_analysis <- function(analysis, to, ..., .format = TRUE) {
       "variable",
       "offset_days", # 10
       "strSym",
-      "H",
+      "elevation_x",
       "delH",
       "distance",
       "f0",
@@ -45,7 +45,7 @@ write_xlsx_analysis <- function(analysis, to, ..., .format = TRUE) {
       "fsameint",
       "balance",
       "delT",
-      "maeT",
+      "maeT", # 20
       "monthlydelT",
       "monthlymaeT",
       "climaticdelT",
@@ -55,13 +55,13 @@ write_xlsx_analysis <- function(analysis, to, ..., .format = TRUE) {
       "valid_days_x",
       "valid_days_y",
       "overlap_min",
-      "overlap_max",
+      "overlap_max", # 30
       "overlap_union",
       "sensor_first_x",
       "sensor_first_y",
-      "common_period", # 32
+      "common_period",
       "common_period_x",
-      "common_period_y" # 33,34
+      "common_period_y"
     )),
     ...
   )

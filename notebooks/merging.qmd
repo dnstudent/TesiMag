@@ -142,3 +142,7 @@ meta |> filter(dataset == "FVG", series_key == 184L) |> collect() |> View()
 query_checkpoint_meta("ARPAFVG", "raw") |> filter(sensor_key == 36L)
 ```
 
+```{r}
+meta |> 
+```
+

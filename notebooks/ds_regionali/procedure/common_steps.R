@@ -270,23 +270,25 @@ merge_same_series <- function(path_from, path_to, set_name, tagged_analysis, met
         mutate(set = set_name) |>
         rank_metadata(metadata, dataset_rankings, ...) |>
         rank_data(metadata) |>
-        left_join(metadata |> select(from_dataset = dataset, from_sensor_key = sensor_key, key), by = "key") |>
-        rename(dataset = set, series_key = gkey)
-    # cross_join(tibble(variable = c(-1L, 1L))) #  Non è il massimo gestire così, ma per ora va bene. Necessario per gestire le situazioni in cui alcune serie non hanno una delle variabili
-    dynamic_merge(path_from, fs::path(path_to, "w_corrections"), ranked_series_groups |> mutate(force_zero_correction = FALSE), correction_threshold, contribution_threshold, .f0_epsilon)
-    dynamic_merge(path_from, fs::path(path_to, "wo_corrections"), ranked_series_groups |> mutate(force_zero_correction = TRUE), correction_threshold, contribution_threshold, .f0_epsilon)
+        left_join(metadata |> select(from_dataset = dataset, from_sensor_key = sensor_key, key, network), by = "key") |>
+        rename(dataset = set, series_key = gkey) |>
+        group_by(series_key, variable) |>
+        mutate(only_recent = ("ISAC" %in% network) & (network != "ISAC")) |> # Se c'è una serie ISAC (omogeneizzata) aggiorna solo i dati recenti
+        ungroup() |>
+        select(-network)
+
+    dynamic_merge(path_from, path_to, ranked_series_groups, correction_threshold, contribution_threshold, .f0_epsilon)
     path_to
 }
 
-merged_checkpoint <- function(set_name, merge_results_path, metadata, which) {
-    merge_results_path <- fs::path(merge_results_path, which)
+merged_checkpoint <- function(set_name, merge_results_path, metadata) {
     # Saving the merging specs: correction coefficients, merged status, series groups
     merging_specs <- open_dataset(fs::path(merge_results_path, "meta", str_glue("dataset={set_name}")), format = "parquet") |>
         select(-key) |>
         collect() |>
         relocate(dataset, series_key, .before = 1L)
 
-    specs_path <- fs::path(archive_path(set_name, "extra", "merge_specs"), which, ext = "parquet")
+    specs_path <- fs::path(archive_path(set_name, "extra", "merge_specs"), ext = "parquet")
     if (!fs::dir_exists(fs::path_dir(specs_path))) {
         fs::dir_create(fs::path_dir(specs_path), recurse = TRUE)
     }
@@ -366,10 +368,5 @@ merged_checkpoint <- function(set_name, merge_results_path, metadata, which) {
     #     semi_join(metadata |> select(dataset, series_key), by = c("dataset", "series_key"))
 
     # return(list(compute(metadata), data))
-    list(meta = compute(metadata), data = compute(data)) |> save_checkpoint(set_name, str_c("merged", which, sep = "_"), check_schema = FALSE, key = "series_key")
-}
-
-merged_checkpoints <- function(set_name, merge_results_path, metadata) {
-    merged_checkpoint(set_name, merge_results_path, metadata, "w_corrections")
-    merged_checkpoint(set_name, merge_results_path, metadata, "wo_corrections")
+    list(meta = compute(metadata), data = compute(data)) |> save_checkpoint(set_name, "merged", check_schema = FALSE, key = "series_key")
 }

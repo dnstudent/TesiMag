@@ -198,9 +198,9 @@ optimal_offset <- function(table, col1, col2, epsilon) {
     inner_join(to_shift, by = c("date", "variable"), suffix = c("_fixed", "_shifting"), relationship = "one-to-many") |>
     mutate(adiff = abs(value_fixed - value_shifting)) |>
     group_by(offset) |>
-    summarise(f0 = mean(as.numeric(adiff < epsilon), na.rm = TRUE), maeT = mean(adiff, na.rm = TRUE), .groups = "drop") |>
+    summarise(f0 = mean(as.numeric(adiff < epsilon), na.rm = TRUE), correlation = cor(value_fixed, value_shifting), .groups = "drop") |>
     mutate(rank_f0 = rank_f0(f0)) |>
-    arrange(rank_f0, maeT) |>
+    arrange(rank_f0, desc(correlation)) |>
     pull(offset) |>
     first()
 }
@@ -215,8 +215,71 @@ offset_column_by <- function(table, column, offset, ids = c("variable")) {
     full_join(to_shift, by = c("date", ids), relationship = "one-to-one")
 }
 
-insert_integrations <- function(table, integrator_column, correction_threshold, contribution_threshold, force_zero_correction, force_merge, epsilon) {
-  offset <- optimal_offset(table, master, {{ integrator_column }}, epsilon)
+add_correction_column.model <- function(table, merge_meta, integrator_column, force_merge, correction_threshold, contribution_threshold) {
+  correction_sample <- table |>
+    filter(between(master, -50, 50), between(!!sym(integrator_column), -50, 50)) |>
+    mutate(value = master - !!sym(integrator_column), month = month(date)) |>
+    filter(abs(value) < 10, !is.na(value))
+
+  available_months <- correction_sample |>
+    count(month) |>
+    filter(n >= 20L) |>
+    nrow()
+
+  if (available_months >= 8L) {
+    # t is computed here to avoid problems when joining with a shifted integrator
+    ts <- annual_index(correction_sample$date)
+    merge_meta$coeffs <- sin_coeffs(correction_sample$value, ts) # DELT$t)
+    merge_meta$mean_correction <- merge_meta$coeffs$k0
+  } else if (available_months > 2L) {
+    merge_meta$coeffs <- list(k0 = mean(correction_sample$value, na.rm = TRUE), a1 = 0, a2 = 0, b1 = 0, b2 = 0)
+    merge_meta$mean_correction <- merge_meta$coeffs$k0
+    merge_meta$few_data <- TRUE
+  } else {
+    merge_meta$coeffs <- list(k0 = 0, a1 = 0, a2 = 0, b1 = 0, b2 = 0)
+    merge_meta$mean_correction <- 0
+    merge_meta$no_data <- TRUE
+  }
+
+  table <- table |>
+    mutate(
+      t = annual_index(date),
+      correction = merge_meta$coeffs$k0 + merge_meta$coeffs$a1 * sin(t) + merge_meta$coeffs$a2 * sin(2 * t) + merge_meta$coeffs$b1 * cos(t) + merge_meta$coeffs$b2 * cos(2 * t)
+    ) |>
+    select(-t)
+
+  if ((abs(merge_meta$mean_correction) <= 0.1) && all(abs(table$correction) <= 0.2, na.rm = TRUE)) {
+    table <- table |> mutate(correction = 0)
+    merge_meta$coeffs <- list(k0 = 0, a1 = 0, a2 = 0, b1 = 0, b2 = 0)
+    merge_meta$mean_correction <- 0
+    merge_meta$minor_correction <- TRUE
+  }
+
+  list(table = table, merge_meta = merge_meta)
+}
+
+add_correction_column.zero <- function(table, merge_meta, integrator_column, only_recent) {
+  master_dates <- table |>
+    filter(!is.na(master)) |>
+    pull(date)
+  if (length(master_dates) > 0) {
+    master_latest <- max(master_dates)
+  } else {
+    master_latest <- -Inf
+  }
+
+  table <- table |>
+    mutate(
+      correction = if_else(date > master_latest, 0, NA_real_)
+    )
+
+  merge_meta$mean_correction <- 0
+  merge_meta$coeffs <- list(k0 = 0, a1 = 0, a2 = 0, b1 = 0, b2 = 0)
+  list(table = table, merge_meta = merge_meta)
+}
+
+insert_integrations.old <- function(table, integrator_column, correction_threshold, contribution_threshold, force_zero_correction, force_merge, copy_recent_raw, epsilon) {
+  offset <- optimal_offset(table, master_raw, {{ integrator_column }}, epsilon)
 
   table <- table |>
     offset_column_by({{ integrator_column }}, offset, ids = "variable")
@@ -243,7 +306,7 @@ insert_integrations <- function(table, integrator_column, correction_threshold, 
     mutate(correction_sample = master - !!sym(integrator_column), month = month(date)) |>
     filter(abs(correction_sample) < 10, !is.na(correction_sample))
 
-  if (!force_zero_correction) {
+  if (!force_zero_correction && !copy_recent_raw) {
     available_months <- DELT |>
       count(month) |>
       filter(n >= 20L) |>
@@ -269,24 +332,43 @@ insert_integrations <- function(table, integrator_column, correction_threshold, 
   }
 
   merge_meta$failed_correction_threshold <- abs(merge_meta$mean_correction) >= correction_threshold
-  merge_meta$merged <- force_merge || (!merge_meta$failed_integrations_threshold && !merge_meta$failed_correction_threshold)
+  merge_meta$merged <- force_merge || (!merge_meta$failed_integrations_threshold && !merge_meta$failed_correction_threshold) || copy_recent_raw
 
   if (merge_meta$merged) {
+    master_dates <- table |>
+      filter(!is.na(master)) |>
+      pull(date)
+    if (length(master_dates) > 0) {
+      master_latest <- max(master_dates)
+    } else {
+      master_latest <- -Inf
+    }
+
+
     table <- table |>
       mutate(
         t = annual_index(date),
-        correction = merge_meta$coeffs$k0 + merge_meta$coeffs$a1 * sin(t) + merge_meta$coeffs$a2 * sin(2 * t) + merge_meta$coeffs$b1 * cos(t) + merge_meta$coeffs$b2 * cos(2 * t),
+        correction = merge_meta$coeffs$k0 + merge_meta$coeffs$a1 * sin(t) + merge_meta$coeffs$a2 * sin(2 * t) + merge_meta$coeffs$b1 * cos(t) + merge_meta$coeffs$b2 * cos(2 * t)
       )
+
+    if (copy_recent_raw) {
+      table <- table |>
+        mutate(
+          correction = if_else(date > master_latest, correction, NA_real_)
+        )
+    }
 
     # Evito di correggere le serie che si scostano di poco
     if ((abs(merge_meta$mean_correction) <= 0.1) && all(abs(table$correction) <= 0.2, na.rm = TRUE)) {
-      table <- table |> mutate(correction = 0)
+      table <- table |> mutate(correction = if_else(is.na(correction), NA_real_, 0))
       merge_meta$coeffs <- list(k0 = 0, a1 = 0, a2 = 0, b1 = 0, b2 = 0)
       merge_meta$mean_correction <- 0
       merge_meta$minor_correction <- TRUE
     }
+
     table <- table |>
       mutate(
+        master_raw = coalesce(master_raw, if_else(is.na(correction), NA_real_, !!sym(integrator_column))),
         master = coalesce(master, !!sym(integrator_column) + correction),
         from = coalesce(from, if_else(is.na(master), NA_character_, integrator_column))
       ) |>
@@ -297,14 +379,66 @@ insert_integrations <- function(table, integrator_column, correction_threshold, 
   list(table = table, meta = as_tibble_row(merge_meta))
 }
 
-merge_sensor <- function(table, integrator_column, correction_threshold, contribution_threshold, force_zero_correction, force_merge, epsilon) {
+integrate_column <- function(table, integrator_column, correction_threshold, contribution_threshold, force_zero_correction, force_merge, copy_recent_raw, epsilon) {
+  offset <- optimal_offset(table, master_raw, {{ integrator_column }}, epsilon)
+  table <- table |>
+    offset_column_by({{ integrator_column }}, offset, ids = "variable")
+
+  merge_meta <- list(
+    merged = NULL,
+    few_data = FALSE,
+    no_data = FALSE,
+    minor_correction = FALSE,
+    offset = offset,
+    coeffs = NULL,
+    would_integrate = NULL,
+    n_joint_days = n_common_nnas(table$master, pull(table, {{ integrator_column }})),
+    mean_correction = NULL,
+    failed_integrations_threshold = NULL,
+    failed_correction_threshold = NULL
+  )
+
+  if (force_zero_correction || copy_recent_raw) {
+    add_result <- add_correction_column.zero(table, merge_meta, integrator_column, only_recent = copy_recent_raw)
+  } else {
+    add_result <- add_correction_column.model(table, merge_meta, integrator_column, force_merge, correction_threshold, contribution_threshold)
+  }
+
+  table <- add_result$table
+  merge_meta <- add_result$merge_meta
+
+  merge_meta$would_integrate <- (is.na(table$master) & !is.na(pull(table, {{ integrator_column }})) & !is.na(table$correction)) |>
+    as.integer() |>
+    sum()
+  merge_meta$failed_integrations_threshold <- merge_meta$would_integrate < contribution_threshold
+  merge_meta$failed_correction_threshold <- abs(merge_meta$mean_correction) > correction_threshold
+  merge_meta$merged <- force_merge || (!merge_meta$failed_integrations_threshold && !merge_meta$failed_correction_threshold) || copy_recent_raw
+
+  if (merge_meta$merged) {
+    table <- table |>
+      mutate(
+        master_raw = coalesce(master_raw, if_else(is.na(correction), NA_real_, !!sym(integrator_column))),
+        master = coalesce(master, !!sym(integrator_column) + correction),
+        from = coalesce(from, if_else(is.na(correction), NA_character_, integrator_column))
+      ) |>
+      select(-correction)
+  } else {
+    table <- table |>
+      select(-correction)
+  }
+
+  merge_meta$coeffs <- list(merge_meta$coeffs)
+  list(table = table, meta = as_tibble_row(merge_meta))
+}
+
+merge_sensor <- function(table, integrator_column, correction_threshold, contribution_threshold, force_zero_correction, force_merge, only_recent, epsilon) {
   tmin_results <- table |>
     filter(variable == -1L) |>
-    insert_integrations({{ integrator_column }}, correction_threshold, contribution_threshold, force_zero_correction, force_merge, epsilon)
+    integrate_column({{ integrator_column }}, correction_threshold, contribution_threshold, force_zero_correction, force_merge, only_recent, epsilon)
 
   tmax_results <- table |>
     filter(variable == 1L) |>
-    insert_integrations({{ integrator_column }}, correction_threshold, contribution_threshold, force_zero_correction, force_merge, epsilon)
+    integrate_column({{ integrator_column }}, correction_threshold, contribution_threshold, force_zero_correction, force_merge, only_recent, epsilon)
 
   meta <- bind_rows(tmin_results$meta |> mutate(variable = -1L), tmax_results$meta |> mutate(variable = 1L)) |>
     rename(would_merge = merged) |>
@@ -335,7 +469,7 @@ dynamic_merge.series <- function(data_root, dataset, series_key, specs, correcti
   series_merge_results <- purrr::reduce(
     specs_list,
     \(results, spec) {
-      sensor_merge_results <- merge_sensor(results$data, spec$tag, correction_threshold, contribution_threshold, spec$force_zero_correction, spec$force_merge, epsilon)
+      sensor_merge_results <- merge_sensor(results$data, spec$tag, correction_threshold, contribution_threshold, spec$force_zero_correction, spec$force_merge, spec$only_recent, epsilon)
       sensor_merge_results$meta <- sensor_merge_results$meta |> mutate(dataset = dataset, series_key = series_key, from_dataset = spec$from_dataset, from_sensor_key = spec$from_sensor_key)
       list(
         data = sensor_merge_results$data,
@@ -344,16 +478,16 @@ dynamic_merge.series <- function(data_root, dataset, series_key, specs, correcti
     },
     .init = list(
       data = data |>
-        mutate(master = NA_real_, from = NA_character_),
+        mutate(master_raw = NA_real_, master = NA_real_, from = NA_character_),
       meta = tibble()
     )
   )
 
   merge_result <- list(
     data = series_merge_results$data |>
-      select(variable, date, value = master, from) |>
+      select(variable, date, value = master, value_raw = master_raw, from) |>
       # Due to the way the merge is done (time offsets), there may be some missing values in the master column
-      filter(!is.na(value)) |>
+      filter(!is.na(value) | !is.na(value_raw)) |>
       separate_wider_delim(from, delim = "/", names = c("from_dataset", "from_sensor_key"), names_repair = "minimal", cols_remove = TRUE) |>
       mutate(from_sensor_key = as.integer(from_sensor_key)),
     meta = full_join(specs, series_merge_results$meta, by = c("from_dataset", "from_sensor_key", "variable"), relationship = "one-to-one") |> unnest_wider(coeffs)
@@ -361,10 +495,10 @@ dynamic_merge.series <- function(data_root, dataset, series_key, specs, correcti
 
   # consistency tests
   merge_result$data |>
-    assert(not_na, date, variable, value, from_dataset, from_sensor_key, description = "Absence of missing entries in the merged table")
+    assert(not_na, date, variable, value, value_raw, from_dataset, from_sensor_key, description = "Absence of missing entries in the merged table")
 
   if (nrow(merge_result$data) < length(pull(data, specs_list[[1]]$tag[[1]]) |> na.omit())) {
-    stop("There are fewer data than at the beginning")
+    stop("There are fewer data entries than at the beginning")
   }
 
   merge_result$meta |>
