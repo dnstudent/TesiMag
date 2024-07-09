@@ -3,11 +3,11 @@ library(RPostgres, warn.conflicts = FALSE)
 library(sf, warn.conflicts = FALSE)
 
 query_boundary <- function(conn, name, kind) {
-    st_read(conn, query = stringr::str_glue("SELECT * FROM boundary WHERE name = '{name}' AND kind = '{kind}'"), geometry_column = "geom")
+    st_read(conn, query = glue::glue_sql("SELECT * FROM regional_boundaries WHERE shapename = {name} AND kind = {kind}", .con = conn), geometry_column = "geom", quiet = TRUE)
 }
 
 query_boundaries <- function(conn, of) {
-  copy_to(conn, of, name = "meta_bounds_tmp", overwrite = TRUE)
+    copy_to(conn, of, name = "meta_bounds_tmp", overwrite = TRUE)
 }
 
 query_state_matches <- function(statconn, state_name, distance_threshold, buffer_m, cmp = "<") {
@@ -15,7 +15,7 @@ query_state_matches <- function(statconn, state_name, distance_threshold, buffer
         "
         WITH inside_stations AS (SELECT s.*
         FROM raw_station_geo s
-        JOIN boundary b
+        JOIN regional_boundaries b
         ON ST_DWithin(b.geom::geography, s.geog, {buffer_m})
         WHERE b.name = '{state_name}'
         )
@@ -152,7 +152,7 @@ query_elevations <- function(metadata, statconn) {
         )
         SELECT s.dataset, s.sensor_key, AVG(ST_Value(r.rast, 1, s.geom, true, 'bilinear')) AS elevation_glo30
         FROM s
-        INNER JOIN cop30dem r
+        INNER JOIN copernicus_glo30 r
         ON r.rast && s.geom
         GROUP BY s.dataset, s.sensor_key
         ",
@@ -161,7 +161,8 @@ query_elevations <- function(metadata, statconn) {
     melev <- dbGetQuery(statconn, query)
     statconn |> dbRemoveTable("stats_tmp")
     metadata |>
-        left_join(melev, by = c("sensor_key", "dataset"), relationship = "one-to-one")
+        left_join(melev, by = c("sensor_key", "dataset"), relationship = "one-to-one") |>
+        mutate(elevation_glo30 = coalesce(elevation_glo30, 0))
     # distinct(dataset, sensor_key, .keep_all = TRUE)
 }
 

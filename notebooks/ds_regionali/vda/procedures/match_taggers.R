@@ -1,17 +1,19 @@
 library(dplyr, warn.conflicts = FALSE)
 library(stringr, warn.conflicts = FALSE)
 
+source("src/merging/pairing.R")
+
 tag_same_series <- function(analysis) {
     analysis |> mutate(
         tag_same_sensor = (overlap_union > 0.9 & f0 > 0.9),
         tag_same_station = (overlap_union > 0.8 & f0 > 0.8),
-        tag_sseries_svs = (dataset_x == "SCIA" & dataset_y == "SCIA") & (
+        tag_sseries_svs = !!datasets_are("SCIA", "SCIA") & (
             ((valid_days_inters >= 160L & f0 > 0.7) | distance < 100)
         ),
-        tag_sseries_ivi = (dataset_x == "ISAC" & dataset_y == "ISAC") & (
+        tag_sseries_ivi = !!datasets_are("ISAC", "ISAC") & (
             (valid_days_inters >= 160L & f0 > 0.1) | (valid_days_inters == 0L & distance < 200)
         ),
-        tag_sseries_ivs = (dataset_x == "ISAC" & dataset_y == "SCIA") & (
+        tag_sseries_ivs = !!datasets_are("ISAC", "SCIA") & (
             (valid_days_inters >= 160L & (f0 > 0.101 | distance < 100))
         ),
         tag_dist = distance < 368,
@@ -23,22 +25,15 @@ tag_same_series <- function(analysis) {
 tag_manual <- function(tagged_analysis) {
     tagged_analysis |> mutate(
         tag_same_series = (tag_same_series |
-            (dataset_x == "ISAC" & dataset_y == "ISAC" & (
-                (sensor_key_x == 3831L & sensor_key_y == 4048L) # Plateu Rosa
+            (!!datasets_are("ISAC", "ISAC") & (
+                !!sensor_keys_are(3831L, 4048L) # Plateu Rosa
             )) |
-            (dataset_x == "ISAC" & dataset_y == "SCIA" & (
-                (sensor_key_x == 472L & sensor_key_y == 551L) # Brusson
+            (!!datasets_are("ISAC", "SCIA") & (
+                !!sensor_keys_are(472L, 551L) # Brusson
             )) |
-            (dataset_x == "SCIA" & dataset_y == "SCIA" & (
-                (sensor_key_x == 69L & sensor_key_y == 3673L) # Saint Cristophe Aereoporto
+            (!!datasets_are("SCIA", "SCIA") & (
+                !!sensor_keys_are(69L, 3673L) # Saint Cristophe Aereoporto
             ))) &
-            !((dataset_x == "ISAC" & sensor_key_x == 2874) | (dataset_y == "ISAC" & sensor_key_y == 2874)) # Prè-Saint-Didier Ponte Dora Baltea
-        # &
-        # !(dataset_x == "SCIA" & dataset_y == "ISAC" & (
-        #     (sensor_key_x == 862L & sensor_key_y == 859L) # Champorcer
-        # )) &
-        # !(dataset_x == "ISAC" & dataset_y == "ISAC" & (
-        #     (sensor_key_x == 858L & sensor_key_y == 859L) # Champorcer
-        # ))
+            !(!!one_station_is("ISAC", sensor_key = 2874L)) # Prè-Saint-Didier Ponte Dora Baltea
     )
 }

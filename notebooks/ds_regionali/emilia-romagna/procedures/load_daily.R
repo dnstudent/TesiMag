@@ -6,11 +6,18 @@ source("src/paths/paths.R")
 source("src/database/tools.R")
 source("src/analysis/data/quality_check.R")
 
-dataset_spec <- function() {
+dataset_spec.ARPAE <- function() {
     list(
         "https://dati.datamb.it/dataset/dati-dalle-stazioni-meteo-locali-della-rete-idrometeorologica-regionale/resource/d990dd69-61c1-41d2-802b-86dc293660a8",
         "regional",
-        "Dataset di ARPAE. Portata istantanea. Sono stati utilizzati i dati aggregati qualora presenti, altrimenti sono stati aggregati a mano. L''orario è GMT, a differenza di altre regioni."
+        "Dataset di ARPAE. Portata istantanea. Sono stati utilizzati i dati aggregati qualora presenti, altrimenti sono stati aggregati a mano. L'orario è GMT, a differenza di altre regioni."
+    )
+}
+dataset_spec.Dext3r <- function() {
+    list(
+        "https://simc.arpae.it/dext3r/",
+        "regional",
+        "Dataset di ARPAE. Usato l'aggregazione giornaliera (GMT 00 - 00). L'orario è GMT, a differenza di altre regioni."
     )
 }
 
@@ -25,6 +32,8 @@ load_daily_data.dext3r <- function(dataconn) {
         mutate(
             lon = lon / 1e5,
             lat = lat / 1e5,
+            lon = if_else(lon < 15, lon, lat),
+            lat = if_else(lat > 40, lat, lon),
             province_full = str_to_title(province_full) |> case_match("Reggio Emilia" ~ "Reggio nell'Emilia", "Forli-Cesena" ~ "Forli'-Cesena", .default = str_to_title(province_full)),
             series_id = station_id,
             sensor_id = station_id,
@@ -60,7 +69,7 @@ load_daily_data.dext3r <- function(dataconn) {
     #         kind = "unknown"
     #     )
 
-    data <- open_dataset(file.path(path.ds, "ARPA", "EMILIA-ROMAGNA", "Dext3r", "data", "fragments") |> list.files(pattern = "*.parquet", full.names = TRUE)) |>
+    data <- open_dataset(file.path(path.ds, "ARPA", "EMILIA-ROMAGNA", "Dext3r", "data_orig", "fragments") |> list.files(pattern = "*.parquet", full.names = TRUE)) |>
         to_duckdb(con = dataconn) |>
         filter(!is.na(value)) |>
         group_by(id, variable, date = as.Date(start)) |>
@@ -70,6 +79,11 @@ load_daily_data.dext3r <- function(dataconn) {
         mutate(dataset = "Dext3r") |>
         to_arrow() |>
         compute()
+
+    meta <- meta |>
+        as_arrow_table() |>
+        semi_join(data, by = "station_id") |>
+        collect()
 
     list("meta" = meta, "data" = data)
 }

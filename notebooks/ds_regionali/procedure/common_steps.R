@@ -169,7 +169,7 @@ prepare_daily_data <- function(data_pack, statconn) {
 qc_checkpoint <- function(dataset, conn) {
     ds <- query_checkpoint(dataset, "raw", conn)
     qc_data <- qc1(ds$data)
-    qc_meta <- ds$meta |> semi_join(filter(qc_data, valid), by = c("dataset", "sensor_key"))
+    qc_meta <- ds$meta
     as_checkpoint(meta = qc_meta |> to_arrow(), data = qc_data |> to_arrow(), check_schema = FALSE) |> save_checkpoint(dataset, "qc1", check_schema = FALSE, partitioning = c("valid", "variable"))
 }
 
@@ -238,11 +238,11 @@ prepare_data_for_merge.old <- function(dataconn, ds_root, regenerate = FALSE) {
     ds_root
 }
 
-prepare_data_for_merge <- function(dataconn, from_raw_root, to_ds_root, regenerate = FALSE, test = FALSE) {
+prepare_data_for_merge <- function(dataconn, from_raw_root, to_ds_root, regenerate = TRUE, test = FALSE) {
     if (regenerate || !fs::dir_exists(to_ds_root)) {
         ds_files <- fs::path(from_raw_root, "**", "*.parquet")
         DBI::dbExecute(conns$data, stringr::str_glue("CREATE OR REPLACE VIEW ds_4merge_tmp AS SELECT * FROM read_parquet('{ds_files}', hive_partitioning = true, hive_types = {{'variable': INT}})"))
-        DBI::dbExecute(conns$data, stringr::str_glue("COPY ds_4merge_tmp TO '{to_ds_root}' (FORMAT PARQUET, PARTITION_BY (dataset, sensor_key, variable), FILENAME_PATTERN 'part-{{i}}')", con = dataconn))
+        DBI::dbExecute(conns$data, stringr::str_glue("COPY ds_4merge_tmp TO '{to_ds_root}' (FORMAT PARQUET, PARTITION_BY (dataset, sensor_key, variable), FILENAME_PATTERN 'part-{{i}}')"))
     }
 
     if (test) {

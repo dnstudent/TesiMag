@@ -63,51 +63,93 @@ fill_regional_na <- function(metadata, statconn) {
         select(-fill_province)
 }
 
-associate_regional_info <- function(metadata, statconn = NULL) {
-    regional_info <- read.csv(file.path("external", "province_regioni.csv"), na.strings = c(""))
+prepare_regional_completion <- function(metadata) {
     if ("province" %in% colnames(metadata)) {
-        metadata |>
-            fill_regional_na(statconn) |>
-            select(!any_of(c("province_code", "province_full"))) |>
-            mutate(
-                province_full = if_else(!is.na(province) & str_length(province) == 2L, NA_character_, province),
-                province_code = if_else(!is.na(province) & str_length(province) == 2L, province, NA_character_)
-            ) |>
-            left_join(regional_info, by = "province_code", copy = TRUE) |>
-            left_join(regional_info, by = c("province_full.x" = "province_full"), copy = TRUE) |>
-            mutate(
-                province_full = coalesce(province_full.x, province_full.y),
-                province_code = coalesce(province_code.x, province_code.y),
-                state = coalesce(state.x, state.y, state)
-            ) |>
-            select(!c(province, province_full.x, province_full.y, province_code.x, province_code.y, state.x, state.y))
-    } else if ("province_code" %in% colnames(metadata)) {
-        metadata |>
-            select(!any_of("province_full")) |>
-            left_join(regional_info, by = "province_code", copy = TRUE)
-    } else if ("province_full" %in% colnames(metadata)) {
-        metadata |>
-            mutate(province_join = province_full |> str_squish() |> str_to_lower()) |>
-            select(-province_full) |>
-            left_join(
-                regional_info |>
-                    mutate(province_join = province_full |> str_squish() |> str_to_lower()),
-                by = "province_join", copy = TRUE
-            ) |>
-            select(-province_join)
-    } else {
-        copy_to(statconn, metadata, name = "_m_tmp", overwrite = TRUE)
-        metadata <- dbGetQuery(
-            statconn,
-            "
-        SELECT m.*, b.name AS province_full
-        FROM _m_tmp m
-        LEFT JOIN boundary b
-        ON ST_Contains(b.geom, ST_SetSRID(ST_MakePoint(lon, lat), 4326)) AND b.kind = 'province'
-            "
+        metadata <- metadata |> mutate(
+            province_full = if_else(!is.na(province) & str_length(province) == 2L, NA_character_, province),
+            province_code = if_else(!is.na(province) & str_length(province) == 2L, province, NA_character_),
+            .keep = "unused"
         )
-        dbRemoveTable(statconn, "_m_tmp")
-        metadata |> associate_regional_info(NULL)
-        # metadata |> mutate(province_full = NA_character_, province_code = NA_character_, state = NA_character_)
     }
+    if (!("province_full" %in% colnames(metadata))) {
+        metadata <- metadata |> mutate(province_full = NA_character_)
+    }
+    if (!("province_code" %in% colnames(metadata))) {
+        metadata <- metadata |> mutate(province_code = NA_character_)
+    }
+    if (!("state" %in% colnames(metadata))) {
+        metadata <- metadata |> mutate(state = NA_character_)
+    }
+    metadata
+}
+
+associate_regional_info <- function(metadata, geoconn, info_path = fs::path(file.path("external", "province_regioni.csv"))) {
+    # NA è Napoli
+    regional_info <- vroom::vroom(info_path, col_types = "ccc", na = c("")) |>
+        mutate(province_k = province_full |> str_to_lower() |> str_squish() |> str_remove_all(regex("[^a-z]")))
+    provinces <- st_read(geoconn, "regional_boundaries", geometry_column = "geom", quiet = TRUE, ) |>
+        filter(kind == "province") |>
+        select(province_full = shapename)
+
+    metadata <- metadata |>
+        prepare_regional_completion() |>
+        st_md_to_sf() |>
+        st_join(provinces, join = st_intersects, suffix = c(".provided", ".computed"), left = TRUE) |>
+        st_drop_geometry() |>
+        mutate(province_full = coalesce(province_full.provided, province_full.computed), .keep = "unused") |>
+        mutate(province_k = province_full |> str_to_lower() |> str_squish() |> str_remove_all(regex("[^a-z]")), .keep = "unused") |>
+        left_join(regional_info, by = "province_k", suffix = c(".provided", ".table")) |>
+        mutate(province_code = coalesce(province_code.provided, province_code.table), state = coalesce(state.provided, state.table), .keep = "unused")
+
+    metadata |>
+        count(dataset, sensor_key) |>
+        assertr::verify(n == 1L, description = "Multiple metadata rows for the same sensor")
+
+    metadata
+
+    # if ("province" %in% colnames(metadata)) {
+    #     metadata <- metadata |>
+    #         fill_regional_na(statconn) |>
+    #         select(!any_of(c("province_code", "province_full"))) |>
+    #         mutate(
+    #             province_full = if_else(!is.na(province) & str_length(province) == 2L, NA_character_, province),
+    #             province_code = if_else(!is.na(province) & str_length(province) == 2L, province, NA_character_)
+    #         ) |>
+    #         left_join(regional_info, by = "province_code", copy = TRUE) |>
+    #         left_join(regional_info, by = c("province_full.x" = "province_full"), copy = TRUE) |>
+    #         mutate(
+    #             province_full = coalesce(province_full.x, province_full.y),
+    #             province_code = coalesce(province_code.x, province_code.y),
+    #             state = coalesce(state.x, state.y, state)
+    #         ) |>
+    #         select(!c(province, province_full.x, province_full.y, province_code.x, province_code.y, state.x, state.y))
+    # } else if ("province_code" %in% colnames(metadata)) {
+    #     metadata |>
+    #         select(!any_of("province_full")) |>
+    #         left_join(regional_info, by = "province_code", copy = TRUE)
+    # } else if ("province_full" %in% colnames(metadata)) {
+    #     metadata |>
+    #         mutate(province_join = province_full |> str_squish() |> str_to_lower()) |>
+    #         select(-province_full) |>
+    #         left_join(
+    #             regional_info |>
+    #                 mutate(province_join = province_full |> str_squish() |> str_to_lower()),
+    #             by = "province_join", copy = TRUE
+    #         ) |>
+    #         select(-province_join)
+    # } else {
+    #     copy_to(statconn, metadata, name = "_m_tmp", overwrite = TRUE)
+    #     metadata <- dbGetQuery(
+    #         statconn,
+    #         "
+    #     SELECT m.*, b.name AS province_full
+    #     FROM _m_tmp m
+    #     LEFT JOIN boundary b
+    #     ON ST_Contains(b.geom, ST_SetSRID(ST_MakePoint(lon, lat), 4326)) AND b.kind = 'province'
+    #         "
+    #     )
+    #     dbRemoveTable(statconn, "_m_tmp")
+    #     metadata |> associate_regional_info(NULL)
+    # metadata |> mutate(province_full = NA_character_, province_code = NA_character_, state = NA_character_)
+    # }
 }

@@ -50,7 +50,7 @@ qc_repetitions <- function(data, consecutive_int_threshold = 8L, consecutive_flo
         select(!c(consecutive_val_gid, is_integer))
 }
 
-qc1 <- function(raw_data_tbl, min_excursion = 1e-4, max_excursion = 50, min_T = -50, max_T = 50, consecutive_int_threshold = 8L, consecutive_float_threshold = 4L, is_int_threshold = 1e-4) {
+qc1 <- function(raw_data_tbl, min_excursion = 1e-4, max_excursion = 50, min_T = -30, max_T = 50, consecutive_int_threshold = 8L, consecutive_float_threshold = 4L, is_int_threshold = 1e-4) {
     raw_data_tbl |>
         qc_excursion(min_excursion, max_excursion) |>
         qc_gross(min_T, max_T) |>
