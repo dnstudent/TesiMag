@@ -84,7 +84,7 @@ gs <- series_groups(tagged_analysis, collect(meta), data, tag_anydupe)
 
 ```{r}
 regional_dataset <- tribble(
-  ~dataset, ~dataset_state,
+  ~dataset, ~dataset_district,
   "PIE", "Piemonte",
   "TOS", "Toscana",
   "VEN", "Veneto",
@@ -100,10 +100,10 @@ regional_dataset <- tribble(
 
 ````{r}
 ranked_series_groups <- gs$table |>
-  left_join(collect(meta) |> select(from_dataset = dataset, from_sensor_key = sensor_key, key, state_in = state), by = "key") |>
+  left_join(collect(meta) |> select(from_dataset = dataset, from_sensor_key = sensor_key, key, district_in = district), by = "key") |>
   left_join(regional_dataset, by = c("from_dataset" = "dataset")) |>
-  mutate(set = "tesidb", right_state = state_in == dataset_state) |>
-  rank_metadata(collect(meta), dataset_rankings = NULL, desc(right_state), desc(valid90))
+  mutate(set = "tesidb", right_district = district_in == dataset_district) |>
+  rank_metadata(collect(meta), dataset_rankings = NULL, desc(right_district), desc(valid90))
 ```
 
 ```{r}
@@ -124,7 +124,7 @@ duplications <- ranked_series_groups |>
   select(dataset = from_dataset, series_key = from_sensor_key, duplicate_of) |>
   distinct()
 duplications |>
-  left_join(meta |> select(dataset, series_key, name, series_first, series_last, valid90, lon, lat, elevation, state), by = c("dataset", "series_key"), copy = T) |>
+  left_join(meta |> select(dataset, series_key, name, series_first, series_last, valid90, lon, lat, elevation, district), by = c("dataset", "series_key"), copy = T) |>
   readr::write_csv(file.path("notebooks", "ds_nazionali", "TESIDB", "merge_duplicates.csv"))
 ```
 

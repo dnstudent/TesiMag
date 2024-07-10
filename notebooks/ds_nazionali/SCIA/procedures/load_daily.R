@@ -20,7 +20,7 @@ dataset_spec <- function() {
 
 load_meta <- function() {
     wfsreti_meta <- read.SCIA.metadata("T_MAX") |>
-        rename(id = identifier, network = rete, name = anagrafica)
+        rename(id = identifier, network = rete, name = anagrafica, district = state)
     official_meta <- vroom::vroom(
         file.path(path.ds, "SCIA", "stazioni", "stazioni_reduced.csv"),
         col_types = "cccddd",
@@ -69,7 +69,7 @@ load_meta <- function() {
             last_year,
             first_year,
             valid_days,
-            state,
+            district,
             province,
             net_code
         )
@@ -80,7 +80,7 @@ load_meta <- function() {
 load_daily_data.scia <- function() {
     meta <- load_meta() |>
         select(-valid_days) |>
-        mutate(dataset = "SCIA", state = as.character(state), province = as.character(province), network = as.character(network), id = as.character(id), kind = "unknown") |>
+        mutate(dataset = "SCIA", district = as.character(district), province = as.character(province), network = as.character(network), id = as.character(id), kind = "unknown") |>
         rename(series_id = id) |>
         as_arrow_table()
 

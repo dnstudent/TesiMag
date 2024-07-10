@@ -4,7 +4,7 @@ options(repr.plot.width = 9, repr.plot.res = 300)
 
 source("src/analysis/data/clim_availability.R")
 
-plot_state_avail <- function(metadata, data, start_date = NULL, end_date = NULL, ...) {
+plot_district_avail <- function(metadata, data, start_date = NULL, end_date = NULL, ...) {
     ymonthly_availabilities <- data |>
         left_join(metadata |> select(dataset, sensor_key), join_by(dataset, sensor_key)) |>
         collect() |>
@@ -21,7 +21,7 @@ plot_state_avail <- function(metadata, data, start_date = NULL, end_date = NULL,
     list("plot" = p, "data" = ymonthly_availabilities)
 }
 
-plot_state_avail.tbl <- function(data, stack, .minimum_valid_days = 20L, .maximum_consecutive_missing_days = 4L) {
+plot_district_avail.tbl <- function(data, stack, .minimum_valid_days = 20L, .maximum_consecutive_missing_days = 4L) {
     ymonthly <- monthly_availabilities(data, minimum_valid_days = .minimum_valid_days, maximum_consecutive_missing_days = .maximum_consecutive_missing_days) |>
         compute()
 

@@ -44,7 +44,7 @@ load_metadata <- function() {
         rename(station_id = station_code, name = station_name) |>
         mutate(
             dataset = "ARPAFVG",
-            # state = "Friuli-Venezia Giulia",
+            district = "Friuli-Venezia Giulia",
             network = "ARPAFVG",
             kind = "unknown",
             user_code = station_id,

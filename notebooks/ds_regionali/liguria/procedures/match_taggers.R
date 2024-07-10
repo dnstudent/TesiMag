@@ -1,6 +1,8 @@
 library(dplyr, warn.conflicts = FALSE)
 
-tag_manual <- function(tagged_analysis) {
+source("src/merging/pairing.R")
+
+tag_manual.old <- function(tagged_analysis) {
     tagged_analysis |>
         mutate(
             tag_same_series = (tag_same_series &
@@ -21,6 +23,26 @@ tag_manual <- function(tagged_analysis) {
                 ) |
                 ((dataset_x == "ISAC" & dataset_y == "SCIA") &
                     (sensor_key_x == 3351L & sensor_key_y == 3601L) # Settepani
+                )) |> coalesce(FALSE)
+        )
+}
+
+tag_manual <- function(tagged_analysis) {
+    tagged_analysis |>
+        mutate(
+            tag_same_series = (tag_same_series &
+                !(!!user_codes_are("VERZI", "07LOAN0")) &
+                !(!!datasets_are("SCIA", "SCIA") &
+                    (
+                        !!user_codes_are_("01310", "07TAVRN") | # Mattarana / Tavarone
+                            !!user_codes_are_("01310", "01270") | # Mattarana / Tavarone
+                            !!user_codes_are_("07GPIA0", "00898") | # Giacopiane Diga / Lago
+                            !!user_codes_are_("07CAIR0", "07OSID0") # Cairo Montenotte / Osiglia
+                    )
+                ) |
+                (!!datasets_are("SCIA", "SCIA") & !!user_codes_are_("01S2589", "01615")) |
+                (!!datasets_are("ISAC", "SCIA") &
+                    !!series_ids_are("LIG_SV_SETTEPANI_02_000289200", "7598") # Settepani
                 )) |> coalesce(FALSE)
         )
 }

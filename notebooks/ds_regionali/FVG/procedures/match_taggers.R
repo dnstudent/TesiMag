@@ -1,4 +1,5 @@
 library(dplyr, warn.conflicts = FALSE)
+source("src/merging/pairing.R")
 
 tag_same_series <- function(analysis) {
     analysis |>
@@ -43,7 +44,7 @@ tag_same_series <- function(analysis) {
         ungroup()
 }
 
-tag_manual <- function(tagged_analysis) {
+tag_manual.old <- function(tagged_analysis) {
     tagged_analysis |>
         mutate(
             tag_same_series =
@@ -108,6 +109,81 @@ tag_manual <- function(tagged_analysis) {
                                     (sensor_key_x == 117L & sensor_key_y == 118L) | # Aviano (USAF)
                                     (sensor_key_x == 115L & sensor_key_y == 118L) | # Aviano (USAF)
                                     (sensor_key_x == 798L & sensor_key_y == 799L) # Cimolais
+                            ))
+                    )
+        )
+}
+
+tag_manual <- function(tagged_analysis) {
+    tagged_analysis |>
+        mutate(
+            tag_same_series =
+                (tag_same_series &
+                    !(!!datasets_are("ARPAFVG", "ISAC") &
+                        (
+                            !!series_ids_are("MUS", "FVG_UD_MUSI_02_000231600") | # Musi
+                                !!series_ids_are("FSP", "FVG_UD_FORNI_DI_SOPRA_02_000231300") | # Forni di Sopra
+                                !!series_ids_are("GEM", "FVG_UD_GEMONA_DEL_FRIULI_02_000232500") | # Gemona
+                                !!series_ids_are("LIG", "FVG_UD_LIGNANO_SABBIADORO_02_000343800") | # Lignano
+                                (series_id_x == "TOL") | # Tolmezzo
+                                !!series_ids_are("FAG", "FVG_UD_FAGAGNA_02_000393300") | # Fagagna
+                                !!series_ids_are("TRI", "FVG_TS_TRIESTE_METEO_ISTITUTO_NAUTICO_02_000401700") | # Trieste
+                                !!series_ids_are("MGG", "FVG_TS_MUGGIA_02_000344200") | # Muggia
+                                (series_id_x == "ZON") | # Zoncolan
+                                (series_id_x == "CDP") | #  Cave del Predil
+                                !!series_ids_are("PIA", "FVG_PN_PIANCAVALLO_02_000103300") # Piancavallo
+                        )
+                    ) &
+                    !(!!datasets_are("ISAC", "SCIA") &
+                        (
+                            !!series_ids_are("FVG_UD_MUSI_02_000231600", "6087") | # Musi
+                                !!series_ids_are("FVG_UD_TOLMEZZO_02_000149200", "8424") | # Tolmezzo
+                                (series_id_x == "FVG_UD_FORNI_DI_SOPRA_02_000231300" & series_id_y != "8381") | # Forni di Sopra
+                                !!series_ids_are("FVG_UD_FORNI_DI_SOPRA_01_200251411", "8380") | # Forni di Sopra
+                                !!series_ids_are("FVG_UD_FAGAGNA_02_000393300", "6069") | # Fagagna
+                                !!series_ids_are("FVG_PN_CLAUT_02_000232400", "8335") | # Claut - Lesis
+                                !!series_ids_are("FVG_GO_MONFALCONE_PLUVIO_02_000501000", "8690") | # Monfalcone
+                                !!series_ids_are("FVG_UD_CHIUSAFORTE_02_000230900", "8438") | # Chiusaforte / Raccolana
+                                !!one_station_is("SCIA", series_id = "8707") # Tarvisio storica
+                        )
+                    ) &
+                    !(!!datasets_are("ARPAFVG", "SCIA") &
+                        (
+                            !!series_ids_are("MNF", "8692") | # Monfalcone
+                                !!series_ids_are("FSP", "8381") | # Forni di Sopra
+                                !!series_ids_are("FSP", "8380") | # Forni di Sopra
+                                !!series_ids_are("LIG", "8604") | # Lignano
+                                !!series_ids_are("MGG", "8702") | # Muggia
+                                (series_id_x == "TOL") | #  Tolmezzo
+                                (series_id_x == "ZON") | # Zoncolan
+                                !!series_ids_are("TRI", "6066") | # Trieste
+                                (series_id_x == "CDP") | # Cave del Predil
+                                !!series_ids_are("PIA", "8349") | # Piancavallo
+                                !!one_station_is("SCIA", series_id = "8707") # Tarvisio storica
+                        )
+                    ) &
+                    !(!!datasets_are_("ISAC", "ISAC") &
+                        (
+                            !!series_ids_are_("FVG_UD_FORNI_DI_SOPRA_01_200251411", "FVG_UD_FORNI_DI_SOPRA_02_000231300") # Forni di Sopra
+                        )
+                    ) &
+                    !(!!datasets_are_("SCIA", "SCIA") &
+                        (
+                            !!series_ids_are_("8380", "6084") | # Forni di Sopra
+                                (user_code_x == "160360" | user_code_y == "160360") | # Aviano (non USAF)
+                                !!one_station_is("SCIA", series_id = "8707") # Tarvisio storica
+                        )
+                    ) &
+                    !((dataset_y == "SCIA" & series_id_y == "8706" & series_id_x != "FVG_UD_TARVISIO_02_000208900") | (dataset_x == "ISAC" & series_id_x == "FVG_UD_TARVISIO_02_000208900" & series_id_y != "8706") | (dataset_y == "ISAC" & series_id_y == "FVG_UD_TARVISIO_02_000208900")) # Tarvisio Campo
+                ) |
+                    (
+                        (!!datasets_are("ISAC", "SCIA") & !!series_ids_are("FVG_UD_PASSO_PREDIL_02_000487200", "8710")) | # Passo del Predil
+                            (!!datasets_are("ARPAFVG", "ISAC") & !!series_ids_are("MNF", "FVG_GO_MONFALCONE_02_000343400")) | # Monfalcone
+                            (!!datasets_are("ARPAFVG", "SCIA") & !!series_ids_are("SAN", "5483")) | # San Vito al Tagliamento
+                            (!!datasets_are_("SCIA", "SCIA") & (
+                                !!series_ids_are_("6702", "6700") | # Udine Rivolto
+                                    !!series_ids_are_("6695", "6696") | # Aviano (USAF)
+                                    !!series_ids_are_("8333", "8334") # Cimolais
                             ))
                     )
         )

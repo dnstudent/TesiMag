@@ -1,4 +1,5 @@
 library(dplyr, warn.conflicts = FALSE)
+source("src/merging/pairing.R")
 
 tag_same_series <- function(analysis) {
     analysis |>
@@ -37,14 +38,28 @@ tag_same_series <- function(analysis) {
 
 tag_manual <- function(tagged_analysis) {
     tagged_analysis |> mutate(
-        tag_same_series = tag_same_series & !(
-            (dataset_x == "ARPAM" & dataset_y == "ISAC" &
-                (sensor_key_x == 75L & sensor_key_y == 2804L) | # CADSEALAND / Porto Recanati
-                (sensor_key_x == 116L & sensor_key_y == 2705L) # Poggio Cancelli
-            )
-        ) |
-            (dataset_x == "ARPAM" & dataset_y == "SCIA" &
-                FALSE
-            )
+        tag_same_series = (tag_same_series & !(
+            (!!datasets_are("ARPAM", "ISAC") &
+                (!!series_ids_are("2684", "MAR_MC_PORTO_RECANATI_02_000002610") | # CADSEALAND / Porto Recanati
+                    !!series_ids_are("2722", "ABR_AQ_POGGIO_CANCELLI_02_200043377") | # Poggio Cancelli
+                    !!series_ids_are("2721", "MAR_AP_MONTEMONACO_02_000002589") | # Montemonaco
+                    !!one_station_is("ARPAM", user_code = "RM-2719") | # Lornano
+                    !!one_station_is("ARPAM", user_code = "RM-2712") | # Arcevia
+                    !!one_station_is("ARPAM", user_code = "RM-2708") # Fossombrone
+                )
+            ) |
+                (!!datasets_are("ISAC", "SCIA") &
+                    (!!series_ids_are("PES", "10711") # Pesaro Valerio / Ferrovia
+                    )
+                ) |
+                (!!datasets_are("ARPAM", "ARPAM") &
+                    (!!user_codes_are_("RT-1588", "RM-2721") | # Montemonaco
+                        !!one_station_is("ARPAM", user_code = "RM-2719") | # Lornano
+                        !!one_station_is("ARPAM", user_code = "RM-2712") | # Arcevia
+                        !!one_station_is("ARPAM", user_code = "RM-2708") # Fossombrone
+                    )
+
+                )
+        ))
     )
 }

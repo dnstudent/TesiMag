@@ -28,7 +28,7 @@ load_daily_data.dext3r <- function(dataconn) {
         unnest(cols = c(region, province, municipality, basin, subbasin, macroarea, country, owner, manager), names_sep = "_") |>
         hoist(categories, category = 1L) |>
         select(-categories) |>
-        rename(elevation = height, state_o = region_name, province_full = province_name, province_num = province_code, station_id = id, town = municipality_name) |>
+        rename(elevation = height, district_o = region_name, province_full = province_name, province_num = province_code, station_id = id, town = municipality_name) |>
         mutate(
             lon = lon / 1e5,
             lat = lat / 1e5,
@@ -51,7 +51,7 @@ load_daily_data.dext3r <- function(dataconn) {
     #     rename(
     #         town = Comune,
     #         province_full = Provincia,
-    #         # state = Regione,
+    #         # district = Regione,
     #         station_id = id
     #     ) |>
     #     mutate(

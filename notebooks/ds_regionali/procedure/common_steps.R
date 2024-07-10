@@ -181,7 +181,7 @@ qc_checkpoint <- function(dataset, conn) {
 #'
 #' @return A list containing the plot and the data.
 ymonthly_availabilities <- function(data, stack = FALSE, ...) {
-    plot_state_avail.tbl(
+    plot_district_avail.tbl(
         data, stack, ...
     )
 }
@@ -333,7 +333,7 @@ merged_checkpoint <- function(set_name, merge_results_path, metadata) {
             .groups = "drop"
         ) |>
         select(
-            dataset, series_key, name, user_code, network, state, province_code, town, lon, lat, elevation, elevation_glo30, kind, series_first, series_last,
+            dataset, series_key, name, user_code, network, district, province_code, town, lon, lat, elevation, elevation_glo30, kind, series_first, series_last,
             from_datasets, from_sensor_keys, data_ranks
         ) |>
         left_join(datestats, by = c("dataset", "series_key"), relationship = "one-to-one") |>
@@ -345,7 +345,7 @@ merged_checkpoint <- function(set_name, merge_results_path, metadata) {
                 name = utf8(),
                 user_code = utf8(),
                 network = utf8(),
-                state = utf8(),
+                district = utf8(),
                 province_code = utf8(),
                 town = utf8(),
                 lon = float64(),
@@ -369,4 +369,20 @@ merged_checkpoint <- function(set_name, merge_results_path, metadata) {
 
     # return(list(compute(metadata), data))
     list(meta = compute(metadata), data = compute(data)) |> save_checkpoint(set_name, "merged", check_schema = FALSE, key = "series_key")
+}
+
+test_tagged_analysis <- function(state_dir) {
+    tao <- openxlsx::read.xlsx(fs::path("notebooks", "ds_regionali", state_dir, "tagged_analysis.old.xlsx"))
+    ta <- openxlsx::read.xlsx(fs::path("notebooks", "ds_regionali", state_dir, "tagged_analysis.xlsx"))
+
+    problems <- tao |>
+        full_join(ta, by = c("dataset_x", "sensor_key_x", "variable", "dataset_y", "sensor_key_y"), suffix = c(".old", ".new")) |>
+        filter(is.na(tag_same_series.old) | is.na(tag_same_series.new) | tag_same_series.old != tag_same_series.new)
+
+
+    if (problems |> nrow() > 0L) {
+        warning("Tagged analysis is not consistent")
+    }
+
+    problems
 }
