@@ -18,13 +18,13 @@ describe.BRUN.metadata_ <- function(data) {
             across(where(is.character), \(x) na_if(x, "")),
             GSOD = replace_na(GSOD, FALSE),
             MG = replace_na(MG, FALSE),
-            country = replace_na(country, "IT") |> as.factor() |> fct_collapse(IT = c("IT", "ITA")),
-            state = as.factor(state),
+            country = country |> as.factor() |> fct_collapse(IT = c("IT", "ITA")),
+            district = as.factor(district),
             province = as.factor(province)
         ) |>
-        left_join(italian_states_, join_by(state == code)) |>
-        select(-state) |>
-        rename(state = name)
+        left_join(italian_districts_, join_by(district == code)) |>
+        select(-district) |>
+        rename(district = name)
 }
 
 read.BRUN.metadata <- function(tvar, flavor) {

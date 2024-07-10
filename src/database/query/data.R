@@ -58,6 +58,10 @@ query_checkpoint_meta <- function(datasets, step = "raw", conn = NULL, filename 
 }
 
 query_checkpoint <- function(datasets, step, conn = NULL, all_stations = FALSE, filename = FALSE) {
+    if (is.null(conn)) {
+        conn <- dbConnect(duckdb())
+        dbExecute(conn, "INSTALL icu; LOAD icu;")
+    }
     meta_step <- if (all_stations) "raw" else step
     list(
         "meta" = query_checkpoint_meta(datasets, meta_step, conn, filename),
@@ -71,7 +75,7 @@ valid_series <- function(valid_data) {
 
 useful_data <- function(data_query) {
     stations <- tbl(data_query$src$con, "raw_stations_tmp") |>
-        filter(lat > 42.1, !(geom_state %in% c("Lazio", "Abruzzo"))) |>
+        filter(lat > 42.1, !(geom_district %in% c("Lazio", "Abruzzo"))) |>
         select(id)
 
     data_query |>

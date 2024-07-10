@@ -22,7 +22,8 @@ station_schema <- schema(
     town = utf8(),
     province_full = utf8(),
     province_code = utf8(),
-    state = utf8(),
+    country = utf8(),
+    district = utf8(),
     station_first = date32(), # declared
     station_last = date32(), # declared
     # first_registration = date32(), # effective

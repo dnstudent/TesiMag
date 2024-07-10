@@ -3,21 +3,21 @@ library(RPostgres, warn.conflicts = FALSE)
 library(sf, warn.conflicts = FALSE)
 
 query_boundary <- function(conn, name, kind) {
-    st_read(conn, query = glue::glue_sql("SELECT * FROM regional_boundaries WHERE shapename = {name} AND kind = {kind}", .con = conn), geometry_column = "geom", quiet = TRUE)
+    st_read(conn, query = glue::glue_sql('SELECT * FROM regional_boundaries WHERE "shapeName" = {name} AND kind = {kind}', .con = conn), geometry_column = "geometry", quiet = TRUE)
 }
 
 query_boundaries <- function(conn, of) {
     copy_to(conn, of, name = "meta_bounds_tmp", overwrite = TRUE)
 }
 
-query_state_matches <- function(statconn, state_name, distance_threshold, buffer_m, cmp = "<") {
+query_district_matches <- function(statconn, district_name, distance_threshold, buffer_m, cmp = "<") {
     query <- glue::glue(
         "
         WITH inside_stations AS (SELECT s.*
         FROM raw_station_geo s
         JOIN regional_boundaries b
         ON ST_DWithin(b.geom::geography, s.geog, {buffer_m})
-        WHERE b.name = '{state_name}'
+        WHERE b.name = '{district_name}'
         )
         SELECT
             a.id AS id_x,
@@ -60,7 +60,7 @@ query_stations_inside <- function(statconn, shape_name, buffer_m = 0) {
     tbl(statconn, sql(query), check_from = FALSE)
 }
 
-close_matches_inside <- function(statconn, state, distance_threshold) {
+close_matches_inside <- function(statconn, district, distance_threshold) {
     query <- glue::glue_sql(
         "
             WITH
@@ -68,7 +68,7 @@ close_matches_inside <- function(statconn, state, distance_threshold) {
             FROM raw_station_geo s
             JOIN boundary b
             ON ST_DWithin(b.geom::geography, s.geog, {distance_threshold})
-            WHERE b.name = {state}
+            WHERE b.name = {district}
             )
             SELECT a.id AS id_x, b.id AS id_y, ST_Distance(a.geog, b.geog) AS distance
             FROM relevant_stations a

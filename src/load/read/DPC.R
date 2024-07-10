@@ -16,7 +16,7 @@ read.DPC.metadata <- function(tvar, flavor) {
             across(where(is.character), \(x) na_if(x, "")),
             province = as.factor(province)
         ) |>
-        left_join(italian_states_, join_by(state == code)) |>
-        select(-state) |>
-        mutate(state = as.factor(name), .keep = "unused")
+        left_join(italian_districts_, join_by(district == code)) |>
+        select(-district) |>
+        mutate(district = as.factor(name), .keep = "unused")
 }

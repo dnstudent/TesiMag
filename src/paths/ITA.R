@@ -9,14 +9,14 @@ path.boundaries.italy.integer <- function(level) {
 path.boundaries.italy.character <- function(level) {
     level <- switch(level,
         "country" = 0,
-        "state" = 1,
+        "district" = 1,
         "province" = 2
     )
     path.boundaries.italy.integer(level)
 }
 path.boundaries.italy <- function(level) UseMethod("path.boundaries.italy", level)
 
-# path.boundaries.italian_states <- file.path(path.ds, "geoBoundaries", "ITA-ADM1", "geoBoundaries-ITA-ADM1.geojson")
+# path.boundaries.italian_districts <- file.path(path.ds, "geoBoundaries", "ITA-ADM1", "geoBoundaries-ITA-ADM1.geojson")
 
 ls.COP30.missing <- function() {
     list.files(path = file.path(path.COP30, "missing"), recursive = FALSE, full.names = TRUE, pattern = "^missing_N\\d{2}_E0\\d{2}.tif$")

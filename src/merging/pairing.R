@@ -37,7 +37,7 @@ pair_common_series <- function(x, match_list, by = c("key_x", "key_y", "variable
 
 
 both_are_asym <- function(x, y, value_x, value_y) {
-    expr((({{ x }} == {{ value_x }} & {{ y }} == {{ value_y }})))
+    expr((!is.na({{ x }}) & !is.na({{ y }}) & ({{ x }} == {{ value_x }}) & ({{ y }} == {{ value_y }})))
 }
 
 both_are_sym <- function(x, y, value1, value2) {
@@ -56,7 +56,12 @@ tags_are_sym <- function(tag, value1, value2, suffix = c("_x", "_y")) {
 
 in_tags <- function(tag, value, suffix = c("_x", "_y")) {
     tags <- str_c(tag, suffix)
-    expr((!!sym(tags[[1]]) == {{ value }} | !!sym(tags[[2]]) == {{ value }}))
+    expr(
+        (
+            (!is.na(!!sym(tags[[1]])) & !!sym(tags[[1]]) == {{ value }}) |
+                (!is.na(!!sym(tags[[2]]) & !!sym(tags[[2]]) == {{ value }}))
+        )
+    )
 }
 
 datasets_are_ <- purrr::partial(tags_are_sym, "dataset")

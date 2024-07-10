@@ -63,43 +63,72 @@ fill_regional_na <- function(metadata, statconn) {
         select(-fill_province)
 }
 
-prepare_regional_completion <- function(metadata) {
+add_missing_columns <- function(metadata, cols) {
+    for (col in cols) {
+        if (!(col %in% colnames(metadata))) {
+            metadata <- metadata |> mutate("{col}" := NA_character_)
+        }
+    }
+    metadata
+}
+
+prepare_for_regional_completion <- function(metadata) {
+    metadata <- add_missing_columns(metadata, c("country", "province_full", "province_code", "district"))
     if ("province" %in% colnames(metadata)) {
         metadata <- metadata |> mutate(
-            province_full = if_else(!is.na(province) & str_length(province) == 2L, NA_character_, province),
-            province_code = if_else(!is.na(province) & str_length(province) == 2L, province, NA_character_),
+            province_full = coalesce(province_full, if_else(!is.na(province) & str_length(province) == 2L, NA_character_, province)) |> str_to_title(),
+            province_code = coalesce(province_code, if_else(!is.na(province) & str_length(province) == 2L, province, NA_character_)) |> str_to_upper(),
             .keep = "unused"
         )
-    }
-    if (!("province_full" %in% colnames(metadata))) {
-        metadata <- metadata |> mutate(province_full = NA_character_)
-    }
-    if (!("province_code" %in% colnames(metadata))) {
-        metadata <- metadata |> mutate(province_code = NA_character_)
-    }
-    if (!("state" %in% colnames(metadata))) {
-        metadata <- metadata |> mutate(state = NA_character_)
     }
     metadata
 }
 
 associate_regional_info <- function(metadata, geoconn, info_path = fs::path(file.path("external", "province_regioni.csv"))) {
+    metadata |>
+        count(dataset, sensor_key) |>
+        assertr::verify(n == 1L, description = "Multiple metadata rows for the same sensor")
+
     # NA è Napoli
     regional_info <- vroom::vroom(info_path, col_types = "ccc", na = c("")) |>
-        mutate(province_k = province_full |> str_to_lower() |> str_squish() |> str_remove_all(regex("[^a-z]")))
-    provinces <- st_read(geoconn, "regional_boundaries", geometry_column = "geom", quiet = TRUE, ) |>
-        filter(kind == "province") |>
-        select(province_full = shapename)
+        rename(district = state) |>
+        mutate(
+            province_k = province_full |> str_to_lower() |> str_squish() |> str_remove_all(regex("[^a-z]")),
+            province_code = str_to_upper(province_code),
+            province_full = str_to_title(province_full)
+        )
+    geo <- st_read(geoconn, "regional_boundaries", geometry_column = "geometry", quiet = TRUE) |> mutate(shapeName = str_to_title(shapeName))
+
+    districts <- geo |>
+        filter(kind == "district") |>
+        select(district = shapeName, country)
+    provinces <- geo |>
+        filter(kind == "municipality") |>
+        select(province_full = shapeName)
 
     metadata <- metadata |>
-        prepare_regional_completion() |>
+        prepare_for_regional_completion() |>
         st_md_to_sf() |>
+        st_join(districts, join = st_intersects, suffix = c(".provided", ".computed"), left = TRUE) |>
         st_join(provinces, join = st_intersects, suffix = c(".provided", ".computed"), left = TRUE) |>
         st_drop_geometry() |>
-        mutate(province_full = coalesce(province_full.provided, province_full.computed), .keep = "unused") |>
+        mutate(
+            country = coalesce(country.provided, country.computed) |> str_to_title(),
+            district = coalesce(district.provided, district.computed) |> str_to_title(),
+            province_full = coalesce(province_full.provided, province_full.computed) |> str_to_title(),
+            .keep = "unused"
+        ) |>
         mutate(province_k = province_full |> str_to_lower() |> str_squish() |> str_remove_all(regex("[^a-z]")), .keep = "unused") |>
-        left_join(regional_info, by = "province_k", suffix = c(".provided", ".table")) |>
-        mutate(province_code = coalesce(province_code.provided, province_code.table), state = coalesce(state.provided, state.table), .keep = "unused")
+        left_join(regional_info, by = "province_k", suffix = c(".provided", ".table"), relationship = "many-to-one") |>
+        mutate(province_code = coalesce(province_code.provided, province_code.table) |> str_to_upper(), district = coalesce(district.provided, district.table), .keep = "unused") |>
+        left_join(regional_info, by = "province_code", suffix = c(".provided", ".table"), relationship = "many-to-one") |>
+        mutate(province_full = coalesce(province_full.provided, province_full.table), district = coalesce(district.provided, district.table), .keep = "unused") |>
+        select(-starts_with("province_k")) |>
+        mutate(across(c("country", "district", "province_full"), str_to_title), province_code = str_to_upper(province_code)) |>
+        group_by(dataset, sensor_key) |>
+        arrange(country, district, province_full, .by_group = TRUE) |>
+        slice_tail() |> # In caso di sovrapposizioni dei confini regionali, prendo l'ultimo match. In particolare i confini forniti per la Francia sono pessimi
+        ungroup()
 
     metadata |>
         count(dataset, sensor_key) |>
@@ -120,9 +149,9 @@ associate_regional_info <- function(metadata, geoconn, info_path = fs::path(file
     #         mutate(
     #             province_full = coalesce(province_full.x, province_full.y),
     #             province_code = coalesce(province_code.x, province_code.y),
-    #             state = coalesce(state.x, state.y, state)
+    #             district = coalesce(district.x, district.y, district)
     #         ) |>
-    #         select(!c(province, province_full.x, province_full.y, province_code.x, province_code.y, state.x, state.y))
+    #         select(!c(province, province_full.x, province_full.y, province_code.x, province_code.y, district.x, district.y))
     # } else if ("province_code" %in% colnames(metadata)) {
     #     metadata |>
     #         select(!any_of("province_full")) |>
@@ -150,6 +179,6 @@ associate_regional_info <- function(metadata, geoconn, info_path = fs::path(file
     #     )
     #     dbRemoveTable(statconn, "_m_tmp")
     #     metadata |> associate_regional_info(NULL)
-    # metadata |> mutate(province_full = NA_character_, province_code = NA_character_, state = NA_character_)
+    # metadata |> mutate(province_full = NA_character_, province_code = NA_character_, district = NA_character_)
     # }
 }
