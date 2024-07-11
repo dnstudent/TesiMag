@@ -1,4 +1,5 @@
 library(dplyr, warn.conflicts = FALSE)
+source("src/merging/pairing.R")
 
 tag_same_series <- function(analysis) {
     analysis |>
@@ -58,11 +59,12 @@ tag_manual <- function(tagged_analysis) {
                                 (sensor_key_x == 2846L & sensor_key_y == 325L) # Prato
                             )
                         ) |
-                        (dataset_x == "SIRToscana" & dataset_y == "SIRToscana" &
+                        (!!datasets_are("SIRToscana", "SIRToscana") &
                             ((sensor_key_x == 136L & sensor_key_y == 141L) | #  Firenze Ximeniano
                                 (sensor_key_x == 436L & sensor_key_y != 439L) | # Volterra
                                 (sensor_key_x != 436L & sensor_key_y == 439L) | # Volterra
-                                (sensor_key_x %in% c(437L, 438L, 440L) | sensor_key_y %in% c(437L, 438L, 440L)) # Volterra
+                                (sensor_key_x %in% c(437L, 438L, 440L) | sensor_key_y %in% c(437L, 438L, 440L)) | # Volterra
+                                !!user_codes_are_("TOS10002410", "TOS11000070") # Suvereto
                             )
                         ) |
                         (dataset_x == "SCIA" & dataset_y == "SIRToscana" &
@@ -90,8 +92,7 @@ tag_manual <- function(tagged_analysis) {
                         (sensor_key_x == 146L & sensor_key_y == 147L) | # Follonica
                             (sensor_key_x == 426L & sensor_key_y == 427L) | # Viareggio
                             (sensor_key_x == 427L & sensor_key_y == 428L) | # Viareggio
-                            (sensor_key_x == 437L & sensor_key_y == 439L) | # Volterra
-                            (sensor_key_x == 401L & sensor_key_y == 402L) # Suvereto
+                            (sensor_key_x == 437L & sensor_key_y == 439L) # Volterra
                     )
                 ) |
                 (dataset_x == "ISAC" & dataset_y == "SIRToscana" &

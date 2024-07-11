@@ -99,7 +99,6 @@ tag_manual <- function(tagged_analysis) {
                 (dataset_x == "ISAC" & dataset_y == "TAA" & (
                     (sensor_key_x == 2469L & sensor_key_y == 95L) | #  Grigno
                         (sensor_key_x == 2028L & sensor_key_y == 123L) | # Mezzolombardo
-                        (sensor_key_x == 583L & sensor_key_y == 28L) | # Campo Tures / Molini Tures
                         (sensor_key_x == 966L & sensor_key_y == 51L) | # Cimego
                         (sensor_key_x == 1876L & sensor_key_y == 112L) | # Malè
                         (sensor_key_x == 3239L & sensor_key_y == 229L) | # Sarentino
