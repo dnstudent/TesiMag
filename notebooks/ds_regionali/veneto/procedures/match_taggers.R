@@ -1,4 +1,5 @@
 library(dplyr, warn.conflicts = FALSE)
+source("src/merging/pairing.R")
 
 #' Tagger which categorically discards matching series, even if they effectively represent the same station.
 #'
@@ -57,21 +58,21 @@ tag_manual <- function(tagged_analysis) {
     tagged_analysis |> mutate(
         tag_same_series = (
             tag_same_series & !(
-                (dataset_x == "ARPAV" & network_y != "DPC" & sensor_key_x == 94L) |
+                (dataset_x == "ARPAV" & network_y != "DPC" & !is.na(user_code_x) & user_code_x == "300014148") | # Fortogna (Longarone)
                     (network_x == "DPC" & dataset_y == "SCIA" & (
-                        sensor_key_x == 3881L # Venezia Sede
+                        !is.na(series_id_x) & series_id_x == "VEN_VE_VENEZIA_SEDE_02_000131900" # Venezia Sede
                     ))
             )) |
             (
-                (dataset_x == "ARPAV" & dataset_y == "ISAC" & (
-                    (sensor_key_x == 7L & sensor_key_y == 121L) | # Andraz
-                        (sensor_key_x == 7L & sensor_key_y == 122L) | # Andraz
-                        (sensor_key_x == 22L & sensor_key_y == 306L) | # Belluno Aereoporto
-                        (sensor_key_x == 51L & sensor_key_y == 3716L) | # Venezia Treporti
-                        (sensor_key_x == 163L & sensor_key_y == 2499L) # Passo Falzarego
+                (!!datasets_are("ARPAV", "ISAC") & (
+                    !!series_ids_are("256", "IT_VEN_BL_ANDRAZ") | # Andraz
+                        !!series_ids_are("256", "VEN_BL_ANDRAZ_CERNADOI_01_200251582") | # Andraz
+                        !!series_ids_are("264", "BEL") | # Belluno Aereoporto
+                        !!series_ids_are("160", "VEN_VE_TREPORTI_02_000238900") | # Venezia Treporti
+                        !!series_ids_are("37", "VEN_BL_PASSO_FALZAREGO_02_000040000") # Passo Falzarego
                 )) |
-                    (dataset_x == "ISAC" & dataset_y == "SCIA" & (
-                        (sensor_key_x == 2423L & sensor_key_y == 2668L) #  Padova
+                    (!!datasets_are("ISAC", "SCIA") & (
+                        !!series_ids_are("PAD", "6724") # Padova Synop
                     ))
             )
     )

@@ -26,14 +26,11 @@ tag_manual <- function(tagged_analysis) {
     tagged_analysis |> mutate(
         tag_same_series = (tag_same_series |
             (!!datasets_are("ISAC", "ISAC") & (
-                !!sensor_keys_are(3831L, 4048L) # Plateu Rosa
+                !!series_ids_are_("IT_VDA_AO_VALTOURNENCHE_PLATEAU_ROSA", "160520") # Plateau Rosa
             )) |
             (!!datasets_are("ISAC", "SCIA") & (
-                !!sensor_keys_are(472L, 551L) # Brusson
-            )) |
-            (!!datasets_are("SCIA", "SCIA") & (
-                !!sensor_keys_are(69L, 3673L) # Saint Cristophe Aereoporto
+                !!series_ids_are("IT_VDA_AO_BRUSSON_CENTRALE_IDROELETTRICA", "15176") # Brusson
             ))) &
-            !(!!one_station_is("ISAC", sensor_key = 2874L)) # Prè-Saint-Didier Ponte Dora Baltea
+            !(!!one_station_is("ISAC", series_id = "VDA_AO_PRE_ST_DIDIER_DORA_BALTEA_01_000615700")) # Prè-Saint-Didier Ponte Dora Baltea
     )
 }

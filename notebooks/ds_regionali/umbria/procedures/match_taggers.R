@@ -1,4 +1,5 @@
 library(dplyr, warn.conflicts = FALSE)
+source("src/merging/pairing.R")
 
 tag_same_series <- function(analysis) {
     analysis |> mutate(
@@ -13,7 +14,7 @@ tag_manual <- function(tagged_analysis) {
     tagged_analysis <- tagged_analysis |>
         mutate(
             tag_same_series = tag_same_series & !(
-                dataset_x == "ARPAUmbria" & dataset_y == "ARPAUmbria" & sensor_key_x == 46L & sensor_key_y == 47L
+                !!datasets_are("ARPAUmbria", "ARPAUmbria") & !!user_codes_are_("200500", "81300")
             )
         )
 }
