@@ -1,5 +1,7 @@
 library(dplyr, warn.conflicts = FALSE)
 library(stringr, warn.conflicts = FALSE)
+source("src/merging/pairing.R")
+
 tag_same_series <- function(analysis) {
     analysis |> mutate(
         tag_same_sensor = (overlap_union > 0.9 & f0 > 0.9),
@@ -37,38 +39,42 @@ tag_manual <- function(tagged_analysis) {
     # stop("Rifare")
     tagged_analysis |> mutate(
         tag_same_series = tag_same_series & !(
-            (dataset_x == "ARPAPiemonte" &
-                (sensor_key_x == 122L & sensor_key_y %in% c(1227L, 1331L)) | # Domodossola
-                (sensor_key_x == 181L & sensor_key_y == 2154L) # Malanotte
+            (dataset_x == "ARPAPiemonte" & (
+                !!series_ids_are("PIE-003061-900", "IT_PIE_VB_DOMODOSSOLA_ROSMINI") | # Domodossola
+                    !!series_ids_are("PIE-003061-900", "7842") | # Domodossola
+                    !!series_ids_are("PIE-004091-900", "6740") # Monte Malanotte
+            )
             ) |
-                (
-                    dataset_x == "ISAC" & dataset_y == "SCIA" &
-                        ((sensor_key_x == 365L & sensor_key_y == 345L) | # Colle Barant / Bobbio Pellice
-                            (sensor_key_x == 1227L) | #  Domodossola Rosmini
-                            (sensor_key_x == 2093L & sensor_key_y == 2134L) # Mondovì
-                        )
+                (!!datasets_are("ISAC", "SCIA") &
+                    (
+                        !!series_ids_are("PIE_TO_BOBBIO_PELLICE_C_BARANT_02_000089400", "7584") | # Colle Barant / Bobbio Pellice
+                            (series_id_x == "IT_PIE_VB_DOMODOSSOLA_ROSMINI") | # Domodossola Rosmini
+                            !!series_ids_are("IT_PIE_CN_MONDOVI_315_MG", "6739") # Mondovì
+                    )
                 ) |
-                (
-                    dataset_x == "ISAC" & dataset_y == "ISAC" &
-                        ((!is.na(user_code_x) & !is.na(user_code_y) & (user_code_x != user_code_y)) |
-                            (sensor_key_y == 1227L) # Domodossola
-                        )
+                (!!datasets_are("ISAC", "ISAC") &
+                    (
+                        (!is.na(user_code_x) & !is.na(user_code_y) & (user_code_x != user_code_y)) |
+                            (series_id_y == "IT_PIE_VB_DOMODOSSOLA_ROSMINI") # Domodossola Rosmini
+                    )
                 ) |
-                (dataset_x == "SCIA" & dataset_y == "SCIA" &
-                    (sensor_key_x == 1934L & sensor_key_y == 4032L) | # Lago Vannino / Toggia
-                    (sensor_key_x == 2154L & sensor_key_y == 2155L) | # Malanotte
-                    (sensor_key_x == 2134L) # Mondovì Synop
+                (!!datasets_are("SCIA", "SCIA") &
+                    (
+                        !!series_ids_are_("7893", "8011") | # Lago Vannino / Toggia
+                            !!series_ids_are_("6740", "7304") | # Monte Malanotte
+                            (user_code_x == "161140") # Mondovì Synop
+                    )
                 ) |
                 (dataset_y == "SCIA" &
-                    (sensor_key_y == 507L) # Borgomanero
+                    (series_id_y == "7786") # Borgomanero
                 )
         ) |
-            (dataset_x == "ARPAPiemonte" & dataset_y == "ISAC" & (
+            (!!datasets_are("ARPAPiemonte", "ISAC") & (
                 FALSE
                 # (sensor_key_x == 51L & sensor_key_y == 435L) # Bra
             )) |
-            (dataset_x == "ARPAPiemonte" & dataset_y == "SCIA" & (
-                (sensor_key_x == 180L & sensor_key_y == 1447L) # Monte Fraiteve
+            (!!datasets_are("ARPAPiemonte", "SCIA") & (
+                !!series_ids_are("PIE-001263-902", "6738") # Monte Fraiteve
             ))
     )
 }
