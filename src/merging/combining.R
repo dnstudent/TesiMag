@@ -419,7 +419,7 @@ integrate_column <- function(table, integrator_column, correction_threshold, con
       mutate(
         master_raw = coalesce(master_raw, if_else(is.na(correction), NA_real_, !!sym(integrator_column))),
         master = coalesce(master, !!sym(integrator_column) + correction),
-        from = coalesce(from, if_else(is.na(correction), NA_character_, integrator_column))
+        from = coalesce(from, if_else(is.na(master), NA_character_, integrator_column))
       ) |>
       select(-correction)
   } else {
