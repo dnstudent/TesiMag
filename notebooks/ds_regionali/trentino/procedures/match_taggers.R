@@ -47,7 +47,6 @@ tag_manual <- function(tagged_analysis) {
                             (sensor_key_x %in% c(1774L, 1775L) & sensor_key_y == 108L) | # Levico
                             # (sensor_key_y == 162L) | # Peio
                             (sensor_key_x == 645L) | # Capriana
-                            (sensor_key_x == 3513L) | # S. Maddalena a Casies
                             (sensor_key_y == 151L) # Passo di Costalunga
                     )) |
                     (dataset_x == "ISAC" & dataset_y == "ISAC" &
@@ -56,8 +55,7 @@ tag_manual <- function(tagged_analysis) {
                             (sensor_key_x == 1953L & sensor_key_y == 3430L) | # Gioveretto
                             (sensor_key_x == 1572L & sensor_key_y == 2759L) | # Grigno / Ponte Filippini
                             (sensor_key_x == 2028L & sensor_key_y == 2029L) | # Mezzolombardo
-                            (sensor_key_x == 627L & sensor_key_y == 628L) | # Caoria / Valsorda
-                            (sensor_key_x == 3513L | sensor_key_y == 3513L) # S. Maddalena a Casies
+                            (sensor_key_x == 627L & sensor_key_y == 628L) # Caoria / Valsorda
                         )) |
                     (dataset_x == "ISAC" & dataset_y == "SCIA" &
                         ((sensor_key_x == 1371L & sensor_key_y == 3339L) | # Fondo / Romeno
@@ -67,7 +65,6 @@ tag_manual <- function(tagged_analysis) {
                             (sensor_key_x == 2983L & sensor_key_y == 4217L) | # Vipiteno
                             # (sensor_key_y == 2989L) | # Peio
                             (sensor_key_x == 1953L & sensor_key_y == 1313L) | # Martello / Diga Gioveretto
-                            (sensor_key_x == 3513L) | # S. Maddalena a Casies
                             (sensor_key_x == 89L & sensor_key_y == 180L) # Alpe di Siusi new / old
                         )) |
                     (dataset_x == "SCIA" & dataset_y == "TAA" &
