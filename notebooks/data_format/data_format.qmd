@@ -18,40 +18,56 @@ source("src/database/query/data.R")
 source("src/merging/combining.R")
 source("notebooks/corrections/manual_corrections.R")
 
+ds4conv_dir <- fs::path("db", "tmp", "dataset4conv")
 conns <- load_dbs()
 datasets <- c("ARPAPiemonte", "ARPAL", "ARPALombardia", "ARPAV", "TAA", "ARPAFVG", "Dext3r", "SIRToscana", "ARPAUmbria", "ARPAM", "SCIA", "ISAC")
 sets <- c("PIE", "LIG", "LOM", "VEN", "TAA2", "FVG", "ER", "TOS", "UMB", "MAR", "VDA")
 ```
 
 ```{r}
-merged_ds <- query_checkpoint("full", "merged_corrected", conns$data, all_stations = FALSE)
-merge_specs <- open_dataset(fs::path("db", "extra", "merge_specs"))
-```
-
-
-```{r}
-ds4conv_dir <- fs::path("db", "tmp", "dataset_for_conv")
-
 if (fs::dir_exists(ds4conv_dir)) unlink(ds4conv_dir, recursive = TRUE)
-merged_ds$data |>
-  collect() |>
-  group_split(dataset, series_key, variable) |>
-  purrr::walk(~ {
-    dataset <- .x$dataset |> first()
-    series_key <- .x$series_key |> first()
-    variable <- .x$variable |> first()
-    path <- fs::path(ds4conv_dir, str_glue("dataset={dataset}"), str_glue("series_key={series_key}"), str_glue("variable={variable}"))
-    if (!fs::dir_exists(path)) fs::dir_create(path, recurse = TRUE)
-    .x |> write_parquet(fs::path(path, "part-0.parquet"))
-  }, .progress = TRUE)
+
+ds_files <- fs::path(archive_path("full", "data", "merged_corrected"), "**", "*.parquet")
+DBI::dbExecute(
+  conns$data,
+  stringr::str_glue(
+    "
+    CREATE OR REPLACE VIEW ds_4conv_tmp AS
+    SELECT *
+    FROM read_parquet('{ds_files}', hive_partitioning = true, hive_types = {{'variable': INT}})
+    "
+  )
+)
+DBI::dbExecute(
+  conns$data,
+  stringr::str_glue(
+    "
+    COPY ds_4conv_tmp
+    TO '{ds4conv_dir}' (FORMAT PARQUET, PARTITION_BY (dataset, series_key, variable), FILENAME_PATTERN 'part-{{i}}')
+    "
+  )
+)
+
+# merged_ds$data |>
+#   collect() |>
+#   group_split(dataset, series_key, variable) |>
+#   purrr::walk(~ {
+#     dataset <- .x$dataset |> first()
+#     series_key <- .x$series_key |> first()
+#     variable <- .x$variable |> first()
+#     path <- fs::path(ds4conv_dir, str_glue("dataset={dataset}"), str_glue("series_key={series_key}"), str_glue("variable={variable}"))
+#     if (!fs::dir_exists(path)) fs::dir_create(path, recurse = TRUE)
+#     .x |> write_parquet(fs::path(path, "part-0.parquet"))
+#   }, .progress = TRUE)
 print("✅")
 ```
 
 ```{r}
 base <- fs::path_abs(".")
-integrators_root <- fs::path(base, "db", "tmp", "dataset_for_merge")
+integrators_root <- fs::path(base, "db", "tmp", "prepared4merge")
 save_to_root <- fs::path(base, "db", "conv", "merged_corrected")
 variable_names <- tibble(variable = c(-1L, 1L), variable_name = c("TMND", "TMXD"))
+merge_specs <- open_dataset(fs::path("db", "extra", "merge_specs"))
 
 unlink(fs::path(save_to_root, "data"), recursive = TRUE)
 merge_specs |>
@@ -68,9 +84,9 @@ merge_specs |>
     c(integrators, cols) %<-% load_data.group.1(integrators_root, .x)
     save_to_path <- fs::path(save_to_root, "data", str_glue("{variable_name}_{dataset}_{stringr::str_pad(series_key, 3L, side = 'left', pad = '0')}.csv"))
     if (!fs::dir_exists(fs::path_dir(save_to_path))) fs::dir_create(fs::path_dir(save_to_path), recurse = TRUE)
-    full_join(master_series |> rename(master = value), integrators, by = "date") |>
+    full_join(master_series |> rename(master = value, master_raw = value_raw), integrators, by = "date") |>
       arrange(date) |>
-      select(date, master, all_of(cols), from_dataset, from_sensor_key) |>
+      select(date, master, master_raw, all_of(cols), from_dataset, from_sensor_key) |>
       complete(date = seq.Date(min(date), max(date), by = "day")) |>
       arrange(date) |>
       write_csv_arrow(save_to_path, write_options = csv_write_options(quoting_style = "AllValid"))
@@ -124,4 +140,7 @@ corrections1 |>
 ```
 
 ```{r}
+query_checkpoint_data("FVG", "merged", conns$data) |>
+    filter(series_key == 95L, variable == -1L, value != value_raw) |>
+    count()
 ```

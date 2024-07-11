@@ -44,9 +44,13 @@ integrator_cols <- corrections |>
 to_integr_cols
 ```
 
+Riempio alcune colonne con dei valori di default omessi per comodità
+
 ```{r}
 co <- prepare_corrections(corrections, merged_metadata)
 ```
+
+Controllo se ci sono stazioni rimaste fuori
 
 ```{r}
 s <- merged_metadata |>
@@ -58,11 +62,10 @@ s
 ```
 
 ```{r}
-query_checkpoint_data(c("SCIA", "ISAC"), "qc1", conns$data, hive_types = list("valid" = "BOOLEAN", "variable" = "INT")) |>
+query_checkpoint_data(c("SCIA", "ISAC"), "raw", conns$data, hive_types = list("variable" = "INT")) |>
   semi_join(s, by = c("dataset" = "from_datasets", "sensor_key" = "from_sensor_keys"), copy = T) |>
   distinct(dataset, sensor_key, variable) |>
   collect()
-
 ```
 
 Integrazione delle correzioni
@@ -79,10 +82,9 @@ source("notebooks/ds_regionali/procedure/checkpoint.R")
 data <- query_checkpoint_data(sets, "merged", conns$data) |> to_arrow()
 chkpt <- as_checkpoint(corrected_metadata, data, check_schema = FALSE)
 save_checkpoint(chkpt, "full", "merged_corrected", check_schema = FALSE, partitioning = c("variable"), key = "series_key")
-print("done")
+print("✅")
 ```
 
 ```{r}
 query_checkpoint_data("full", "merged_corrected", conns$data)
 ```
-
