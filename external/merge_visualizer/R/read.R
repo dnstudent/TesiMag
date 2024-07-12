@@ -9,8 +9,7 @@ read_merge_specs <- function(root_path) {
       col_types = cols(
         dataset = col_character(),
         series_key = col_integer(),
-        from_dataset = col_character(),
-        from_sensor_key = col_integer(),
+        from = col_character(),
         variable = col_integer(),
         metadata_rank = col_integer(),
         data_rank = col_integer(),
@@ -33,8 +32,7 @@ read_metadata <- function(root_path) {
         dataset = col_character(),
         series_key = col_integer(),
         user_code = col_character(),
-        from_dataset = col_character(),
-        from_sensor_key = col_integer(),
+        from = col_character(),
         lon = col_double(),
         lat = col_double(),
         elevation = col_double(),
@@ -57,13 +55,15 @@ read_data_tables <- function(root_path, dataset, series_key) {
     col_types = cols(
       date = col_date(format = "%Y-%m-%d"),
       master = col_double(),
-      from_dataset = col_character(),
-      from_sensor_key = col_integer(),
+      from = col_character(),
       .default = col_double()
     ),
     id = "file"
   ) |>
-    mutate(file = fs::path_file(file) |> fs::path_ext_remove()) |>
-    separate_wider_delim(file, "_", names = c("variable", "dataset", "series_key")) |>
-    mutate(variable = case_match(variable, "TMND" ~ -1L, "TMXD" ~ 1L))
+    mutate(
+      # file = fs::path_file(file) |> fs::path_ext_remove(),
+      dataset = !!dataset,
+      series_key = !!series_key,
+      variable = str_sub(fs::path_file(file) |> fs::path_ext_remove(), 1L, 4L) |> case_match("TMND" ~ -1L, "TMXD" ~ 1L)
+    )
 }
