@@ -310,9 +310,9 @@ merged_checkpoint <- function(set_name, merge_results_path, metadata) {
 
     datestats <- data |>
         filter(!is.na(value)) |>
-        count(dataset, series_key, variable) |>
-        group_by(dataset, series_key) |>
-        summarise(valid_days = max(n), series_first = min(date), series_last = max(date), .groups = "drop") |>
+        group_by(dataset, series_key, variable) |>
+        summarise(valid_days = n(), series_first = min(date), series_last = max(date), .groups = "drop_last") |>
+        summarise(series_first = min(series_first), series_last = max(series_last), valid_days = max(valid_days)) |>
         full_join(datestats90, by = c("dataset", "series_key")) |>
         collect()
 
@@ -328,7 +328,7 @@ merged_checkpoint <- function(set_name, merge_results_path, metadata) {
             from_sensor_keys = list(from_sensor_key),
             from_datasets = list(from_dataset),
             data_ranks = list(data_rank),
-            merged = list(merged)
+            merged = list(merged),
             .groups = "drop"
         ) |>
         select(
@@ -357,10 +357,10 @@ merged_checkpoint <- function(set_name, merge_results_path, metadata) {
                 from_sensor_keys = list_of(int32()),
                 data_ranks = list_of(int32()),
                 merged = list_of(bool()),
+                series_first = date32(),
+                series_last = date32(),
                 valid_days = int32(),
                 valid90 = int32(),
-                series_first = date32(),
-                series_last = date32()
             )
         )
 

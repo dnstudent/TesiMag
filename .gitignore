@@ -12,6 +12,8 @@
 *.geojson
 *.csv
 raw_analysis.xlsx
+tagged_analysis.xlsx
+tagged_analysis.old.xlsx
 !/external/province_regioni.csv
 *.duckdb*
 ~$*.xlsx
