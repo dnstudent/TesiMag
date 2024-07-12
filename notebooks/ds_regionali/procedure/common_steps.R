@@ -312,29 +312,28 @@ merged_checkpoint <- function(set_name, merge_results_path, metadata) {
         filter(!is.na(value)) |>
         count(dataset, series_key, variable) |>
         group_by(dataset, series_key) |>
-        summarise(valid_days = max(n), .groups = "drop") |>
+        summarise(valid_days = max(n), series_first = min(date), series_last = max(date), .groups = "drop") |>
         full_join(datestats90, by = c("dataset", "series_key")) |>
         collect()
 
     metadata <- metadata |>
         rename(from_dataset = dataset, from_sensor_key = sensor_key) |>
         select(-any_of(c("key", "series_key"))) |>
-        inner_join(merging_specs |> select(from_dataset, from_sensor_key, dataset, series_key, metadata_rank, data_rank) |> distinct(), by = c("from_dataset", "from_sensor_key"), relationship = "one-to-one") |>
+        inner_join(merging_specs |> select(from_dataset, from_sensor_key, dataset, series_key, metadata_rank, data_rank, merged) |> distinct(), by = c("from_dataset", "from_sensor_key"), relationship = "one-to-one") |>
         # filter(merged) |>
         group_by(dataset, series_key) |>
         arrange(metadata_rank, .by_group = TRUE) |>
         summarise(
-            across(!c(ends_with("_first"), ends_with("_last"), from_dataset, from_sensor_key, data_rank), ~ first(.)),
+            across(!c(ends_with("_first"), ends_with("_last"), from_dataset, from_sensor_key, data_rank, merged), ~ first(.)),
             from_sensor_keys = list(from_sensor_key),
             from_datasets = list(from_dataset),
             data_ranks = list(data_rank),
-            series_first = min(series_first, na.rm = TRUE),
-            series_last = max(series_last, na.rm = TRUE),
+            merged = list(merged)
             .groups = "drop"
         ) |>
         select(
-            dataset, series_key, name, user_code, network, district, province_code, town, lon, lat, elevation, elevation_glo30, kind, series_first, series_last,
-            from_datasets, from_sensor_keys, data_ranks
+            dataset, series_key, name, user_code, network, country, district, province_code, town, lon, lat, elevation, elevation_glo30, kind,
+            from_datasets, from_sensor_keys, data_ranks, merged
         ) |>
         left_join(datestats, by = c("dataset", "series_key"), relationship = "one-to-one") |>
         # filter(valid_days >= 30L) |>
@@ -345,6 +344,7 @@ merged_checkpoint <- function(set_name, merge_results_path, metadata) {
                 name = utf8(),
                 user_code = utf8(),
                 network = utf8(),
+                country = utf8(),
                 district = utf8(),
                 province_code = utf8(),
                 town = utf8(),
@@ -353,13 +353,14 @@ merged_checkpoint <- function(set_name, merge_results_path, metadata) {
                 elevation = float64(),
                 elevation_glo30 = float64(),
                 kind = utf8(),
-                series_first = date32(),
-                series_last = date32(),
                 from_datasets = list_of(utf8()),
                 from_sensor_keys = list_of(int32()),
                 data_ranks = list_of(int32()),
+                merged = list_of(bool()),
                 valid_days = int32(),
-                valid90 = int32()
+                valid90 = int32(),
+                series_first = date32(),
+                series_last = date32()
             )
         )
 
