@@ -1,5 +1,5 @@
 ---
-title: "merging"
+title: "Post-merge pairing"
 author: "Davide Nicoli"
 format: html
 editor: visual
@@ -21,25 +21,28 @@ conns <- load_dbs()
 ```{r}
 meta <- query_checkpoint_meta("full", "merged_corrected", conn = conns$data) |>
   window_order(dataset, series_key) |>
-  mutate(key = row_number(), sensor_key = series_key, sensor_first = NA_Date_, sensor_last = NA_Date_) |>
+  mutate(key = row_number(), sensor_key = series_key, sensor_first = series_first, sensor_last = series_last, .keep = "unused") |>
   compute()
 data <- query_checkpoint_data("full", "merged_corrected", conn = conns$data, hive_types = list("variable" = "INT")) |>
-  inner_join(meta |> select(dataset, series_key, key), by = c("dataset", "series_key"))
+  filter(abs(value) < 50) |>
+  rename(sensor_key = series_key) |>
+  inner_join(meta |> select(dataset, sensor_key, key), by = c("dataset", "sensor_key"))
 ```
 
 ```{r}
-sensor_matches <- close_matches(meta, 20000, conns$stations)
+sensor_matches <- close_matches(meta, 5000, conns$stations)
 var_matches <- series_matches(data, sensor_matches, meta)
 ```
+
 
 ```{r}
 involved_series <- var_matches |> pivot_longer(cols = c(key_x, key_y), names_to = "key_type", values_to = "key")
 metaf <- meta |>
   semi_join(involved_series, by = "key", copy = T) |>
   compute()
-# dataf <- data |> semi_join(involved_series, by = c("key", "variable"), copy = T) |>
-#   to_arrow() |>
-#   write_parquet("temp.parquet")
+data |> semi_join(involved_series, by = c("key", "variable"), copy = T) |>
+  to_arrow() |>
+  write_parquet("temp.parquet")
 analysis <- series_matches_analysis(var_matches,
   query_parquet("temp.parquet", conns$data),
   metaf,
@@ -48,14 +51,16 @@ analysis <- series_matches_analysis(var_matches,
 ```
 
 ```{r}
+analysis |> write_parquet(file.path("notebooks", "ds_nazionali", "TESIDB", "raw_analysis.parquet"))
 analysis |> write_xlsx_analysis(file.path("notebooks", "ds_nazionali", "TESIDB", "raw_analysis.xlsx"), name_x, name_y, .format = FALSE)
 ```
 
 ```{r}
-analysis <- read.xlsx(file.path("notebooks", "ds_nazionali", "TESIDB", "raw_analysis.xlsx")) |>
+analysis <- read_parquet(file.path("notebooks", "ds_nazionali", "TESIDB", "raw_analysis.parquet")) |>
   left_join(meta |> select(dataset, sensor_key, key), by = c("dataset_x" = "dataset", "sensor_key_x" = "sensor_key"), copy = T) |>
   left_join(meta |> select(dataset, sensor_key, key), by = c("dataset_y" = "dataset", "sensor_key_y" = "sensor_key"), copy = T, suffix = c("_x", "_y"))
 
+source("src/merging/pairing.R")
 tagged_analysis <- analysis |>
   mutate(
     tag_dupe = ((dataset_x != dataset_y) &
@@ -64,10 +69,9 @@ tagged_analysis <- analysis |>
           ((!is.na(f0noint) & f0noint > 0.12) | (dataset_x != dataset_y & fsameint > 0.9))
         )))) |
       (
-        (sensor_key_x == 139L & sensor_key_y == 183L) | # Monte Zoncolan
-          (sensor_key_x == 150L & sensor_key_y == 190L) | # Busalla
-          (sensor_key_x == 193L & sensor_key_y == 196L) | # Cabanne
-          (sensor_key_x == 172L & sensor_key_y == 336L) # Santa Maddalena in Casies
+        !!user_codes_are("ZON", "ZON") | # Monte Zoncolan
+          !!user_codes_are_("08CABANNE", "01675") | # Cabanne
+          !!user_codes_are_("01602", "01397") # Busalla
       )
   ) |>
   group_by(dataset_x, dataset_y, sensor_key_x, sensor_key_y) |>
@@ -75,7 +79,7 @@ tagged_analysis <- analysis |>
     tag_anydupe = any(tag_dupe)
   ) |>
   ungroup()
-tagged_analysis |> write_xlsx_analysis(file.path("notebooks", "ds_nazionali", "TESIDB", "tagged_analysis.xlsx"), name_x, name_y, tag_dupe, tag_anydupe, .format = FALSE)
+tagged_analysis |> write_xlsx_analysis(file.path("notebooks", "ds_nazionali", "TESIDB", "tagged_analysis.xlsx"), starts_with("name"), starts_with("user_code"), starts_with("series_id"), tag_dupe, tag_anydupe, .format = FALSE)
 ```
 
 ```{r}
@@ -98,11 +102,10 @@ regional_dataset <- tribble(
 )
 ```
 
-````{r}
+```{r}
 ranked_series_groups <- gs$table |>
   left_join(collect(meta) |> select(from_dataset = dataset, from_sensor_key = sensor_key, key, district_in = district), by = "key") |>
-  left_join(regional_dataset, by = c("from_dataset" = "dataset")) |>
-  mutate(set = "tesidb", right_district = district_in == dataset_district) |>
+  left_join(regional_dataset, by = c("from_dataset" = "dataset")) |> mutate(set = "tesidb", right_district = district_in == dataset_district) |>
   rank_metadata(collect(meta), dataset_rankings = NULL, desc(right_district), desc(valid90))
 ```
 
@@ -111,9 +114,8 @@ ranked_series_groups |> filter(gkey == 11L)
 ```
 
 ```{r}
-meta |> semi_join(ranked_series_groups |> filter(gkey == 11L), by = c("dataset" = "from_dataset", "series_key" = "from_sensor_key"), copy = T) |> collect()
+meta |> semi_join(ranked_series_groups |> filter(gkey == 11L), by = c("dataset" = "from_dataset", "sensor_key" = "from_sensor_key"), copy = T) |> collect()
 ```
-
 
 ```{r}
 duplications <- ranked_series_groups |>
@@ -124,18 +126,16 @@ duplications <- ranked_series_groups |>
   select(dataset = from_dataset, series_key = from_sensor_key, duplicate_of) |>
   distinct()
 duplications |>
-  left_join(meta |> select(dataset, series_key, name, series_first, series_last, valid90, lon, lat, elevation, district), by = c("dataset", "series_key"), copy = T) |>
+  left_join(meta |> select(dataset, series_key = sensor_key, name, series_first = sensor_first, series_last = sensor_last, valid90, lon, lat, elevation, district), by = c("dataset", "series_key"), copy = T) |>
   readr::write_csv(file.path("notebooks", "ds_nazionali", "TESIDB", "merge_duplicates.csv"))
 ```
 
 ```{r}
-anti_join(meta, duplications, by = c("dataset", "series_key"), copy = T) |> collect()
+anti_join(meta, duplications, by = c("dataset", "sensor_key" = "series_key"), copy = T) |> collect()
 ```
 
-
-
 ```{r}
-meta |> filter(dataset == "FVG", series_key == 184L) |> collect() |> View()
+meta |> filter(dataset == "FVG", sensor_key == 184L) |> collect() |> View()
 ```
 
 ```{r}
@@ -143,6 +143,4 @@ query_checkpoint_meta("ARPAFVG", "raw") |> filter(sensor_key == 36L)
 ```
 
 ```{r}
-meta |> 
 ```
-

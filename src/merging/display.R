@@ -86,7 +86,7 @@ write_xlsx_analysis <- function(analysis, to, ..., .format = TRUE) {
       class(analysis$common_period_vs_y) <- "percentage"
     }
   } else {
-    options("openxlsx.numFmt" = "#.##")
+    options("openxlsx.numFmt" = "0.00")
   }
   wb <- createWorkbook()
   addWorksheet(wb, "data")
