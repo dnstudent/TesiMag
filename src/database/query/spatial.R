@@ -227,7 +227,6 @@ associate_regional_info.bruno <- function(metadata, provinces_path, districts_pa
             province_code = str_to_upper(province_code),
             province_full = str_to_title(province_full)
         )
-    geo <- st_read(geoconn, "regional_boundaries", geometry_column = "geometry", quiet = TRUE) |> mutate(shapeName = str_to_title(shapeName))
 
     districts <- st_read(districts_path, quiet = TRUE) |>
         mutate(shapeName = str_to_title(shapeName)) |>
