@@ -2,6 +2,8 @@ library(DBI, warn.conflicts = FALSE)
 library(RPostgres, warn.conflicts = FALSE)
 library(sf, warn.conflicts = FALSE)
 
+source("src/database/toos.R")
+
 query_boundary <- function(conn, name, kind) {
     st_read(conn, query = glue::glue_sql('SELECT * FROM regional_boundaries WHERE "shapeName" = {name} AND kind = {kind}', .con = conn), geometry_column = "geometry", quiet = TRUE)
 }
@@ -210,4 +212,57 @@ query_distance <- function(pairs, statconn) {
     matches <- dbGetQuery(statconn, query)
     statconn |> dbRemoveTable("pairs_tmp")
     matches
+}
+
+associate_regional_info.bruno <- function(metadata, provinces_path, districts_path, info_path = fs::path(file.path("external", "province_regioni.csv"))) {
+    metadata |>
+        count(dataset, sensor_key) |>
+        assertr::verify(n == 1L, description = "Multiple metadata rows for the same sensor")
+
+    # NA è Napoli
+    regional_info <- vroom::vroom(info_path, col_types = "ccc", na = c("")) |>
+        rename(district = state) |>
+        mutate(
+            province_k = province_full |> str_to_lower() |> str_squish() |> str_remove_all(regex("[^a-z]")),
+            province_code = str_to_upper(province_code),
+            province_full = str_to_title(province_full)
+        )
+    geo <- st_read(geoconn, "regional_boundaries", geometry_column = "geometry", quiet = TRUE) |> mutate(shapeName = str_to_title(shapeName))
+
+    districts <- st_read(districts_path, quiet = TRUE) |>
+        mutate(shapeName = str_to_title(shapeName)) |>
+        select(district = shapeName) |>
+        mutate(country = "Italy")
+    provinces <- st_read(provinces_path, quiet = TRUE) |>
+        select(province_full = shapeName)
+
+    metadata <- metadata |>
+        prepare_for_regional_completion() |>
+        st_md_to_sf() |>
+        st_join(districts, join = st_intersects, suffix = c(".provided", ".computed"), left = TRUE) |>
+        st_join(provinces, join = st_intersects, suffix = c(".provided", ".computed"), left = TRUE) |>
+        st_drop_geometry() |>
+        mutate(
+            country = coalesce(country.provided, country.computed) |> str_to_title(),
+            district = coalesce(district.provided, district.computed) |> str_to_title(),
+            province_full = coalesce(province_full.provided, province_full.computed) |> str_to_title(),
+            .keep = "unused"
+        ) |>
+        mutate(province_k = province_full |> str_to_lower() |> str_squish() |> str_remove_all(regex("[^a-z]")), .keep = "unused") |>
+        left_join(regional_info, by = "province_k", suffix = c(".provided", ".table"), relationship = "many-to-one") |>
+        mutate(province_code = coalesce(province_code.provided, province_code.table) |> str_to_upper(), district = coalesce(district.provided, district.table), .keep = "unused") |>
+        left_join(regional_info, by = "province_code", suffix = c(".provided", ".table"), relationship = "many-to-one") |>
+        mutate(province_full = coalesce(province_full.provided, province_full.table), district = coalesce(district.provided, district.table), .keep = "unused") |>
+        select(-starts_with("province_k")) |>
+        mutate(across(c("country", "district", "province_full"), str_to_title), province_code = str_to_upper(province_code)) |>
+        group_by(dataset, sensor_key) |>
+        arrange(country, district, province_full, .by_group = TRUE) |>
+        slice_tail() |> # In caso di sovrapposizioni dei confini regionali, prendo l'ultimo match. In particolare i confini forniti per la Francia sono pessimi
+        ungroup()
+
+    metadata |>
+        count(dataset, sensor_key) |>
+        assertr::verify(n == 1L, description = "Multiple metadata rows for the same sensor")
+
+    metadata
 }
