@@ -30,6 +30,7 @@ stationsdb/
 .DS_Store
 tokens
 kml_metadata/
+notebooks/julia
 
 build/
 text/
