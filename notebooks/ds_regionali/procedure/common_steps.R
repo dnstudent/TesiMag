@@ -123,13 +123,13 @@ associate_dem_elevation.bruno <- function(metadata, glo30_dem_path) {
         mutate(elevation_glo30 = stars::st_extract(dem, pick(lon, lat) |> as.matrix()) |> pull(1L))
 }
 
-associate_regional_info.bruno <- function(metadata, province_boundaries_path) {
-    province_boundaries <- sf::st_read(province_boundaries_path, quiet = TRUE)
-    metadata |>
-        st_md_to_sf() |>
-        st_join(province_boundaries |> select(province_full = shapeName), join = sf::st_intersects) |>
-        sf::st_drop_geometry()
-}
+# associate_regional_info.bruno <- function(metadata, province_boundaries_path) {
+#     province_boundaries <- sf::st_read(province_boundaries_path, quiet = TRUE)
+#     metadata |>
+#         st_md_to_sf() |>
+#         st_join(province_boundaries |> select(province_full = shapeName), join = sf::st_intersects) |>
+#         sf::st_drop_geometry()
+# }
 
 
 prepare_daily_data <- function(data_pack, statconn) {
@@ -202,47 +202,14 @@ spatial_availabilities <- function(ymonthly_avail, stations, map, ...) {
     list("plot" = p, "data" = spatav)
 }
 
-prepare_data_for_merge.old <- function(dataconn, ds_root, regenerate = FALSE) {
-    if (regenerate || !fs::dir_exists(ds_root)) {
-        # save_ds <- function(ds) {
-        #     fragment_dir <- fs::path(
-        #         ds_root,
-        #         str_glue("dataset={first(ds$dataset)}"),
-        #         str_glue("sensor_key={first(ds$sensor_key)}"),
-        #         str_glue("variable={first(ds$variable)}")
-        #     )
-        #     if (!fs::dir_exists(fragment_dir)) {
-        #         fs::dir_create(fragment_dir, recurse = TRUE)
-        #     }
-        #     write_parquet(ds |> arrange(date), fs::path(fragment_dir, "part-0.parquet"))
-        # }
-
-        # datasets <- fs::dir_ls(fs::path_dir(archive_path("*", "data", "raw")), type = "directory") |> fs::path_file()
-
-        # query_checkpoint_data(datasets, "raw", dataconn, hive_types = list("variable" = "INT")) |>
-        #     filter(variable == -1L) |>
-        #     collect() |>
-        #     group_split(dataset, sensor_key, variable) |>
-        #     purrr::walk(save_ds, .progress = TRUE)
-
-        # query_checkpoint_data(datasets, "raw", dataconn, hive_types = list("valid" = "BOOLEAN", "variable" = "INT")) |>
-        #     filter(valid, variable == 1L) |>
-        #     select(!c(starts_with("qc_"), valid)) |>
-        #     collect() |>
-        #     group_split(dataset, sensor_key, variable) |>
-        #     purrr::walk(save_ds, .progress = TRUE)
-        # to_arrow() |>
-        # write_dataset(ds_root, format = "parquet", partitioning = c("dataset", "sensor_key", "variable")) BUGGED: too many files
-        DBI::dbExecute(dataconn, "COPY")
-    }
-    ds_root
-}
-
-prepare_data_for_merge <- function(dataconn, from_raw_root, to_ds_root, regenerate = TRUE, test = FALSE) {
+prepare_data_for_merge <- function(dataconn, from_raw_root, to_ds_root, regenerate = TRUE, test = FALSE, key_column = "sensor_key") {
     if (regenerate || !fs::dir_exists(to_ds_root)) {
         ds_files <- fs::path(from_raw_root, "**", "*.parquet")
         DBI::dbExecute(conns$data, stringr::str_glue("CREATE OR REPLACE VIEW ds_4merge_tmp AS SELECT * FROM read_parquet('{ds_files}', hive_partitioning = true, hive_types = {{'variable': INT}})"))
-        DBI::dbExecute(conns$data, stringr::str_glue("COPY ds_4merge_tmp TO '{to_ds_root}' (FORMAT PARQUET, PARTITION_BY (dataset, sensor_key, variable), FILENAME_PATTERN 'part-{{i}}')"))
+        if (fs::dir_exists(to_ds_root)) {
+            unlink(to_ds_root, recursive = TRUE)
+        }
+        DBI::dbExecute(conns$data, stringr::str_glue("COPY ds_4merge_tmp TO '{to_ds_root}' (FORMAT PARQUET, PARTITION_BY (dataset, {key_column}, variable), FILENAME_PATTERN 'part-{{i}}')"))
     }
 
     if (test) {

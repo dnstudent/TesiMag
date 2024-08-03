@@ -26,15 +26,15 @@ prepare_corrections <- function(corrections, metadata) {
   corrections |>
     mutate(
       from_datasets = str_split(from_datasets, regex(";|\\*")),
-      from_sensor_keys = str_split(from_sensor_keys, regex(";|\\*")) |> purrr::map(as.integer),
+      from_sensor_keys = str_split(from_sensor_keys, regex(";|\\*")) |> purrr::map(as.integer)
+    ) |>
+    right_join(metadata |> select(dataset, from_datasets, from_sensor_keys, series_last, valid90), by = c("dataset", "from_datasets", "from_sensor_keys"), relationship = "one-to-one") |>
+    mutate(
       manual_loc_correction = !is.na(lon_ok) | !is.na(lat_ok),
       manual_elev_correction = !is.na(ele_ok),
-    ) |>
-    left_join(metadata |> select(dataset, from_datasets, from_sensor_keys, series_last, valid90), by = c("dataset", "from_datasets", "from_sensor_keys"), relationship = "one-to-one") |>
-    mutate(
-      loc_precision = if_else(manual_loc_correction, coalesce(loc_precision, -1), coalesce(loc_precision, if_else(year(series_last) <= 2010L, 1, 0))),
-      elev_precision = if_else(manual_elev_correction | (loc_precision == -1), coalesce(elev_precision, -1), coalesce(elev_precision, if_else(year(series_last) <= 2010L, 1, 0))),
-      keep = coalesce(keep, valid90 >= 5L*365L)
+      loc_precision = coalesce(if_else(manual_loc_correction, coalesce(loc_precision, -1), coalesce(loc_precision, if_else(year(series_last) <= 2010L, 1, 0))), 1),
+      elev_precision = coalesce(if_else(manual_elev_correction | (loc_precision == -1), coalesce(elev_precision, -1), coalesce(elev_precision, if_else(year(series_last) <= 2010L, 1, 0))), 1),
+      keep = coalesce(keep, valid90 >= 5L * 365L, FALSE)
     ) |>
     assert(within_bounds(3, 19), lon_ok) |>
     assert(within_bounds(41, 49), lat_ok) |>
@@ -57,7 +57,8 @@ integrate_corrections <- function(merged_metadata, raw_corrections, statconn) {
       .keep = "unused"
     ) |>
     select(-elevation_glo30) |>
-    rename(sensor_key = series_key) |> 
+    rename(sensor_key = series_key) |>
     query_elevations(statconn) |>
+    mutate(elevation = coalesce(elevation, elevation_glo30)) |>
     rename(series_key = sensor_key)
 }

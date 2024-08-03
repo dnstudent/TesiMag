@@ -102,18 +102,20 @@ if (!fs::dir_exists(fs::path(save_to, "metadata"))) {
   fs::dir_create(fs::path(save_to, "metadata"), recurse = TRUE)
 }
 
-query_checkpoint_meta("full", "merged_corrected", conns$data) |>
+mrc <- query_checkpoint_meta("full", "merged_corrected", conns$data) |>
   collect() |>
   assertr::assert(not_na, dataset, series_key, from_datasets, from_sensor_keys) |>
   prepare_lists_and_from() |>
-  relocate(dataset, series_key, from, name) |>
-  write_csv_arrow(fs::path(save_to, "metadata", "metadata.csv"), write_options = csv_write_options(quoting_style = "AllValid"))
+  relocate(dataset, series_key, from, name)
+mrc |> vroom::vroom_write(fs::path(save_to, "metadata", "metadata.csv"))
+mrc |> openxlsx::write.xlsx(fs::path(save_to, "metadata", "metadata.xlsx"), asTable = TRUE)
 
-open_dataset(fs::path("db", "extra", "merge_specs")) |>
+ms <- open_dataset(fs::path("db", "extra", "merge_specs")) |>
   collect() |>
   assertr::assert(not_na, everything()) |>
-  unite("from", from_dataset, from_sensor_key, sep = "/") |>
-  write_csv_arrow(fs::path(save_to, "metadata", "merge_specs.csv"), write_options = csv_write_options(quoting_style = "AllValid"))
+  unite("from", from_dataset, from_sensor_key, sep = "/")
+ms |> vroom::vroom_write(fs::path(save_to, "metadata", "merge_specs.csv"))
+ms |> openxlsx::write.xlsx(fs::path(save_to, "metadata", "merge_specs.xlsx"), asTable = TRUE)
 ```
 
 ```{r}
@@ -130,17 +132,19 @@ corrections1 <- merged_metadata |>
   left_join(corrections, by = c("dataset", "from_datasets", "from_sensor_keys"), relationship = "one-to-one") |>
   prepare_corrections(merged_metadata)
 
-corrections_path <- fs::path(save_to, "metadata", "manual_corrections.csv")
+corrections_path <- fs::path(save_to, "metadata", "manual_corrections.xlsx")
 if (!fs::dir_exists(fs::path_dir(corrections_path))) fs::dir_create(fs::path_dir(corrections_path), recurse = TRUE)
-corrections1 |>
+ccs <- corrections1 |>
   prepare_lists_and_from() |>
-  rename(original_lon = lon, original_lat = lat, original_elevation = elevation, manual_lon = lon_ok, manual_lat = lat_ok, manual_elevation = ele_ok, manual_name = name_ok, manual_user_code = user_code_ok) |>
-  readr::write_csv(fs::path(save_to, "metadata", "manual_corrections.csv"), na = "")
+  rename(original_lon = lon, original_lat = lat, original_elevation = elevation, manual_lon = lon_ok, manual_lat = lat_ok, manual_elevation = ele_ok, manual_name = name_ok, manual_user_code = user_code_ok)
+ccs |> vroom::vroom_write(fs::path(save_to, "metadata", "manual_corrections.csv"))
+ccs |> openxlsx::write.xlsx(fs::path(save_to, "metadata", "manual_corrections.xlsx"), asTable = TRUE)
 ```
 
 Tabella con i metadati originali
 ```{r}
 original_metadata <- query_checkpoint_meta(datasets, "raw", conns$data) |>
   collect()
-original_metadata |> readr::write_csv(fs::path(save_to, "metadata", "starting_metadata.csv"))
+original_metadata |> vroom::vroom_write(fs::path(save_to, "metadata", "starting_metadata.csv"))
+original_metadata |> openxlsx::write.xlsx(fs::path(save_to, "metadata", "starting_metadata.xlsx"))
 ```

@@ -16,7 +16,15 @@ source("src/merging/analysis.R")
 source("src/merging/display.R")
 source("notebooks/ds_regionali/procedure/common_steps.R")
 conns <- load_dbs()
+convert_and_write_xlsx <- function(metadata, path) {
+  metadata |> mutate(across(where(is.Date), as.character), across(where(is.list), ~ paste(unlist(.), sep = ";"))) #|> write.xlsx(path, asTable = TRUE)
+}
 ```
+
+```{r}
+dps |> mutate(a = list(list(1,2))) |> convert_and_write_xlsx("")
+```
+
 
 ```{r}
 meta <- query_checkpoint_meta("full", "merged_corrected", conn = conns$data) |>
@@ -34,12 +42,14 @@ sensor_matches <- close_matches(meta, 5000, conns$stations)
 var_matches <- series_matches(data, sensor_matches, meta)
 ```
 
-
 ```{r}
 involved_series <- var_matches |> pivot_longer(cols = c(key_x, key_y), names_to = "key_type", values_to = "key")
 metaf <- meta |>
   semi_join(involved_series, by = "key", copy = T) |>
   compute()
+```
+
+```{r}
 data |> semi_join(involved_series, by = c("key", "variable"), copy = T) |>
   to_arrow() |>
   write_parquet("temp.parquet")
@@ -48,9 +58,6 @@ analysis <- series_matches_analysis(var_matches,
   metaf,
   matches_offsets = c(-1L, 0L, 1L)
 )
-```
-
-```{r}
 analysis |> write_parquet(file.path("notebooks", "ds_nazionali", "TESIDB", "raw_analysis.parquet"))
 analysis |> write_xlsx_analysis(file.path("notebooks", "ds_nazionali", "TESIDB", "raw_analysis.xlsx"), name_x, name_y, .format = FALSE)
 ```
@@ -83,6 +90,20 @@ tagged_analysis |> write_xlsx_analysis(file.path("notebooks", "ds_nazionali", "T
 ```
 
 ```{r}
+source("notebooks/ds_regionali/procedure/common_steps.R")
+
+rm(data)
+gc()
+data <- query_checkpoint_data("full", "merged_corrected", conns$data, hive_types = list("variable" = "INT")) |>
+    rename(sensor_key = series_key) |>
+    inner_join(meta |> select(dataset, sensor_key, key), by = c("dataset", "sensor_key")) |>
+    compute()
+path_from <- prepare_data_for_merge(conns$data, fs::path("db", "data", "merged_corrected"), fs::path("db", "tmp", "prepared4remerge"), FALSE, key_column = "series_key")
+saved_to <- merge_same_series(path_from, fs::path("db", "tmp", "rawremerged"), new_dataset, tagged_analysis, metadata, data, 1, 2L * 365L, NULL, desc(dataset), desc(sensor_last), desc(network))
+merged_checkpoint(new_dataset, saved_to, metadata)
+```
+
+```{r}
 gs <- series_groups(tagged_analysis, collect(meta), data, tag_anydupe)
 ```
 
@@ -93,7 +114,7 @@ regional_dataset <- tribble(
   "TOS", "Toscana",
   "VEN", "Veneto",
   "LOM", "Lombardia",
-  "VDA", "Valle D'Aosta",
+  "VDA", "Valle D'aosta",
   "FVG", "Friuli Venezia Giulia",
   "ER", "Emilia-Romagna",
   "LIG", "Liguria",
@@ -125,9 +146,11 @@ duplications <- ranked_series_groups |>
   ungroup() |>
   select(dataset = from_dataset, series_key = from_sensor_key, duplicate_of) |>
   distinct()
-duplications |>
-  left_join(meta |> select(dataset, series_key = sensor_key, name, series_first = sensor_first, series_last = sensor_last, valid90, lon, lat, elevation, district), by = c("dataset", "series_key"), copy = T) |>
-  readr::write_csv(file.path("notebooks", "ds_nazionali", "TESIDB", "merge_duplicates.csv"))
+dps <- duplications |>
+  left_join(meta |> select(dataset, series_key = sensor_key, name, series_first = sensor_first, series_last = sensor_last, valid90, lon, lat, elevation, district), by = c("dataset", "series_key"), copy = T)
+
+dps |> vroom::vroom_write(file.path("db", "conv", "merged_corrected", "merge_duplicates.csv"))
+dps |> openxlsx::write.xlsx(file.path("db", "conv", "merged_corrected", "merge_duplicates.xlsx"), asTable = TRUE)
 ```
 
 ```{r}

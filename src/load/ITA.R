@@ -2,7 +2,7 @@ source("src/paths/paths.R")
 
 load.DEM.COP30 <- function(cached = TRUE) {
     if (cached) {
-        rast(path.cached.COP30)
+        terra::rast(path.cached.COP30)
     } else {
         ls.COP30() |>
             terra::sprc() |>

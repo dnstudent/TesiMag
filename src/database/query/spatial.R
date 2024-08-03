@@ -2,8 +2,6 @@ library(DBI, warn.conflicts = FALSE)
 library(RPostgres, warn.conflicts = FALSE)
 library(sf, warn.conflicts = FALSE)
 
-source("src/database/toos.R")
-
 query_boundary <- function(conn, name, kind) {
     st_read(conn, query = glue::glue_sql('SELECT * FROM regional_boundaries WHERE "shapeName" = {name} AND kind = {kind}', .con = conn), geometry_column = "geometry", quiet = TRUE)
 }
