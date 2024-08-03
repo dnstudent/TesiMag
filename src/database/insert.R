@@ -13,7 +13,7 @@ add_ds_info <- function(name, infos, conn) {
     if (length(infos) > 3L) {
         citation <- infos[[4]]
     } else {
-        citation <- NULL
+        citation <- NA_character_
     }
     dbExecute(conn, glue::glue_sql("INSERT INTO dataset (name, source, kind, description, citation) VALUES ({name}, {source}, {kind}, {description}, {citation}) ON CONFLICT (name) DO UPDATE SET source = EXCLUDED.source, kind = EXCLUDED.kind, description = EXCLUDED.description, citation = EXCLUDED.citation", .con = conn))
 }
