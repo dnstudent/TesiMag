@@ -36,7 +36,7 @@ load_meta <- function() {
             series_id = `WIGOS-ID`,
             user_code = `station/location`,
             name = Station,
-            elevation = as.numeric(elevation),
+            elevation = as.numeric(`Station height m. a. sea level`),
             sensor_first = as.Date(NA_integer_),
             sensor_last = as.Date(NA_integer_),
             station_first = as.Date(NA_integer_),
@@ -44,12 +44,12 @@ load_meta <- function() {
             series_first = as.Date(NA_integer_),
             series_last = as.Date(NA_integer_),
             town = NA_character_,
-            district = Canton,
+            district = NA_character_,
             province = NA_character_,
-            country = "The Swiss Confederation",
+            country = "Switzerland",
             kind = "unknown",
         ) |>
-        select(-Abbreviation, -Station, -Canton)
+        select(-`station/location`, -`Station height m. a. sea level`)
 }
 
 load_fragment <- function(path) {
