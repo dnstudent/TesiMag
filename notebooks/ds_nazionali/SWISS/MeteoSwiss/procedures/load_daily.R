@@ -29,15 +29,20 @@ load_meta <- function() {
         ),
         n_max = 29L
     ) |>
+        rename(
+            lon = Longitude,
+            lat = Latitude,
+            elevation = `Station height m. a. sea level`,
+            user_code = `station/location`,
+            series_id = `WIGOS-ID`,
+            name = Station
+        ) |>
         mutate(
             network = "NBNC",
             dataset = "MeteoSwiss",
             sensor_id = NA_character_,
             station_id = NA_character_,
-            series_id = `WIGOS-ID`,
-            user_code = `station/location`,
-            name = Station,
-            elevation = as.numeric(`Station height m. a. sea level`),
+            elevation = as.numeric(elevation),
             sensor_first = as.Date(NA_integer_),
             sensor_last = as.Date(NA_integer_),
             station_first = as.Date(NA_integer_),
@@ -49,8 +54,7 @@ load_meta <- function() {
             province = NA_character_,
             country = "Switzerland",
             kind = "unknown",
-        ) |>
-        select(-`station/location`, -`Station height m. a. sea level`)
+        )
 }
 
 
