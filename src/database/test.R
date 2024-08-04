@@ -2,8 +2,8 @@ library(dplyr, warn.conflicts = FALSE)
 library(assertr, warn.conflicts = FALSE)
 library(arrow, warn.conflicts = FALSE)
 
-assert_data_uniqueness <- function(checkpoint, keys) {
-    if (checkpoint$data |>
+assert_data_uniqueness <- function(checkpoint, keys, disable = F) {
+    if (!disable && checkpoint$data |>
         group_by(across(all_of(keys)), variable, date) |>
         tally() |>
         filter(n > 1L) |>
@@ -14,8 +14,8 @@ assert_data_uniqueness <- function(checkpoint, keys) {
     checkpoint
 }
 
-assert_metadata_uniqueness <- function(checkpoint, keys) {
-    if (checkpoint$meta |>
+assert_metadata_uniqueness <- function(checkpoint, keys, disable = F) {
+    if (!disable && checkpoint$meta |>
         group_by(across(all_of(keys))) |>
         tally() |>
         filter(n > 1L) |>

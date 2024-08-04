@@ -19,37 +19,39 @@ source("notebooks/ds_regionali/procedure/checkpoint.R")
 source("notebooks/ds_regionali/procedure/plots.R")
 source("notebooks/ds_regionali/procedure/tools.R")
 
-test_metadata_consistency <- function(meta) {
-    meta |> verify(!is.na(series_id))
+test_metadata_consistency <- function(meta, disable = F) {
+    if (!disable) {
+        meta |> verify(!is.na(series_id))
 
-    meta |>
-        group_by(sensor_id, station_id, series_id) |>
-        count() |>
-        verify(n == 1L)
+        meta |>
+            group_by(sensor_id, station_id, series_id) |>
+            count() |>
+            verify(n == 1L)
 
-    assert_that(meta |>
-        filter(if_all(c(sensor_id, station_id, series_id), is.na)) |>
-        nrow() == 0L)
+        assert_that(meta |>
+            filter(if_all(c(sensor_id, station_id, series_id), is.na)) |>
+            nrow() == 0L)
 
-    assert_that(meta |>
-        filter(if_any(c(dataset, network, lon, lat, kind), is.na)) |>
-        nrow() == 0L)
-
+        assert_that(meta |>
+            filter(if_any(c(dataset, network, lon, lat, kind), is.na)) |>
+            nrow() == 0L)
+    }
     meta
 }
 
-test_data_consistency <- function(data) {
-    if (data |>
-        filter(if_any(c(dataset, sensor_key, variable, date), is.na)) |>
-        compute() |>
-        nrow() > 0L) {
-        stop("Data contains NA keys")
-    }
+test_data_consistency <- function(data, disable = F) {
+    if (!disable) {
+        if (data |>
+            filter(if_any(c(dataset, sensor_key, variable, date), is.na)) |>
+            compute() |>
+            nrow() > 0L) {
+            stop("Data contains NA keys")
+        }
 
-    if (data |> group_by(dataset, sensor_key, variable, date) |> count() |> filter(n > 1L) |> compute() |> nrow() > 0L) {
-        stop("Data contains duplicate measures for the same key")
+        if (data |> group_by(dataset, sensor_key, variable, date) |> count() |> filter(n > 1L) |> compute() |> nrow() > 0L) {
+            stop("Data contains duplicate measures for the same key")
+        }
     }
-
     data
 }
 
@@ -132,21 +134,21 @@ associate_dem_elevation.bruno <- function(metadata, glo30_dem_path) {
 # }
 
 
-prepare_daily_data <- function(data_pack, statconn) {
+prepare_daily_data <- function(data_pack, statconn, debug = F) {
     data_pack$meta <- data_pack$meta |>
         arrange(name, series_id, user_code) |>
         make_keys() |>
         associate_regional_info(statconn) |>
         associate_dem_elevation(statconn) |>
         mutate(sensor_first = coalesce(sensor_first, station_first), sensor_last = coalesce(sensor_last, station_last)) |>
-        test_metadata_consistency() |>
+        test_metadata_consistency(debug) |>
         as_arrow_table()
 
     data_pack$data <- data_pack$data |>
         filter(!is.na(value)) |>
         mutate(variable = if_else(variable == "T_MIN", -1L, 1L)) |>
         associate_sensor_key(data_pack$meta) |>
-        test_data_consistency() |>
+        test_data_consistency(debug) |>
         arrange(sensor_key, variable, date) |>
         compute()
 
@@ -162,7 +164,6 @@ prepare_daily_data <- function(data_pack, statconn) {
         select(-names(meta_schema), sensor_key, dataset) |>
         compute()
 
-    # split <- split_station_metadata(data_pack$meta)
     list("checkpoint" = as_checkpoint(meta, data_pack$data), "extra_meta" = extra_meta)
 }
 
