@@ -8,6 +8,11 @@ dependencies:
   - polars
   - pyarrow
   - black
+  - geopandas
+  - bs4
+  - numpy
+  - tqdm
+  - pip
   - pip:
     - adbc_driver_manager
 
