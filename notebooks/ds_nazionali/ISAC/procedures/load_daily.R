@@ -19,7 +19,7 @@ load_work_metadata <- function(variant) {
         tmin,
         tmax
     ) |>
-        mutate(across(c(region_, country, province), as.character), dataset = "ISAC", network = if_else(!is.na(internal_id), "DPC", "ISAC"), kind = "unknown", country = case_match(country, "IT" ~ "Italy", .default = NA_character_)) |>
+        mutate(across(c(region_, country, province), as.character), dataset = "ISAC", network = if_else(!is.na(internal_id), "DPC", "ISAC"), kind = "unknown", country = case_match(country, "IT" ~ "Italy", "AT" ~ "Austria", .default = NA_character_)) |>
         rename(name = anagrafica, actual_original_id = identifier)
 }
 

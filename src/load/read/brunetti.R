@@ -46,7 +46,8 @@ describe.brunetti.region_dpc_ <- function(data) {
             version = as.integer(version),
             internal_id = as.integer(internal_id),
             district = na_if(district, "XXX"),
-            province = na_if(province, "XX")
+            province = na_if(province, "XX"),
+            country = "Italy"
         )
 }
 

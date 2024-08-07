@@ -18,7 +18,7 @@ describe.BRUN.metadata_ <- function(data) {
             across(where(is.character), \(x) na_if(x, "")),
             GSOD = replace_na(GSOD, FALSE),
             MG = replace_na(MG, FALSE),
-            country = country |> as.factor() |> fct_collapse(IT = c("IT", "ITA")),
+            country = country |> as.factor() |> fct_collapse(IT = c("IT", "ITA", "Italy")),
             district = as.factor(district),
             province = as.factor(province)
         ) |>
