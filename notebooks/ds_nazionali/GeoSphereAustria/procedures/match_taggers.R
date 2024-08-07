@@ -30,13 +30,29 @@ tag_same_series <- function(analysis) {
 
 tag_manual <- function(tagged_analysis) {
     tagged_analysis |> mutate(
-        tag_same_series = tag_same_series & !(
+        tag_same_series = (tag_same_series & !(
             (!!datasets_are_("GeoSphereAustria", "ISAC") & (
                 !!series_ids_are_("98", "AT_MARIAPFARR_GSOD_113480_MG") | # Tamsweg / Mariapfarr
                     !!series_ids_are_("175", "AT_INNSBRUCK_AU_LOWI_GSOD_111200_MG") | # Innsbruck
                     !!series_ids_are_("9011", "AT_KUFSTEIN_GSOD_111300_MG") | # Oberndorf / Kufstein
                     !!series_ids_are_("15412", "AT_SONNBLICK_GSOD_111460") # Sonnblick
-            ))
-        )
+            )) |
+                (!!datasets_are("GeoSphereAustria", "GeoSphereAustria") & (
+                    !!station_ids_are("12300", "12302") | # Saalbach
+                        !!station_ids_are("12301", "12302") | # Saalbach
+                        !!station_ids_are_("14512", "14513") | # Imst
+                        !!station_ids_are_("12615", "12616") | # Radstadt
+                        !!station_ids_are_("12610", "12616") | # Radstadt
+                        !!station_ids_are_("15710", "15712") | # Tamsweg
+                        !!station_ids_are_("15711", "15712") # Tamsweg
+                ))
+        )) |
+            (
+                (!!datasets_are("GeoSphereAustria", "GeoSphereAustria") & (
+                    !!series_ids_are_("14311", "14310") | # Langen am Arlberg
+                        !!series_ids_are_("15505", "15506") | # Bad Hofgastein
+                        !!series_ids_are_("20021", "20020") # Villacher Alpe
+                ))
+            )
     )
 }

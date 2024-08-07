@@ -51,7 +51,7 @@ load_meta <- function(ita_bounds) {
 
     close_stations <- meta |>
         st_md_to_sf() |>
-        st_filter(ita_bounds, .predicate = st_is_within_distance, dist = units::set_units(100, "km")) |>
+        st_filter(ita_bounds, .predicate = st_is_within_distance, dist = units::set_units(200, "km")) |>
         st_drop_geometry()
 
     close_stations |> bind_rows(meta |> semi_join(close_stations, by = "series_id") |> anti_join(close_stations, by = "station_id"))
@@ -77,6 +77,6 @@ load_data <- function(meta, dataconn) {
 }
 
 load_daily_data.geosphereaustria <- function(ita_bounds, dataconn) {
-    meta <- load_meta(ita_bounds, dataconn)
+    meta <- load_meta(ita_bounds)
     list(meta = meta, data = load_data(meta, dataconn))
 }
