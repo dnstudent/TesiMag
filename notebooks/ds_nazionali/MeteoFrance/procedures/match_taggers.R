@@ -16,10 +16,11 @@ tag_same_series <- function(analysis) {
         mutate(
             tag_good_diff = valid_days_inters > 100L & (!is.na(f0noint) & f0noint > 0.15) & distance < 2000,
             tag_proximity = distance < 100 & abs(delH) < 50,
+
             # Summary
-            tag_same_sensor = (overlap_union > 0.9 & f0 > 0.9),
-            tag_same_station = (overlap_min > 0.9 & f0 > 0.8),
-            tag_same_series = tag_good_diff | tag_proximity,
+            tag_same_sensor = (overlap_union > 0.9 & f0 > 0.9 & valid_days_inters > 100L),
+            tag_same_station = (overlap_min > 0.9 & f0 > 0.8 & valid_days_inters > 100L),
+            tag_same_series = tag_good_diff | (tag_proximity & (valid_days_inters < 100L | tag_good_diff)),
         )
 }
 

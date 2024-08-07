@@ -13,7 +13,7 @@ dataset_spec <- function() {
     )
 }
 
-load_meta <- function(ita_bounds, exclude) {
+load_meta <- function(ita_bounds) {
     from_data <- open_dataset(fs::path(path.ds, "MeteoFrance", "dataset")) |>
         select(series_id = NUM_POSTE, name = NOM_USUEL, lat = LAT, lon = LON, elevation = ALTI) |>
         distinct() |>
@@ -58,8 +58,7 @@ load_meta <- function(ita_bounds, exclude) {
         st_filter(close_stations, .predicate = st_is_within_distance, dist = units::set_units(500, "m")) |>
         st_drop_geometry()
 
-    bind_rows(close_stations |> st_drop_geometry(), excluded_but_close) |>
-        anti_join(exclude, by = "series_id")
+    bind_rows(close_stations |> st_drop_geometry(), excluded_but_close)
 }
 
 load_data <- function(meta) {
@@ -84,7 +83,7 @@ load_data <- function(meta) {
         compute()
 }
 
-load_daily_data.meteofrance <- function(ita_bounds, exclude) {
-    meta <- load_meta(ita_bounds, exclude)
+load_daily_data.meteofrance <- function(ita_bounds) {
+    meta <- load_meta(ita_bounds)
     list(meta = meta, data = load_data(meta))
 }
