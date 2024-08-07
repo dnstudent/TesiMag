@@ -74,10 +74,12 @@ load_data.auto <- function(meta, dataconn) {
     # CONTROLLATO: OK
     open_dataset(fs::path(path.ds, "meteo.si", "auto_ds.arrow"), format = "arrow") |>
         semi_join(meta |> filter(type == 4L), by = "station_id") |>
+        mutate(time = lubridate::force_tz(time, tzone = "UTC") |> lubridate::with_tz("CET") - as.difftime(10, "mins")) |>
+        compute() |>
         to_duckdb(con = conns$data) |>
         pivot_longer(cols = c("t2mmin", "t2mmax")) |>
         filter(!is.na(value)) |>
-        # Mixing tmin and tmax; they are aggregates anyway
+        # Mixing tmin and tmax; this should deal with mixups without compromising the min/max statistics
         group_by(station_id, date = as.Date(time), hour = hour(time)) |>
         summarise(tminh = min(value, na.rm = T), tmaxh = max(value, na.rm = T), .groups = "drop_last") |>
         #  Filtering out days having data covering less than 22 hours
