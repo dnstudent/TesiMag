@@ -68,11 +68,13 @@ datasets_are_ <- purrr::partial(tags_are_sym, "dataset")
 sensor_keys_are_ <- purrr::partial(tags_are_sym, "sensor_key")
 user_codes_are_ <- purrr::partial(tags_are_sym, "user_code")
 series_ids_are_ <- purrr::partial(tags_are_sym, "series_id")
+station_ids_are_ <- purrr::partial(tags_are_sym, "station_id")
 
 datasets_are <- purrr::partial(tags_are_asym, "dataset")
 sensor_keys_are <- purrr::partial(tags_are_asym, "sensor_key")
 user_codes_are <- purrr::partial(tags_are_asym, "user_code")
 series_ids_are <- purrr::partial(tags_are_asym, "series_id")
+station_ids_are <- purrr::partial(tags_are_asym, "station_id")
 
 in_sensor_keys <- purrr::partial(in_tags, "sensor_key")
 in_user_codes <- purrr::partial(in_tags, "user_code")
