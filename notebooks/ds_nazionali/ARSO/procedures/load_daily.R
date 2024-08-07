@@ -55,9 +55,11 @@ load_meta <- function(ita_bounds) {
 }
 
 load_data.trad <- function(meta, dataconn) {
+    # CONTROLLATO: OK
     open_dataset(fs::path(path.ds, "meteo.si", "trad_ds.arrow"), format = "arrow") |>
         semi_join(meta |> filter(type != 4L), by = "station_id") |>
         rename(T_MIN = tmin, T_MAX = tmax) |>
+        filter(T_MIN < T_MAX) |> # Ci sono due date in cui non è vero
         mutate(date = as.Date(time)) |>
         select(-time) |>
         to_duckdb(con = dataconn) |>
@@ -69,14 +71,18 @@ load_data.trad <- function(meta, dataconn) {
 }
 
 load_data.auto <- function(meta, dataconn) {
-    # ATTENZIONE! CONTROLLARE TMIN <= TMAX, DISPONIBILITA'/GIORNO, PRESENZA DI TUTTE LE MISURE
+    # CONTROLLATO: OK
     open_dataset(fs::path(path.ds, "meteo.si", "auto_ds.arrow"), format = "arrow") |>
         semi_join(meta |> filter(type == 4L), by = "station_id") |>
-        to_duckdb(con = dataconn) |>
-        pivot_longer(cols = c("t2mmin", "t2mmax"), names_to = "variable", values_to = "value") |>
+        to_duckdb(con = conns$data) |>
+        pivot_longer(cols = c("t2mmin", "t2mmax")) |>
         filter(!is.na(value)) |>
-        group_by(station_id, date = as.Date(time)) |>
-        summarise(T_MIN = min(value, na.rm = T), T_MAX = max(value, na.rm = T), .groups = "drop") |>
+        # Mixing tmin and tmax; they are aggregates anyway
+        group_by(station_id, date = as.Date(time), hour = hour(time)) |>
+        summarise(tminh = min(value, na.rm = T), tmaxh = max(value, na.rm = T), .groups = "drop_last") |>
+        #  Filtering out days having data covering less than 22 hours
+        filter(sum(as.integer(!is.na(tminh)), na.rm = T) > 22L) |>
+        summarise(T_MIN = min(tminh, na.rm = T), T_MAX = max(tmaxh, na.rm = T), .groups = "drop") |>
         pivot_longer(cols = c("T_MIN", "T_MAX"), names_to = "variable", values_to = "value") |>
         to_arrow() |>
         relocate(station_id, date, variable, value) |>
