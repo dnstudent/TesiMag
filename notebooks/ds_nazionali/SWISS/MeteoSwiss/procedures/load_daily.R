@@ -6,7 +6,7 @@ source("src/paths/paths.R")
 
 dataset_spec <- function() {
     list(
-        "https://opendata.swiss/it/dataset/homogene-monatsdaten",
+        "https://opendata.swiss/it/dataset/klimamessnetz-tageswerte",
         "national",
         "Dataset MeteoSwiss"
     )
