@@ -51,7 +51,7 @@ load_meta <- function(ita_bounds) {
         st_md_to_sf()
 
     close_stations <- geometa |>
-        st_filter(ita_bounds, .predicate = st_is_within_distance, dist = units::set_units(100, "km"))
+        st_filter(ita_bounds, .predicate = st_is_within_distance, dist = units::set_units(200, "km"))
 
     excluded_but_close <- geometa |>
         anti_join(close_stations |> st_drop_geometry(), by = "station_id") |>
