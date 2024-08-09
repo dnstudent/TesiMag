@@ -9,17 +9,17 @@ dataset_spec <- function() {
     list(
         "https://opendata.swiss/it/dataset/klimamessnetz-tageswerte",
         "national",
-        "Dataset MeteoSwiss NBNC: rete climatologica di base nazionale. 29 stazioni con serie a lungo termine."
+        "Dataset MeteoSwiss NBCN: rete climatologica di base nazionale. 29 stazioni con serie a lungo termine."
     )
 }
 
 load_meta <- function(...) {
-    load_general_meta(...) |> mutate(dataset = "MeteoSwiss_NBNC")
+    load_general_meta(...) |> mutate(dataset = "MeteoSwissNBCN")
 }
 
 
 load_data <- function() {
-    data_dir <- fs::path(path.ds, "MeteoSwiss", "NBNC-daily", "fragments")
+    data_dir <- fs::path(path.ds, "MeteoSwiss", "NBCN-daily", "fragments")
     open_delim_dataset(data_dir,
         schema = schema(
             `station/location` = utf8(),
@@ -45,10 +45,10 @@ load_data <- function() {
         tidyr::pivot_longer(cols = c(T_MIN, T_MAX), names_to = "variable", values_to = "value") |>
         to_arrow() |>
         filter(!is.na(value)) |>
-        mutate(dataset = "MeteoSwiss_NBNC") |>
+        mutate(dataset = "MeteoSwissNBCN") |>
         compute()
 }
 
-load_daily_data.meteoswiss_nbnc <- function() {
+load_daily_data.meteoswiss_nbcn <- function() {
     list(meta = load_meta(), data = load_data())
 }
