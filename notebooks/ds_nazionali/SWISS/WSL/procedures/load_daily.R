@@ -3,20 +3,19 @@ library(arrow, warn.conflicts = F)
 library(lubridate, warn.conflicts = F)
 
 source("src/paths/paths.R")
+source("notebooks/ds_nazionali/SWISS/procedures/load_daily.R")
 
 dataset_spec <- function() {
     list(
         "https://www.wsl.ch/it/services-produkte/servizio-dati-slf/",
         "national",
-        "Dataset dell'Istituto federale di ricerca per la foresta, la neve e il paesaggio (WSL) svizzero, rete partner di MeteoSwiss. Stazioni automatiche IMIS. Passo sub-orario (UTC). Medie semiorarie.",
+        "Dataset dell'Istituto federale di ricerca per la foresta, la neve e il paesaggio (WSL) svizzero, rete partner di MeteoSwiss. Stazioni automatiche IMIS. Rilevazioni sub-orarie (UTC). Aggregazione di medie semiorarie.",
         "https://doi.org/10.16904/envidat.406"
     )
 }
 
-load_meta <- function() {
-    meta_path <- fs::path(path.ds, "MeteoSwiss", "WSL", "imis", "stations.csv")
-
-    vroom(meta_path,
+load_meta <- function(...) {
+    vroom(fs::path(path.ds, "MeteoSwiss", "WSL", "imis", "stations.csv"),
         col_types = cols(
             network = col_character(),
             station_code = col_character(),
@@ -28,6 +27,7 @@ load_meta <- function() {
         ),
         locale = locale(encoding = "utf-8")
     ) |>
+        as_tibble() |>
         mutate(
             dataset = "WSL",
             sensor_id = NA_character_,

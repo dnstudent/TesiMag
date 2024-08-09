@@ -3,58 +3,18 @@ library(arrow, warn.conflicts = F)
 library(lubridate, warn.conflicts = F)
 
 source("src/paths/paths.R")
+source("notebooks/ds_nazionali/SWISS/procedures/load_daily.R")
 
 dataset_spec <- function() {
     list(
         "https://opendata.swiss/it/dataset/klimamessnetz-tageswerte",
         "national",
-        "Dataset MeteoSwiss"
+        "Dataset MeteoSwiss NBNC: rete climatologica di base nazionale. 29 stazioni con serie a lungo termine."
     )
 }
 
-load_meta <- function() {
-    meta_path <- fs::path(path.ds, "MeteoSwiss", "NBNC-daily", "liste-download-nbcn-d.csv")
-
-    vroom(meta_path,
-        delim = ";",
-        locale = locale(encoding = "iso-8859-1"),
-        col_types = cols(
-            `Data since` = col_date(format = "%d.%m.%Y"),
-            `Station height m. a. sea level` = col_integer(),
-            CoordinatesE = col_integer(),
-            CoordinatesN = col_integer(),
-            Latitude = col_double(),
-            Longitude = col_double(),
-            .default = col_character()
-        ),
-        n_max = 29L
-    ) |>
-        rename(
-            lon = Longitude,
-            lat = Latitude,
-            elevation = `Station height m. a. sea level`,
-            user_code = `station/location`,
-            series_id = `WIGOS-ID`,
-            name = Station
-        ) |>
-        mutate(
-            network = "NBNC",
-            dataset = "MeteoSwiss",
-            sensor_id = NA_character_,
-            station_id = NA_character_,
-            elevation = as.numeric(elevation),
-            sensor_first = as.Date(NA_integer_),
-            sensor_last = as.Date(NA_integer_),
-            station_first = as.Date(NA_integer_),
-            station_last = as.Date(NA_integer_),
-            series_first = as.Date(NA_integer_),
-            series_last = as.Date(NA_integer_),
-            town = NA_character_,
-            state = NA_character_,
-            province = NA_character_,
-            country = "Switzerland",
-            kind = "unknown",
-        )
+load_meta <- function(...) {
+    load_general_meta(...) |> mutate(dataset = "MeteoSwiss_NBNC")
 }
 
 
@@ -79,22 +39,16 @@ load_data <- function() {
         delim = ";",
         skip = 1L
     ) |>
-        select(user_code = `station/location`, date, T_MIN = tre200dn, T_MAX = tre200dx) |>
+        select(series_id = `station/location`, date, T_MIN = tre200dn, T_MAX = tre200dx) |>
         mutate(date = lubridate::ymd(date)) |>
         to_duckdb() |>
         tidyr::pivot_longer(cols = c(T_MIN, T_MAX), names_to = "variable", values_to = "value") |>
         to_arrow() |>
         filter(!is.na(value)) |>
-        mutate(dataset = "MeteoSwiss") |>
+        mutate(dataset = "MeteoSwiss_NBNC") |>
         compute()
 }
 
-load_daily_data.meteoswiss <- function() {
-    meta <- load_meta()
-    data <- load_data() |>
-        left_join(meta |> select(user_code, series_id) |> as_arrow_table(), by = "user_code") |>
-        select(-user_code) |>
-        compute()
-
-    list(meta = meta, data = data)
+load_daily_data.meteoswiss_nbnc <- function() {
+    list(meta = load_meta(), data = load_data())
 }
