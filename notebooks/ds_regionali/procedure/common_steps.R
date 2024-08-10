@@ -229,7 +229,7 @@ prepare_data_for_merge <- function(dataconn, from_raw_root, to_ds_root, regenera
     to_ds_root
 }
 
-merge_same_series <- function(path_from, path_to, set_name, tagged_analysis, metadata, data, correction_threshold, contribution_threshold, dataset_rankings, ..., .f0_epsilon = 0.05) {
+merge_same_series <- function(path_from, path_to, set_name, tagged_analysis, metadata, data, correction_threshold, contribution_threshold, dataset_rankings, ..., .f0_epsilon = 0.05, .rank_table = NULL) {
     gs <- series_groups(tagged_analysis, metadata, data, tag_same_series)
     ranked_series_groups <- gs$table |>
         group_by(gkey, key) |>
@@ -237,7 +237,7 @@ merge_same_series <- function(path_from, path_to, set_name, tagged_analysis, met
         ungroup() |>
         mutate(set = set_name) |>
         rank_metadata(metadata, dataset_rankings, ...) |>
-        rank_data(metadata) |>
+        rank_data(metadata, .rank_table) |>
         left_join(metadata |> select(from_dataset = dataset, from_sensor_key = sensor_key, key, network), by = "key") |>
         rename(dataset = set, series_key = gkey) |>
         group_by(series_key, variable) |>

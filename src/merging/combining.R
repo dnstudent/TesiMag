@@ -81,27 +81,49 @@ rank_metadata <- function(series_groups, metadata, dataset_rankings, ...) {
     left_join(gkey_rank, by = c("set", "gkey", "key"))
 }
 
-rank_data <- function(series_groups, metadata) {
+default_rank_table <- tribble(
+  ~dataset, ~network, ~rank,
+  "ISAC", "ISAC", -Inf, # ISAC series are always ranked first
+  "ISAC", "DPC", Inf, # DPC series are always ranked last
+  "SCIA", NA_character_, 10L # SCIA series are always ranked "10"
+)
+
+rank_data <- function(series_groups, metadata, rank_table = NULL) {
   # Data ranking is fixed: ISAC > ARPA > SCIA > DPC
-  network_rank_table <- tribble(
-    ~dataset, ~network, ~network_rank,
-    "ISAC", "ISAC", 1L, # ISAC series are always ranked first
-    "ISAC", "DPC", 4L # DPC series are always ranked last
-  ) |>
-    bind_rows(
-      metadata |> filter(dataset == "SCIA") |> distinct(dataset, network) |> mutate(network_rank = 3L), # SCIA series are ranked second to last
-      metadata |>
-        filter(!dataset %in% c("SCIA", "ISAC")) |>
-        distinct(dataset, network) |>
-        mutate(network_rank = 2L) # ARPA series are ranked second
-    )
+  # network_rank_table <- tribble(
+  #   ~dataset, ~network, ~network_rank,
+  #   "ISAC", "ISAC", 1L, # ISAC series are always ranked first
+  #   "ISAC", "DPC", 4L # DPC series are always ranked last
+  # ) |>
+  #   bind_rows(
+  #     metadata |> filter(dataset == "SCIA") |> distinct(dataset, network) |> mutate(network_rank = 3L), # SCIA series are ranked second to last
+  #     metadata |>
+  #       filter(!dataset %in% c("SCIA", "ISAC")) |>
+  #       distinct(dataset, network) |>
+  #       mutate(network_rank = 2L) # ARPA series are ranked second
+  #   )
+
+  if (is.null(rank_table)) {
+    rank_table <- default_rank_table
+  }
+
+  rank_keys <- colnames(select(rank_table, -rank))
+  prios <- metadata |>
+    select(all_of(rank_keys)) |>
+    distinct() |>
+    full_join(rank_table, by = c("dataset"), relationship = "many-to-many") |>
+    mutate(network = coalesce(network.y, network.x), .keep = "unused") |>
+    distinct() |>
+    # Missing entries are ranked 0
+    mutate(rank = coalesce(rank, 0L))
+
 
   gkey_rank <- series_groups |>
     distinct(set, gkey, key) |>
     left_join(metadata |> select(key, dataset, sensor_key, network, sensor_last), by = "key") |>
-    left_join(network_rank_table, by = c("dataset", "network")) |>
+    left_join(prios, by = c("dataset", "network")) |>
     group_by(set, gkey) |>
-    arrange(network_rank, desc(sensor_last), .by_group = TRUE) |>
+    arrange(rank, desc(sensor_last), .by_group = TRUE) |>
     mutate(data_rank = row_number(), force_zero_correction = "ISAC" %in% network) |>
     select(set, gkey, key, data_rank, force_zero_correction) |>
     ungroup()
