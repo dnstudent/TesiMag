@@ -38,13 +38,14 @@ load_meta <- function(ita_bounds) {
             series_first = as.Date(NA_integer_),
             series_last = as.Date(NA_integer_),
             province = NA_character_,
-            town = NA_character_
+            town = NA_character_,
+            country = "Slovenia"
         )
 
     geometa <- meta |>
         st_md_to_sf()
     close_stations <- geometa |>
-        st_filter(ita_bounds, .predicate = st_is_within_distance, dist = units::set_units(100, "km"))
+        st_filter(ita_bounds, .predicate = st_is_within_distance, dist = units::set_units(200, "km"))
 
     excluded_but_close <- geometa |>
         anti_join(close_stations |> st_drop_geometry(), by = "station_id") |>
