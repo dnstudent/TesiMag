@@ -20,8 +20,8 @@ source("notebooks/corrections/manual_corrections.R")
 
 ds4conv_dir <- fs::path("db", "tmp", "dataset4conv")
 conns <- load_dbs()
-datasets <- c("ARPAPiemonte", "ARPAL", "ARPALombardia", "ARPAV", "TAA", "ARPAFVG", "Dext3r", "SIRToscana", "ARPAUmbria", "ARPAM", "SCIA", "ISAC")
-sets <- c("PIE", "LIG", "LOM", "VEN", "TAA2", "FVG", "ER", "TOS", "UMB", "MAR", "VDA")
+datasets <- c("ARPAPiemonte", "ARPAL", "ARPALombardia", "ARPAV", "TAA", "ARPAFVG", "Dext3r", "SIRToscana", "ARPAUmbria", "ARPAM", "SCIA", "ISAC", "MeteoFrance", "GeoSphereAustria", "ARSO", "MeteoSwissNBCN", "SwissMetNet")
+sets <- c("PIE", "LIG", "LOM", "VEN", "TAA2", "FVG", "ER", "TOS", "UMB", "MAR", "VDA", "FRA", "AUT", "SLO", "SWI")
 save_to <- fs::path("db", "conv", "merged_corrected")
 ```
 

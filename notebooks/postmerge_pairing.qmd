@@ -38,7 +38,7 @@ data <- query_checkpoint_data("full", "merged_corrected", conn = conns$data, hiv
 ```
 
 ```{r}
-sensor_matches <- close_matches(meta, 5000, conns$stations)
+sensor_matches <- close_matches(meta, 2500, conns$stations)
 var_matches <- series_matches(data, sensor_matches, meta)
 ```
 
@@ -91,7 +91,7 @@ tagged_analysis |> write_xlsx_analysis(file.path("notebooks", "ds_nazionali", "T
 
 ```{r}
 source("notebooks/ds_regionali/procedure/common_steps.R")
-
+new_dataset <- "tesids"
 rm(data)
 gc()
 data <- query_checkpoint_data("full", "merged_corrected", conns$data, hive_types = list("variable" = "INT")) |>
@@ -99,7 +99,7 @@ data <- query_checkpoint_data("full", "merged_corrected", conns$data, hive_types
     inner_join(meta |> select(dataset, sensor_key, key), by = c("dataset", "sensor_key")) |>
     compute()
 path_from <- prepare_data_for_merge(conns$data, fs::path("db", "data", "merged_corrected"), fs::path("db", "tmp", "prepared4remerge"), FALSE, key_column = "series_key")
-saved_to <- merge_same_series(path_from, fs::path("db", "tmp", "rawremerged"), new_dataset, tagged_analysis, metadata, data, 1, 2L * 365L, NULL, desc(dataset), desc(sensor_last), desc(network))
+saved_to <- merge_same_series(path_from, fs::path("db", "tmp", "rawremerged"), new_dataset, tagged_analysis |> rename(tag_same_series = tag_anydupe), meta |> collect(), data, 1, 2L * 365L, NULL, desc(dataset), desc(sensor_last), desc(network))
 merged_checkpoint(new_dataset, saved_to, metadata)
 ```
 
@@ -120,6 +120,10 @@ regional_dataset <- tribble(
   "LIG", "Liguria",
   "TAA2", "Trentino-Alto Adige",
   "MAR", "Marche",
+  "SWI", "Switzerland",
+  "FRA", "France",
+  "SLO", "Slovenia",
+  "AUT", "Austria"
 )
 ```
 
@@ -131,12 +135,13 @@ ranked_series_groups <- gs$table |>
 ```
 
 ```{r}
-ranked_series_groups |> filter(gkey == 11L)
+ranked_series_groups |> filter(from_dataset == "SWI")
 ```
 
 ```{r}
-meta |> semi_join(ranked_series_groups |> filter(gkey == 11L), by = c("dataset" = "from_dataset", "sensor_key" = "from_sensor_key"), copy = T) |> collect()
+meta |> semi_join(ranked_series_groups |> filter(gkey == 39L), by = c("dataset" = "from_dataset", "sensor_key" = "from_sensor_key"), copy = T) |> collect()
 ```
+
 
 ```{r}
 duplications <- ranked_series_groups |>
@@ -150,7 +155,13 @@ dps <- duplications |>
   left_join(meta |> select(dataset, series_key = sensor_key, name, series_first = sensor_first, series_last = sensor_last, valid90, lon, lat, elevation, district), by = c("dataset", "series_key"), copy = T)
 
 dps |> vroom::vroom_write(file.path("db", "conv", "merged_corrected", "merge_duplicates.csv"))
-dps |> openxlsx::write.xlsx(file.path("db", "conv", "merged_corrected", "merge_duplicates.xlsx"), asTable = TRUE)
+options("openxlsx.dateFormat" = "yyyy/mm/dd")
+wb <- createWorkbook()
+addWorksheet(wb, "duplicates")
+writeDataTable(wb, 1, dps)
+addStyle(wb, 1, style = createStyle(numFmt = "DATE"), rows = 2:nrow(dps), cols = 5:6, gridExpand = TRUE)
+saveWorkbook(wb, file.path("db", "conv", "merged_corrected", "merge_duplicates.xlsx"), overwrite = TRUE)
+# dps |> write.xlsx(file.path("db", "conv", "merged_corrected", "merge_duplicates.xlsx"), asTable = TRUE)
 ```
 
 ```{r}

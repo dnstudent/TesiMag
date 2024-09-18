@@ -58,7 +58,7 @@ load_meta <- function(ita_bounds) {
         st_filter(close_stations, .predicate = st_is_within_distance, dist = units::set_units(500, "m")) |>
         st_drop_geometry()
 
-    bind_rows(close_stations |> st_drop_geometry(), excluded_but_close)
+    bind_rows(close_stations |> st_drop_geometry(), excluded_but_close) |> as_arrow_table()
 }
 
 load_data <- function(meta) {
@@ -85,5 +85,6 @@ load_data <- function(meta) {
 
 load_daily_data.meteofrance <- function(ita_bounds) {
     meta <- load_meta(ita_bounds)
-    list(meta = meta, data = load_data(meta))
+    data <- load_data(meta)
+    list(meta = meta, data = data)
 }

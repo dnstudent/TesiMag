@@ -152,8 +152,8 @@ query_elevations <- function(metadata, statconn) {
         )
         SELECT s.dataset, s.sensor_key, AVG(ST_Value(r.rast, 1, s.geom, true, 'bilinear')) AS elevation_glo30
         FROM s
-        INNER JOIN copernicus_glo30 r
-        ON r.rast && s.geom
+        CROSS JOIN copernicus_glo30 r
+        WHERE r.rast && s.geom
         GROUP BY s.dataset, s.sensor_key
         ",
         .con = statconn

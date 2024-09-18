@@ -21,7 +21,7 @@ source("notebooks/corrections/manual_corrections.R")
 source("notebooks/ds_regionali/procedure/checkpoint.R")
 
 conns <- load_dbs()
-sets <- c("ER", "FVG", "LOM", "MAR", "TAA2", "TOS", "UMB", "VDA", "PIE", "LIG", "VEN")
+sets <- c("ER", "FVG", "LOM", "MAR", "TAA2", "TOS", "UMB", "VDA", "PIE", "LIG", "VEN", "SWI", "SLO", "FRA", "AUT")
 ```
 
 Caricamento di metadati e correzioni
@@ -86,5 +86,5 @@ print("✅")
 ```
 
 ```{r}
-query_checkpoint_data("full", "merged_corrected", conns$data)
+query_checkpoint_data("full", "merged_corrected", conns$data) |> filter(dataset == "SWI")
 ```
