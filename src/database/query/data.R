@@ -37,7 +37,7 @@ query_dataset <- function(path, conn = NULL, filename = FALSE, hive_types = list
     if (length(path) > 1L) path <- paste0(path, collapse = "', '")
     if (is.null(conn)) {
         conn <- dbConnect(duckdb())
-        dbExecute(conn, "INSTALL icu; LOAD icu;")
+        # dbExecute(conn, "INSTALL icu; LOAD icu;")
     }
     if (length(hive_types) > 0L) {
         hive_types <- purrr::map2_chr(names(hive_types), hive_types, ~ str_glue("'{.x}': {.y}")) |> paste(collapse = ", ")

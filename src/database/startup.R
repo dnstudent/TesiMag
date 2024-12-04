@@ -7,13 +7,13 @@ load_dbs <- function() {
     connquack <- dbConnect(duckdb())
     dbExecute(connquack, "PRAGMA temp_directory='db/tmp/duckdb'")
     dbExecute(connquack, "PRAGMA max_temp_directory_size='100GiB'")
-    dbExecute(
-        connquack,
-        "
-        INSTALL icu;
-        LOAD icu;
-        "
-    )
+    # dbExecute(
+    #     connquack,
+    #     "
+    #     INSTALL icu;
+    #     LOAD icu;
+    #     "
+    # )
     list(stations = connpost, data = connquack)
 }
 
