@@ -9,6 +9,7 @@
 *.tif
 *.parquet
 *.pdf
+!/_book/*.pdf
 *.geojson
 *.csv
 raw_analysis.xlsx
@@ -37,3 +38,6 @@ build/
 *.log
 *.toc
 *.synctex.gz
+/.quarto/
+_latex_artifacts/
+.quarto/

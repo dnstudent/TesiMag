@@ -1,0 +1,68 @@
+# Stima delle normali climatologiche georiferite
+
+## Obiettivo
+
+Si desidera costruire un dataset di normali climatologiche mensili degli estremi di temperatura collocate nel modo più preciso possibile nello spazio. Ciò richiede un'attenta combinazione di
+
+Scopo della prima fase del lavoro è stato raccogliere, controllare e combinare i dati rilevati dalle stazioni meteorologiche distribuite sul territorio italiano e nelle zone limitrofe all'arco alpino. La buona riuscita di tale operazione è risultata complessa, per le misure effettuate nel trentennio 1991-2020, a causa della frammentarietà e disomogeneità delle sorgenti dei dati, attribuibili a tre ragioni principali. Innanzitutto, vi è un elevato numero di soggetti coinvolti nella gestione delle principali reti di rilevazione meteorologica e dei dati da esse derivanti. Questo fenomeno ha avuto origine nel trasferimento di competenze del Sistema Idrografico e Mareografico Nazionale (SIMN) a centri funzionali, Dipartimento di Protezione Civile (DPC) e Agenzie Regionali per la Protezione dell'Ambiente (ARPA)[@InquadramentoStoricoMonitoraggio] avvenuto all'inizio degli anni 2000. Tali enti ed agenzie non seguono un protocollo nazionale che omogenizzi i criteri di gestione della rete e dell'elaborazione e distribuzione dei dati, per cui persino raccogliere i dataset risulta un problema non banale. In secondo luogo, dalla fine degli anni '80 vi è stata una progressiva diffusione dei sistemi di rilevamento automatico, accompagnata dalla dismissione di quelli meccanici. Questo cambiamento ha introdotto significative disomogeneità nelle serie temporali e spesso ha portato al loro troncamento, laddove la stazione di riferimento non fosse rimpiazzata. Infine si riscontra una generale carenza di documentazione relativa alle stazioni stesse: di norma si trovano liste di anagrafiche, posizioni e quote (talvolta imprecise), ma solo pochi enti forniscono uno storico delle modifiche apportate alle stazioni (eventuali ricollocamenti, cambiamenti nelle tipologie di sensori, ecc.).
+
+L’Istituto Superiore per la Protezione e la Ricerca Ambientale (ISPRA) ha cercato di affrontare il problema della frammentazione organizzando le varie raccolte locali in un unico dataset: SCIA[@SCIASistemaNazionale]. Tale archivio, tuttavia, presenta importanti limiti legati alla qualità e disponibilità sia di dati che di metadati.
+
+## Serie di temperatura
+
+I dataset sorgenti sono cataloghi di estremi giornalieri di temperatura o di dati grezzi georiferiti. Ogni sequenza è quindi definita come minimo da un set di metadati (codice identificativo univoco, nome stazione, posizione geografica)
+
+-   un set di metadati (id, $s_{net}$, **x**, H, $s_{nam}$):
+    -   id: identificativo del sensore che ha rilevato i dati, della stazione di cui fa parte il sensore o della serie di cui fa parte la stazione;
+    -   $s_{nam}$: nominativo della stazione;
+    -   $s_{net}$: rete di cui fa parte la stazione che ha rilevato i dati;
+    -   **x**: collocazione geografica della stazione;
+    -   H: quota del sensore sul livello del mare;
+-   una raccolta di stime $\{(d, v, T_{d,v})\}_d \in C$, $v \in \{T_{MIN}, T_{MAX}\}$:
+    -   **d**: data a cui fa riferimento la stima;
+    -   **v**: variabile stimata;
+    -   $T_{d,v}$: valore della stima in °C.
+
+Da un'analisi preliminare risulta evidente che ogni rete o gestore di dataset ha stabilito un proprio criterio nel calcolare le stime giornaliere di temperatura a partire dai dati rilevati dai sensori. In particolare, sono state fatte scelte differenti nei seguenti ambiti:
+
+-   **Definizione di “giornata di misura”**:
+    -   In alcuni casi va dalle 09:00 del giorno corrente alle 09:00 del giorno seguente (approccio tradizionale).
+    -   In altri va dalle 00:00 alle 00:00 (approccio moderno).
+-   **Timezone delle date**:
+    -   Viene utilizzato GMT o (più spesso) CET.
+-   **Aggregazione dei dati grezzi**:
+    -   Alcuni dataset/reti forniscono gli estremi assoluti di temperatura rilevati nel corso della giornata.
+    -   Altri forniscono gli estremi delle medie orarie.
+
+Si noti che gli identificativi forniti con le sequenze di stime possono indicare una di tre tipi di entità:
+
+-   **Un sensore**: lo strumento che esegue le misure;
+-   **Una stazione**: la collocazione fisica comune a uno o più sensori che possono cambiare nel tempo (e.g., per sostituzioni dovute a malfunzionamenti o aggiornamenti);
+-   **Una serie**: l'insieme di stazioni (ciascuna con la sua collocazione) presenti in una località (spazio geografico limitato di area inferiore a 1 km² e stessa esposizione) in periodi temporali differenti.
+
+In questo lavoro interessa costruire le “serie di stime”, ovvero identificare di quale serie (secondo la definizione data sopra) le sequenze di stime contenute nei dataset facciano parte. Ciò è stato fatto, ove il dataset non abbia fornito questa informazione (ovvero per tutte le regioni/dataset tranne ARPA Piemonte), con procedure di merging.
+
+## SCIA
+
+```{r}
+#| label: fig-sciadisp
+#| fig-cap: "Disponibilità di serie SCIA mese per mese. Sono rappresentate solo le serie che riportano almeno 25 misure per mese."
+
+library(DBI, warn.conflicts = F, quietly = T)
+library(duckdb, warn.conflicts = F, quietly = T)
+library(zeallot, warn.conflicts = F, quietly = T)
+library(dplyr, warn.conflicts = F, quietly = T)
+library(ggplot2, warn.conflicts = F, quietly = T)
+library(lubridate, warn.conflicts = F, quietly = T)
+source("src/database/query/data.R")
+source("notebooks/ds_regionali/procedure/common_steps.R")
+
+conn <- dbConnect(duckdb())
+stations <- query_checkpoint_meta("SCIA", "raw", conn) |> filter(lat > 42.2 & !(district %in% c("Lazio", "Abruzzo")))
+district_data <- query_checkpoint_data("SCIA", "raw", conn) |>
+    filter(between(year(date), 1991L, 2020L), variable == 1L) |>
+    semi_join(stations, by = "sensor_key") |>
+    compute()
+c(p, ymonthly_avail) %<-% ymonthly_availabilities(district_data, .minimum_valid_days = 25L)
+p + labs(x = "Mese", y = "n", title = "Disponibilità di serie SCIA") + theme(legend.position = "none")
+```

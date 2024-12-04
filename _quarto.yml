@@ -1,0 +1,47 @@
+project:
+  type: book
+  execute-dir: project
+
+book:
+  output-file: tesi
+  title: "A high resolution dataset of climatologic monthly normals for northern-central Italy"
+  author:
+    - name: "Davide Nicoli"
+      affiliation:
+        - name: Università degli Studi di Milano
+          city: Milano
+          address: Via Festa del Perdono 7
+      email: davide.nicoli1@studenti.unimi.it
+      id: 980508
+  date: last-modified
+  chapters:
+    - index.qmd
+    - elaborato/sezioni/preparazione_serie.qmd
+    - elaborato/references.qmd
+  appendices:
+    - elaborato/sezioni/definizione_parametri.qmd
+    - elaborato/sezioni/sorgenti_dati.qmd
+  downloads:
+    - pdf
+
+execute:
+  echo: false
+  warning: false
+  message: false
+
+bibliography: elaborato/references.bib
+
+format:
+  html:
+    theme: cosmo
+  pdf:
+    lang: it
+    documentclass: scrreprt
+    link-citations: true
+    colorlinks: false
+    cite-method: biblatex
+    latex-output-dir: _latex_artifacts
+    toc-depth: 2
+    latex-clean: false
+
+editor: visual
