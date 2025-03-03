@@ -1,0 +1,43 @@
+## Raccolta dei dati
+
+Nella seguente sezione si presenta da dove sono stati reperiti i dati di partenza e quali scelte sono state fatte nella costruzione di serie di estremi di temperatura giornalieri.
+
+### Disponibilità e qualità di dati e metadati
+
+Al fine di preparare il dataset delle climatologie si è reso necessario raccogliere, controllare e combinare i dati rilevati dalle stazioni meteorologiche distribuite sul territorio italiano e nelle zone limitrofe all'arco alpino, in modo da avere a disposizione serie giornaliere di estremi di temperatura. Tale operazione è risultata particolarmente complessa, per le misure effettuate nel trentennio 1991-2020, a causa della frammentarietà e disomogeneità delle sorgenti di dati, attribuibili a tre ragioni principali. Innanzitutto, vi è un elevato numero di soggetti coinvolti nella gestione delle principali reti di rilevazione meteorologica e dei dati da esse derivanti. Questo fenomeno ha avuto origine nel trasferimento di competenze del Sistema Idrografico e Mareografico Nazionale (SIMN) a centri funzionali, Dipartimento di Protezione Civile (DPC) e Agenzie Regionali per la Protezione dell'Ambiente (ARPA)[@InquadramentoStoricoMonitoraggio] avvenuto all'inizio degli anni 2000. Tali enti ed agenzie non seguono un protocollo nazionale che omogenizzi i criteri di gestione della rete e dell'elaborazione e distribuzione dei dati, per cui persino raccogliere i dataset risulta un problema non banale. In secondo luogo, dalla fine degli anni '80 vi è stata una progressiva diffusione dei sistemi di rilevamento automatico, accompagnata dalla dismissione di quelli meccanici. Questo cambiamento ha introdotto significative disomogeneità nelle serie temporali e spesso ha portato al loro troncamento, laddove la stazione di riferimento non sia stata rimpiazzata. Infine si riscontra una generale carenza di documentazione relativa alle stazioni stesse: di norma si trovano liste di anagrafiche, posizioni e quote (non di rado imprecise), ma solo pochi enti forniscono uno storico delle modifiche apportate alle stazioni (eventuali ricollocamenti, cambiamenti nelle tipologie di sensori, ecc.).
+
+La maggior parte dei dati raccolti sono stati forniti come aggregazioni a livello giornaliero, solo in poche situazioni si è fatto ricorso ai dati grezzi. Da un'analisi preliminare è risultato evidente che ogni rete o gestore di dataset utilizza un proprio criterio nel calcolare tali stime a partire dai dati rilevati dai sensori. In particolare, si sono incontrate scelte differenti riguardo i seguenti ambiti:
+
+-   definizione di “giornata di misura”: in alcuni casi va dalle 09:00 del giorno corrente alle 09:00 del giorno seguente (approccio tradizionale), in altri va dalle 00:00 alle 00:00 (approccio moderno);
+
+-   timezone delle date: vengono utilizzati GMT o CET;
+
+-   aggregazione dei dati grezzi: vengono forniti gli estremi assoluti delle temperature rilevate nel corso della giornata (in linea con quanto cercato per la tesi) o gli estremi delle medie orarie (sempre distanti al più qualche decimo di grado dagli estremi assoluti e sempre "meno estremi" rispetto ad essi).
+
+La disponibilità temporale e spaziale delle serie nei singoli dataset infine risulta essere perlopiù incompleta: ad esempio dataset nazionali come SCIA, quello del DPC e del CNR-ISAC risultano essere incompleti sulla dimensione della distribuzione spaziale delle serie, mentre quelli regionali non registrano le misure antecedenti al passaggio di competenze citato in precedenza.
+
+La presenza delle problematiche illustrate e la necessità di serie giornaliere il più possibile complete e consistenti sotto il profilo sia temporale che spaziazle hanno reso necessaria l'elaborazione di procedure adeguate di *meging* dei singoli dataset e saranno presentate in una sezione successiva.
+
+### Sorgenti utilizzate
+
+| Nome           | Origine | Carattere | Descrizione |
+|----------------|---------|-----------|-------------|
+| SCIA           | \[      |           |             |
+| DPC            |         |           |             |
+| CNR-ISAC       |         |           |             |
+| ARPA Piemonte  |         |           |             |
+| ARPA Lombardia |         |           |             |
+| ARPA Veneto    |         |           |             |
+| MeteoTrentino  |         |           |             |
+| CIVIS Bolzano  |         |           |             |
+| ARPA FVG/OSMER |         |           |             |
+| ARPAL          |         |           |             |
+| SIR Toscana    |         |           |             |
+| Dext3r         |         |           |             |
+| ARPAM          |         |           |             |
+| ARPA Umbria    |         |           |             |
+|                |         |           |             |
+
+: Dataset sorgenti
+
+L’Istituto Superiore per la Protezione e la Ricerca Ambientale (ISPRA) ha cercato di affrontare il problema della frammentazione organizzando le varie raccolte locali in un unico dataset: SCIA[@SCIASistemaNazionale]. Tale archivio, tuttavia, presenta importanti limiti legati alla qualità e disponibilità sia di dati che di metadati.

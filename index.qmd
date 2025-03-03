@@ -1,1 +1,10 @@
-{{< include elaborato/sezioni/introduzione.qmd >}}
+---
+title: "Introduzione"
+format: html
+---
+
+## Scopo del lavoro
+
+Il seguente lavoro descrive la costruzione di un dataset grigliato delle normali climatologiche standard mensili[@WMOGuidelinesNormalsCalculation2017] relative agli estremi di temperatura sul territorio del centro-nord Italia per il trentennio 1991-2020. È articolato in due macro-passaggi: la stima delle normali georeferenziate a partire dalle rilevazioni effettuate dalle stazioni meteorologiche distribuite sul territorio in esame e l'interpolazione di tali dati tramite metodi geostatistici.
+
+## Procedimento

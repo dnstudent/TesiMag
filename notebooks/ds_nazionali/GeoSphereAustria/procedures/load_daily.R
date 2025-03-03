@@ -51,7 +51,7 @@ load_meta <- function(ita_bounds) {
 
     close_stations <- meta |>
         st_md_to_sf() |>
-        st_filter(ita_bounds, .predicate = st_is_within_distance, dist = units::set_units(200, "km")) |>
+        # st_filter(ita_bounds, .predicate = st_is_within_distance, dist = units::set_units(200, "km")) |>
         st_drop_geometry()
 
     close_stations |> bind_rows(meta |> semi_join(close_stations, by = "series_id") |> anti_join(close_stations, by = "station_id"))
@@ -71,6 +71,21 @@ load_data <- function(meta, dataconn) {
         to_duckdb(con = dataconn) |>
         tidyr::pivot_longer(cols = c("T_MIN", "T_MAX"), names_to = "variable", values_to = "value") |>
         to_arrow() |>
+        mutate(dataset = "GeoSphereAustria") |>
+        filter(!is.na(value)) |>
+        compute()
+}
+
+load_data_precip <- function() {
+    data_dir <- fs::path(fs::path(path.ds, "GeoSphereAustria", "fragments", "rr.rr_flag"))
+    ds_schema <- schema(time = timestamp(unit = "us"), station_id = utf8(), rr = float64(), rr_flag = float64(), substation = utf8())
+    open_csv_dataset(data_dir,
+        convert_options = csv_convert_options(include_missing_columns = TRUE, col_types = ds_schema),
+        timestamp_parsers = "%Y-%m-%dT%H:%M:%OS"
+    ) |>
+        select(station_id, time, value = rr, quality = rr_flag) |>
+        mutate(date = as.Date(time), variable = "rr") |>
+        select(-time) |>
         mutate(dataset = "GeoSphereAustria") |>
         filter(!is.na(value)) |>
         compute()

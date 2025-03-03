@@ -5,6 +5,7 @@ format: html
 ---
 
 ## Init
+
 ```{r}
 Sys.setlocale("LC_ALL", "UTF-8")
 library(dplyr, warn.conflicts = FALSE)
@@ -26,6 +27,7 @@ save_to <- fs::path("db", "conv", "merged_corrected")
 ```
 
 Preparazione delle tabelle di dati d'origine in un formato utilizzabile velocemente
+
 ```{r}
 if (fs::dir_exists(ds4conv_dir)) unlink(ds4conv_dir, recursive = TRUE)
 
@@ -54,6 +56,7 @@ print("✅")
 ```
 
 Scrittura delle tabelle csv "convertite"
+
 ```{r}
 base <- fs::path_abs(".")
 integrators_root <- fs::path(base, "db", "tmp", "prepared4merge")
@@ -89,6 +92,7 @@ print("Converted merged dataset to csv")
 ```
 
 Scrittura delle tabelle di metadati e specifiche del merging
+
 ```{r}
 prepare_lists_and_from <- function(metas) {
   metas |>
@@ -142,6 +146,7 @@ ccs |> openxlsx::write.xlsx(fs::path(save_to, "metadata", "manual_corrections.xl
 ```
 
 Tabella con i metadati originali
+
 ```{r}
 original_metadata <- query_checkpoint_meta(datasets, "raw", conns$data) |>
   collect()

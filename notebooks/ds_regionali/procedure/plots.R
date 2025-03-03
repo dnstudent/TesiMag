@@ -27,7 +27,7 @@ plot_district_avail.tbl <- function(data, stack, .minimum_valid_days = 20L, .max
 
     p <- ymonthly |>
         group_by(dataset, variable, year, month, .add = TRUE) |>
-        summarise(available_series = sum(as.integer(qc_month_available), na.rm = TRUE), .groups = "drop") |>
+        summarise(available_series = sum(as.integer(qc_month_available), na.rm = TRUE), .groups = "keep") |>
         arrange(year, month) |>
         collect() |>
         mutate(yearmonth = make_yearmonth(year, month)) |>

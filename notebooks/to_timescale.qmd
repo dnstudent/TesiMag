@@ -1,0 +1,51 @@
+---
+title: "to_timescale"
+format: html
+---
+
+```{r}
+Sys.setlocale("LC_ALL", "UTF-8")
+library(duckplyr, warn.conflicts = FALSE)
+library(arrow, warn.conflicts = FALSE)
+library(tidyr, warn.conflicts = FALSE)
+
+source("src/database/startup.R")
+source("src/database/query/data.R")
+source("src/merging/combining.R")
+source("notebooks/corrections/manual_corrections.R")
+```
+
+```{r}
+conns <- load_dbs()
+db <- query_checkpoint("full", "merged_corrected", conns$data)
+```
+
+```{r}
+library(DBI)
+dbExecute(conns$data, sql("INSTALL POSTGRES"))
+dbExecute(conns$data, sql("ATTACH 'dbname=geo' AS postgres_db (TYPE POSTGRES)")
+```
+
+```{r}
+dbExecute(conns$data, sql("COPY postgres_db.temperatures FROM 'db/data/merged_corrected/full/**/*.parquet'"))
+```
+
+```{r}
+dbExecute(conns$data, sql("ATTACH 'dbname=geo'  AS postgres_db (TYPE POSTGRES)"))
+```
+
+```{r}
+dbWriteTableArrow(conns$stations, "temperatures", db$data |> to_arrow())
+```
+
+```{r}
+db$data |> to_arrow() |> schema()
+```
+
+```{r}
+tbl(conns$data, "postgres_db.temperatures")
+```
+
+```{r}
+close_dbs(conns)
+```

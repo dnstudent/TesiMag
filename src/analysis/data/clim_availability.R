@@ -38,7 +38,7 @@ is_month_usable <- function(x, ...) UseMethod("is_month_usable", x)
 monthly_availabilities.grouped <- function(table, minimum_valid_days = 20L, maximum_consecutive_missing_days = 4L) {
     table |>
         mutate(datediff = (as.integer(date - lag(date, order_by = date))) |> coalesce(1L)) |>
-        summarise(qc_month_available = (n() >= minimum_valid_days & max(datediff, na.rm = TRUE) <= maximum_consecutive_missing_days), .groups = "drop")
+        summarise(qc_month_available = (n() >= minimum_valid_days & max(datediff, na.rm = TRUE) <= maximum_consecutive_missing_days), .groups = "keep")
 }
 
 monthly_availabilities <- function(table, minimum_valid_days = 20L, maximum_consecutive_missing_days = 4L) {

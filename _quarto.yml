@@ -16,11 +16,7 @@ book:
   date: last-modified
   chapters:
     - index.qmd
-    - elaborato/sezioni/preparazione_serie.qmd
-    - elaborato/references.qmd
-  appendices:
-    - elaborato/sezioni/definizione_parametri.qmd
-    - elaborato/sezioni/sorgenti_dati.qmd
+    - elaborato/sezioni/stima_normali.qmd
   downloads:
     - pdf
 
@@ -28,6 +24,7 @@ execute:
   echo: false
   warning: false
   message: false
+  freeze: auto
 
 bibliography: elaborato/references.bib
 
@@ -42,6 +39,6 @@ format:
     cite-method: biblatex
     latex-output-dir: _latex_artifacts
     toc-depth: 2
-    latex-clean: false
+    latex-tinytex: false
 
 editor: visual

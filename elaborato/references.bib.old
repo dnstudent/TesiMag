@@ -14,7 +14,6 @@
     urldate = {2024-12-03}
 }
 
-
 @manual{WMOGuidelinesNormalsCalculation2017,
 	title = {WMO Guidelines on the Calculation of Climate Normals},
 	author = {{World Meteorological Organization (WMO)}},
@@ -28,3 +27,4 @@
 	number = {1203},
 	isbn = {978-92-63-11203-3}
 }
+
