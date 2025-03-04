@@ -55,6 +55,8 @@ Per ogni regione:
 
 -   sorgenti (link);
 
+-   datasets: tipo di stazioni, ente gestore;
+
 -   rappresentatività dei dataset:
 
     -   disponibilità temporale numero di serie (con requisiti WMO);

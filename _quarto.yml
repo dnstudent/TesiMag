@@ -17,8 +17,11 @@ book:
   chapters:
     - index.qmd
     - elaborato/sezioni/stima_normali.qmd
+  appendices: 
+    - elaborato/sezioni/datasets.qmd
   downloads:
     - pdf
+  language: it
 
 execute:
   echo: false

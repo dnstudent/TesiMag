@@ -43,3 +43,5 @@ _latex_artifacts/
 .quarto/
 _freeze
 _book/
+/elaborato/**/*_cache/
+/elaborato/**/*_files/

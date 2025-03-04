@@ -1,6 +1,6 @@
 ## Raccolta dei dati
 
-Nella seguente sezione si presenta da dove sono stati reperiti i dati di partenza e quali scelte sono state fatte nella costruzione di serie di estremi di temperatura giornalieri.
+Nella sezione seguente si presenta da dove sono stati reperiti i dati di partenza e quali scelte sono state fatte nella costruzione di serie di estremi di temperatura giornalieri.
 
 ### Disponibilità e qualità di dati e metadati
 
@@ -9,35 +9,105 @@ Al fine di preparare il dataset delle climatologie si è reso necessario raccogl
 La maggior parte dei dati raccolti sono stati forniti come aggregazioni a livello giornaliero, solo in poche situazioni si è fatto ricorso ai dati grezzi. Da un'analisi preliminare è risultato evidente che ogni rete o gestore di dataset utilizza un proprio criterio nel calcolare tali stime a partire dai dati rilevati dai sensori. In particolare, si sono incontrate scelte differenti riguardo i seguenti ambiti:
 
 -   definizione di “giornata di misura”: in alcuni casi va dalle 09:00 del giorno corrente alle 09:00 del giorno seguente (approccio tradizionale), in altri va dalle 00:00 alle 00:00 (approccio moderno);
-
 -   timezone delle date: vengono utilizzati GMT o CET;
-
 -   aggregazione dei dati grezzi: vengono forniti gli estremi assoluti delle temperature rilevate nel corso della giornata (in linea con quanto cercato per la tesi) o gli estremi delle medie orarie (sempre distanti al più qualche decimo di grado dagli estremi assoluti e sempre "meno estremi" rispetto ad essi).
 
 La disponibilità temporale e spaziale delle serie nei singoli dataset infine risulta essere perlopiù incompleta: ad esempio dataset nazionali come SCIA, quello del DPC e del CNR-ISAC risultano essere incompleti sulla dimensione della distribuzione spaziale delle serie, mentre quelli regionali non registrano le misure antecedenti al passaggio di competenze citato in precedenza.
 
-La presenza delle problematiche illustrate e la necessità di serie giornaliere il più possibile complete e consistenti sotto il profilo sia temporale che spaziazle hanno reso necessaria l'elaborazione di procedure adeguate di *meging* dei singoli dataset e saranno presentate in una sezione successiva.
+La presenza delle problematiche illustrate e la necessità di serie giornaliere il più possibile complete e consistenti sotto il profilo sia temporale che spaziazle hanno reso necessaria l'elaborazione di procedure adeguate di meging dei singoli dataset e saranno presentate nella @sec-merging.
 
-### Sorgenti utilizzate
+### Sorgenti utilizzate {#sec-sources}
 
-| Nome           | Origine | Carattere | Descrizione |
-|----------------|---------|-----------|-------------|
-| SCIA           | \[      |           |             |
-| DPC            |         |           |             |
-| CNR-ISAC       |         |           |             |
-| ARPA Piemonte  |         |           |             |
-| ARPA Lombardia |         |           |             |
-| ARPA Veneto    |         |           |             |
-| MeteoTrentino  |         |           |             |
-| CIVIS Bolzano  |         |           |             |
-| ARPA FVG/OSMER |         |           |             |
-| ARPAL          |         |           |             |
-| SIR Toscana    |         |           |             |
-| Dext3r         |         |           |             |
-| ARPAM          |         |           |             |
-| ARPA Umbria    |         |           |             |
-|                |         |           |             |
+Di seguito i dataset impiegati per il lavoro. In @sec-appsources viene fornita una descrizione dettagliata di contenuti, problematiche e disponibilità dati di ciascuno di essi.
 
-: Dataset sorgenti
+| Nome           | Copertura                  |
+|----------------|----------------------------|
+| SCIA           | Italia                     |
+| DPC            | Italia                     |
+| CNR-ISAC       | Italia                     |
+| ARPA Piemonte  | Regionale                  |
+| ARPA Lombardia | Regionale                  |
+| ARPA Veneto    | Regionale                  |
+| MeteoTrentino  | Provinciale (Trento)       |
+| CIVIS Bolzano  | Provinciale                |
+| ARPA FVG/OSMER | Regionale                  |
+| ARPAL          | Regionale (Liguria)        |
+| SIR Toscana    | Regionale                  |
+| Dext3r         | Regionale (Emilia-Romagna) |
+| ARPAM          | Regionale (Marche)         |
+| ARPA Umbria    | Regionale                  |
 
-L’Istituto Superiore per la Protezione e la Ricerca Ambientale (ISPRA) ha cercato di affrontare il problema della frammentazione organizzando le varie raccolte locali in un unico dataset: SCIA[@SCIASistemaNazionale]. Tale archivio, tuttavia, presenta importanti limiti legati alla qualità e disponibilità sia di dati che di metadati.
+A livello qualitativo si è constatato che:
+
+-   i dataset regionali sono i meglio forniti in quanto a disponibilità dei dati recenti (post-2000) e qualità dei metadati delle stazioni;
+
+-   SCIA è ben fornito di dati storici (pre-2000), mentre quelli recenti sono incompleti e generalmente collocati in maniera poco accurata; pur essendo passate da un'operazione di quality-check alcune serie contengono significativi errori;
+
+-   CNR-ISAC fornisce qualche centinaio di serie lunghe già omogeneizzate;
+
+-   DPC registra serie spesso non presenti negli altri dataset, tuttavia fornisce gli estremi giornalieri delle medie orarie invece che gli estremi assoluti e le stazioni sono spesso collocate in maniera poco accurata.
+
+### Merging {#sec-merging}
+
+La procedura di merging ha per scopo la combinazione delle varie sequenze di dati in serie rappresentative della collocazione geografica delle stazioni di rilevamento. Nell'elaborarla si è prestata particolare attenzione a due questioni: l'unione delle sequenze duplicate (merging "orizzontale") e l'aggregazione di sequenze rappresentative di una stessa località geografica ma provenienti da stazioni o sensori diversi (merging "verticale"). Né il primo né il secondo problema hanno avuto soluzione immediata a causa della mancanza di codici di identificazione univoci, delle inaccuratezze sul collocamento geografico delle stazioni e di varie incongruenze nella registrazione dei valori di temperatura.
+
+Il procedimento definitivo si articola in due fasi: l'identificazione delle sequenze facenti parte della stessa serie e l'unione di queste in singole serie.
+
+#### Identificazione delle serie
+
+Se si considerano le sequenze recuperate dai vari dataset come i vertici di un grafo le cui connessioni sono costituite dalla relazione "fanno parte della stessa serie" (da qui in poi "*match*"), il problema in esame ha come soluzione le componenti connesse del suddetto grafo. Questo approccio consente di definire la relazione di connessione, che in generale potrebbe essere molto articolata, in maniera più semplice, e gestire in maniera approppriata il raggruppamento di più sequenze anche quando non ci sono *match* tra tutte le componenti e ogni altra.
+
+<!--- TODO Fornire esempio allegando due immagini: da un lato il grafo non completamente connesso, dall'altro le serie -->
+
+Idealmente, per individuare un *match*, basterebbe controllare l'uguaglianza delle sequenze di dati attribuite ai sensori nei vari dataset, o degli identificativi univoci delle stazioni, oppure la coincidenza o prossimità delle posizioni. Non è però questo il caso per i cataloghi a disposizione. In particolare, i problemi riscontrati nell'effettuare *matching* tra serie inter- e intra-dataset sono legati a:
+
+-   inaccuratezza nel collocamento spaziale legata alla precisione numerica del dato registrato (generalmente accade per le stazioni meno recenti) e a conversioni del sistema di riferimento;
+-   prossimità di stazioni differenti, come avviene in particolare nei contesti cittadini;
+-   differenze nelle anagrafiche: dal semplice utilizzo di caratteri accentati o simboli all'impiego di nomi di località differenti;
+-   assenza dei codici identificativi univoci delle stazioni;
+-   differenze nella stima degli estremi giornalieri: estremi delle medie orarie o estremi assoluti giornalieri;
+-   presenza di serie già integrate con i dati di altre;
+-   differenti definizioni di "giornata meteorologica" come esposto in precedenza.
+
+Queste osservazioni e la generale mancanza di una documentazione approfondita dei cataloghi che spieghi i criteri di raccolta dati, impongono l'elaborazione di metodi empirici e parametrici per determinare *match* tra sequenze differenti. Si è scelto di utilizzare per la classificazione un approccio ad albero decisionale, che porta alla dichiarazione di *match* avvenuto sottoponendo le coppie candidate ad una successione di test di confronto ad esito binario su parametri scelti in maniera ponderata. Partendo da considerazioni banali (due sequenze della stessa serie hanno dati uguali o "simili" ', sono ragionevolmente vicine e hanno anagrafiche simili) e confrontando dati e metadati per via grafica e tabulare si è giunti alla scelta del seguente set di parametri:
+
+-   media delle differenze tra stime giornaliere, medie mensili e climatologie mensili prese con e senza valore assoluto;
+-   distanza sul piano tra le posizioni dichiarate;
+-   differenza tra le quote dichiarate;
+-   somiglianza tra nomi di stazione secondo l'algoritmo Jaro-Winkler;
+-   $\mathrm{f}_0$: percentuale di stime giornaliere identiche al decimo di grado;
+-   percentuale di stime giornaliere non intere identiche al decimo di grado (alcune serie lunghe hanno registrato la temperatura in passato con precisione intera o semiintera: stazioni vicine hanno parte della sequenza identica per questa ragione);
+-   $\mathrm{b}$: media dei segni delle differenze tra stime giornaliere diverse da 0 (permette di capire quanta parte delle misure di una stazione sono più estreme di quelle dell'altra);
+-   $\mathrm{n_d}$: numero di giorni in cui entrambe le serie hanno misure valide.
+
+I match sono stati cercati nell'insieme delle stazioni distanti al più $15\:\mathrm{km}$ le une dalle altre. Sono stati calcolati i parametri introducendo nelle sequenze offset di -1, 0 e +1 giorni, per trovare match anche nelle situazioni in cui la stima è stata attribuita alla giornata precedente o successiva (cosa che capita ad esempio quando le definizioni di giornata meteorologica sono diverse).
+
+Per ogni accoppiamento di dataset o di network di stazioni si sono fissati empiricamente dei valori-soglia per i parametri sopra elencati da utilizzare nei test di confronto dell'albero decisionale. Si è partiti dalle seguenti considerazioni:
+
+-   valori rilevanti di $\mathrm{f}_0$ ($> 15\%$) a fronte di un numero significativo di giorni in comune ($\mathrm{n_d} > 100$) dovrebbero indicare un match "orizzontale";
+-   distanze ridotte ($< 500\:\mathrm{m}$) o valori di somiglianza tra anagrafiche alti ($> 90\%$) potrebbero indicare sia match "orizzontali" che "verticali";
+-   valori rilevanti di $\mathrm{f}_0$ associati a valori estremi di $|\mathrm{b}|$ ($\ge 0.8$) e di segno discorde per le sequenze di minime e massime potrebbero indicare match tra serie con estremi assoluti a confronto con estremi delle medie.
+
+Tali criteri sono stati adattati e integrati a seconda dei casi confrontando le analisi dei candidati match in tabelle. La bontà delle soglie scelte è stata valutata esaminando manualmente un campione rappresentativo dei risultati di ogni passaggio del merging controllando i grafici delle differenze tra valori delle stazioni accoppiate, le posizioni in anagrafica su Google Earth e tutti i casi in cui la media delle differenze fosse maggiore di $0.5\:\mathrm{°C}$.
+
+<!--- TODO Inserire tabelle di esempio e plot -->
+
+In alcune situazioni le soglie individuate non sono risultate sufficienti a stabilire i *match* alla perfezione: si sono dovute fare integrazioni manuali sia per dichiarare situazioni di *match* che per negare quelle trovate dalla procedura automatica.
+
+#### Unione delle sequenze
+
+L'ultimo passaggio del merging consiste nella combinazione di dati e metadati delle sequenze che compongono ogni serie. L'operazione viene effettuata integrando con gli elementi dei gruppi presi uno alla volta una serie master. Ciò richiede di stabilire criteri d'ordine e di metodo per l'unione sia dei metadati che dei dati.
+
+Per quanto riguarda l'ordine di unione, tenendo conto delle osservazioni esposte nella @sec-sources, si è generalmente scelto di preferire i metadati delle agenzie regionali/provinciali a quelli dei dataset nazionali; per i dati invece si sono prese come riferimento le sequenze omogeneizzate ISAC-CNR, seguite in ordine da quelle delle agenzie regionali/provinciali, SCIA e infine DPC. Sia per i metadati che per i dati il secondo criterio d'ordine, usato nei casi di pareggio del primo, è la lontananza temporale dei dati forniti, con priorità data alle sequenze più recenti (che hanno generalmente metadati più accurati).
+
+Per quanto riguarda invece il protocollo di integrazione delle stime giornaliere si è scelto di inserire iterativamente valori nella sequenza master, ove mancanti, se i contributi della sequenza integrante superano i due anni. L'aggiunta viene fatta sommando ai dati grezzi della serie integrante una correzione modellizzata in funzione del giorno dell'anno. Tale modello è scelto tra una serie di Fourier troncata al terzo ordine, uno scalare o lo zero a seconda della dimensione e della distribuzione del sample di anomalie:
+
+$$
+\Delta T_{m,i}(d) \sim \begin{cases}
+a_0/2 + \sum^3_{n=1} a_n \cos(n 2\pi t(d)) + b_n\sin(n 2\pi t(d)) & \text{se } \mathcal{I}_{i,m} \ge 8 \\
+a_0/2 & \text{se } 2 \le \mathcal{I}_{i,m} < 8 \\
+0\:\mathrm{°C} & \text{altrimenti}
+\end{cases}
+$$
+
+dove $d$ è una data, $t(d)$ il numero del giorno $d$ normalizzato rispetto alla lunghezza del suo anno e $\mathcal{I}_{i,m}$ il numero di mesi dell'anno diversi aventi almeno 20 anomalie valide.
