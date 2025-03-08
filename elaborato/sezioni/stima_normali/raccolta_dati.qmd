@@ -57,7 +57,103 @@ Il procedimento definitivo si articola in due fasi: l'identificazione delle sequ
 
 Se si considerano le sequenze recuperate dai vari dataset come i vertici di un grafo le cui connessioni sono costituite dalla relazione "fanno parte della stessa serie" (da qui in poi "*match*"), il problema in esame ha come soluzione le componenti connesse del suddetto grafo. Questo approccio consente di definire la relazione di connessione, che in generale potrebbe essere molto articolata, in maniera più semplice, e gestire in maniera approppriata il raggruppamento di più sequenze anche quando non ci sono *match* tra tutte le componenti e ogni altra.
 
-<!--- TODO Fornire esempio allegando due immagini: da un lato il grafo non completamente connesso, dall'altro le serie -->
+<!--- Serie buona: Lucca TOS/111, Levico TAA2/80 -->
+
+```{r}
+#| label: fig-rawseriesexample
+#| fig-cap: "Serie di Levico (TN). Otto sequenze concorrono alla costituzione della serie."
+#| fig-subcap:
+#|  - "Posizione delle stazioni."
+#|  - "Sequenze delle temperature massime giornaliere. La DPC/1775 è stata omessa perché troppo recente."
+#| cache: false
+#| fig-asp: 0.618
+#| layout-ncol: 2
+#| column: page
+
+library(dplyr)
+library(ggplot2)
+library(ggrepel)
+library(lubridate)
+library(stringr)
+library(arrow)
+library(OpenStreetMap)
+library(sf)
+library(tsibble)
+source("src/database/startup.R")
+source("src/database/query/data.R")
+source("notebooks/ds_regionali/procedure/common_steps.R")
+
+conns <- load_dbs()
+ds <- open_dataset("db/extra/merge_specs")
+eight_series <- ds |>
+    filter(dataset == "TAA2", series_key == 80L) |>
+    collect()
+eight_stats <- query_checkpoint_meta(c("TAA", "ISAC", "SCIA"), "raw", conns$data) |>
+    semi_join(eight_series, copy = T, by = c("dataset" = "from_dataset", "sensor_key" = "from_sensor_key")) |>
+    collect() |>
+    mutate(display_dataset = if_else(dataset == "ISAC", network, dataset)) |>
+    sf::st_as_sf(coords = c("lon", "lat"), crs = 4326)
+
+# Map
+wdbbox <- sf::st_bbox(eight_stats |> sf::st_buffer(units::set_units(100, "m")))
+sa_map <- openmap(c(wdbbox$ymax, wdbbox$xmin), c(wdbbox$ymin, wdbbox$xmax), zoom = 16)
+stat_points <- eight_stats |>
+    st_transform(crs = 3857) |>
+    mutate(coords = as.data.frame(st_coordinates(geometry))) |>
+    st_drop_geometry() |>
+    unnest(coords) |>
+    select(dataset = display_dataset, sensor_key, x = X, y = Y)
+
+autoplot.OpenStreetMap(sa_map) +
+    geom_point(data = stat_points, aes(color = dataset, shape = dataset), size = 7) +
+    geom_label_repel(data = stat_points, aes(label = str_c(dataset, sensor_key, sep = "/"))) +
+    scale_color_brewer(palette = "Dark2")
+
+# Series
+meta <- eight_stats |>
+    st_drop_geometry() |>
+    select(display_dataset, dataset, sensor_key, name)
+data <- query_checkpoint_data(c("TAA", "ISAC", "SCIA"), "raw", conns$data) |>
+    filter(variable == 1L, between(date, "1985-01-01", "2020-12-31")) |>
+    inner_join(meta, by = c("dataset", "sensor_key"), copy = T) |>
+    mutate(sequence = str_c(display_dataset, sensor_key, name, sep = "/")) |>
+    select(sequence, date, value) |>
+    collect() |>
+    as_tsibble(key = sequence, index = date) |>
+    fill_gaps()
+ggplot(data) +
+    geom_line(aes(x = date, y = value), na.rm = T) +
+    facet_wrap(vars(sequence), ncol = 1) +
+    scale_y_continuous(breaks = c(15, 25)) +
+    labs(x = "Data", y = "Temperatura [°C]")
+```
+
+```{r}
+#| label: fig-graphexample
+#| fig-cap: "Grafo della serie di Levico (TN). La procedura di rilevazione dei *match* non è in grado di connettere tutte le stazioni, tuttavia le "
+#| cache: false
+#| fig-asp: 0.618
+
+source("src/merging/combining.R")
+levico <- openxlsx::read.xlsx("elaborato/sezioni/stima_normali/levico.xlsx", sheet = "Foglio1") |>
+    as_tibble() |>
+    filter(variable == 1)
+
+graph_from_isedge(levico |> mutate(key_x = sensor_key_x, key_y = sensor_key_y), tag_same_series, FALSE) |> plot()
+```
+
+```{r}
+#| label: tbl-compexample
+#| tbl-cap: "Estratto del confronto di sequenze e metadati delle stazioni di Levico per le massime giornaliere."
+
+library(knitr)
+options(knitr.kable.NA = "")
+levico |>
+    mutate(dataset_x = if_else(dataset_x == "ISAC", network_x, dataset_x), dataset_y = if_else(dataset_y == "ISAC", network_y, dataset_y), sequence_x = str_c(dataset_x, sensor_key_x, sep = "/"), sequence_y = str_c(dataset_y, sensor_key_y, sep = "/")) |>
+    select(starts_with("sequence"), distance, delH, f0, delT, maeT, balance, valid_days_inters) |>
+    slice_head(n = 5L) |>
+    kable(col.names = c("Sequenza 1", "Sequenza 2", "Distanza [m]", "∆ Quota [m]", "$\\mathrm{f}_0$", "$\\langle \\Delta T \\rangle$ [°C]", "$\\langle \\abs{\\Delta T} \\rangle$ [°C]", "b", "$\\mathrm{n_d}$"), digits = c(0, 0, 0, 0, 2, 2, 2, 2, 0))
+```
 
 Idealmente, per individuare un *match*, basterebbe controllare l'uguaglianza delle sequenze di dati attribuite ai sensori nei vari dataset, o degli identificativi univoci delle stazioni, oppure la coincidenza o prossimità delle posizioni. Non è però questo il caso per i cataloghi a disposizione. In particolare, i problemi riscontrati nell'effettuare *matching* tra serie inter- e intra-dataset sono legati a:
 

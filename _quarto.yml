@@ -27,13 +27,15 @@ execute:
   echo: false
   warning: false
   message: false
-  freeze: auto
+  freeze: false
 
 bibliography: elaborato/references.bib
 
 format:
   html:
     theme: cosmo
+    fig-dpi: 300
+    lightbox: true
   pdf:
     lang: it
     documentclass: scrreprt
@@ -43,5 +45,6 @@ format:
     latex-output-dir: _latex_artifacts
     toc-depth: 2
     latex-tinytex: false
+    fig-dpi: 300
 
 editor: visual
