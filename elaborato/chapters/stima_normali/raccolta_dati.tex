@@ -51,9 +51,9 @@ A livello qualitativo si è constatato che:
 
 \begin{itemize}
   \item
-    i dataset regionali sono i meglio forniti in quanto a disponibilità dei dati recenti (post-2000) e qualità dei metadati delle stazioni;
+    i dataset regionali sono i meglio forniti in quanto a dati recenti (post-2000) e qualità delle anagrafiche delle stazioni;
   \item
-    SCIA è ben fornito di dati storici (pre-2000), mentre quelli recenti sono incompleti e generalmente collocati in maniera poco accurata; pur essendo passate da un'operazione di quality-check alcune serie contengono significativi errori;
+    SCIA è ben fornito di dati storici (pre-2000), mentre quelli recenti sono incompleti; le stazioni sono spesso collocate in maniera poco accurata. Inoltre, pur essendo passate da un'operazione di quality-check alcune serie contengono errori significativi (in particolare le sinottiche);
   \item
     CNR-ISAC fornisce qualche centinaio di serie lunghe già omogeneizzate;
   \item
@@ -61,24 +61,32 @@ A livello qualitativo si è constatato che:
 \end{itemize}
 
 \subsection{Merging}\label{ch:merging}
-La procedura di merging ha per scopo la combinazione delle varie sequenze di dati in serie rappresentative della collocazione geografica delle stazioni di rilevamento. Nell'elaborarla si è prestata particolare attenzione a due questioni: l'unione delle sequenze duplicate (merging ``orizzontale'') e l'aggregazione di sequenze rappresentative di una stessa località geografica ma provenienti da stazioni o sensori diversi (merging ``verticale''). Né il primo né il secondo problema hanno avuto soluzione immediata a causa della mancanza di codici di identificazione univoci, delle inaccuratezze sul collocamento geografico delle stazioni e di varie incongruenze nella registrazione dei valori di temperatura.
+La procedura di merging ha per scopo la combinazione delle varie sequenze di dati in serie rappresentative della collocazione geografica delle stazioni di rilevamento. Nell'elaborarla si è prestata particolare attenzione a due questioni: l'unione delle sequenze duplicate o ridondanti (merging ``orizzontale'') e l'aggregazione di sequenze rappresentative di una stessa località geografica ma provenienti da stazioni o sensori diversi (merging ``verticale''). Né il primo né il secondo problema hanno avuto soluzione immediata a causa della mancanza di codici di identificazione univoci, delle inaccuratezze sul collocamento geografico delle stazioni e di varie incongruenze nella registrazione dei valori di temperatura.
 
 Il procedimento definitivo si articola in due fasi: l'identificazione delle sequenze facenti parte della stessa serie e l'unione di queste in singole serie.
 
 \subsubsection{Identificazione delle serie}
-Se si considerano le sequenze recuperate dai vari dataset come i vertici di un grafo le cui connessioni sono costituite dalla relazione ``fanno parte della stessa serie'' (da qui in poi ``\emph{match}''), il problema in esame ha come soluzione le componenti connesse del suddetto grafo. Questo approccio consente di definire la relazione di connessione, che in generale potrebbe essere molto articolata, in maniera più semplice, e gestire in maniera approppriata il raggruppamento di più sequenze anche quando non ci sono \emph{match} tra tutte le componenti e ogni altra.
+\begin{figure}[ht]
+  \includegraphics[width=\textwidth]{images/stima_normali/raccolta_dati/reggio_series_osm.pdf}
+  \caption{Sequenze originali nella zona di Reggio Emilia. Si possono notare quattro raggruppamenti principali più una stazione apparentemente isolata. Non tutte le sequenze sono etichettate per rendere più fruibile l'immagine. Mappa di base fornita da Esri~\autocite{esriWorldTopographicMap2013}.}\label{fig:reggio-osm}
+\end{figure}
+\begin{figure}[ht]
+  \includegraphics[height=.3\textheight]{images/stima_normali/raccolta_dati/reggio_series_plot.pdf}
+  \caption{Estratto delle sequenze introdotte nella figura~\ref{fig:reggio-osm}, scelte tra quelle collocate nella città di Reggio Emilia. Sembrerebbero rapprentare una stazione ricollocata nel 2007 o nel 2008, tuttavia ogni sorgente dà una versione differente. Alcune hanno eliminato dei dati (buchi nella sequenza) probabilmente a causa di un controllo qualità con esito negativo.}\label{fig:reggio-plot}
+\end{figure}
+Se si considerano le sequenze recuperate dai vari dataset come i vertici di un grafo le cui connessioni sono costituite dalla relazione ``fanno parte della stessa serie'' (da qui in poi ``\emph{match}''), il problema in esame ha come soluzione le componenti connesse del suddetto grafo. Questo approccio consente di definire una relazione di connessione, che in generale potrebbe essere molto articolata, in maniera non necessariamente esaustiva, dal momento che automatizza il raggruppamento di più sequenze anche quando non ci sono \emph{match} tra tutte le componenti e ogni altra. Un esempio di grafo fatto in questo modo è presentato in figura~\ref{fig:reggio-graph}.
 
-Idealmente, per individuare un \emph{match}, basterebbe controllare l'uguaglianza delle sequenze di dati attribuite ai sensori nei vari dataset, o degli identificativi univoci delle stazioni, oppure la coincidenza o prossimità delle posizioni. Non è però questo il caso per i cataloghi a disposizione. In particolare, i problemi riscontrati nell'effettuare \emph{matching} tra serie inter- e intra-dataset sono legati a:
+Idealmente, per individuare un \emph{match}, basterebbe controllare l'uguaglianza delle sequenze di dati attribuite ai sensori nei vari dataset, o degli identificativi univoci delle stazioni, oppure la coincidenza o prossimità delle loro posizioni. Non è però questo il caso per i cataloghi a disposizione. In particolare, i problemi riscontrati nell'effettuare \emph{matching} tra serie inter- e intra-dataset sono legati a:
 
 \begin{itemize}
   \item
-    inaccuratezza nel collocamento spaziale legata alla precisione numerica del dato registrato (generalmente accade per le stazioni meno recenti) e a conversioni del sistema di riferimento;
+    inaccuratezza nel collocamento spaziale legata alla precisione numerica del dato registrato (generalmente accade per le stazioni meno recenti) e a conversioni del sistema di riferimento (si osservi, ad esempio, la figura~\ref{fig:reggio-osm});
   \item
     prossimità di stazioni differenti, come avviene in particolare nei contesti cittadini;
   \item
     differenze nelle anagrafiche: dal semplice utilizzo di caratteri accentati o simboli all'impiego di nomi di località differenti;
   \item
-    assenza dei codici identificativi univoci delle stazioni;
+    assenza o incompletezza dei codici identificativi univoci delle stazioni;
   \item
     differenze nella stima degli estremi giornalieri: estremi delle medie orarie o estremi assoluti giornalieri;
   \item
@@ -87,7 +95,7 @@ Idealmente, per individuare un \emph{match}, basterebbe controllare l'uguaglianz
     differenti definizioni di ``giornata meteorologica'' come esposto in precedenza.
 \end{itemize}
 
-Queste osservazioni e la generale mancanza di una documentazione approfondita dei cataloghi che spieghi i criteri di raccolta dati, impongono l'elaborazione di metodi empirici e parametrici per determinare \emph{match} tra sequenze differenti. Si è scelto di utilizzare per la classificazione un approccio ad albero decisionale, che porta alla dichiarazione di \emph{match} avvenuto sottoponendo le coppie candidate ad una successione di test di confronto ad esito binario su parametri scelti in maniera ponderata. Partendo da considerazioni banali (due sequenze della stessa serie hanno dati uguali o ``simili'' ', sono ragionevolmente vicine e hanno anagrafiche simili) e confrontando dati e metadati per via grafica e tabulare si è giunti alla scelta del seguente set di parametri:
+Queste osservazioni e la generale mancanza di una documentazione approfondita dei cataloghi che spieghi i criteri di raccolta dati, impongono l'elaborazione di metodi empirici e parametrici (adattabili quindi a combinazioni di network diversi) per determinare i \emph{match} tra le sequenze. Si è scelto di utilizzare per la classificazione un approccio ad albero decisionale, che porta alla dichiarazione di \emph{match} avvenuto sottoponendo le coppie candidate ad una successione di test di confronto ad esito binario su parametri scelti in maniera ponderata. Partendo da considerazioni banali (due sequenze della stessa serie dovrebbero avere dati uguali o ``simili'', nomi simili ed essere ragionevolmente vicine) e confrontando dati e metadati per via grafica e tabulare si è giunti alla scelta del seguente set di parametri:
 
 \begin{itemize}
   \item
@@ -99,16 +107,21 @@ Queste osservazioni e la generale mancanza di una documentazione approfondita de
   \item
     somiglianza tra nomi di stazione secondo l'algoritmo Jaro-Winkler;
   \item
-    \(\mathrm{f}_0\): percentuale di stime giornaliere identiche al decimo di grado;
+    \(\mathrm{f}_0\): percentuale di stime giornaliere identiche al decimo di grado sull'insieme dei giorni di misura comuni alle sequenze;
+    % \item
+    %   percentuale di stime giornaliere non intere identiche al decimo di grado (alcune serie lunghe registrano le temperature con precisione intera o semiintera: stazioni vicine hanno parte della sequenza identica per questa ragione);
   \item
-    percentuale di stime giornaliere non intere identiche al decimo di grado (alcune serie lunghe hanno registrato la temperatura in passato con precisione intera o semiintera: stazioni vicine hanno parte della sequenza identica per questa ragione);
-  \item
-    \(\mathrm{b}\): media dei segni delle differenze tra stime giornaliere diverse da 0 (permette di capire quanta parte delle misure di una stazione sono più estreme di quelle dell'altra);
+    \(\mathrm{b}\): media dei segni delle differenze tra stime giornaliere diverse da 0 (permette di capire in quanta parte le misure di una stazione sono consistentemente maggiori o minori di quelle dell'altra);
   \item
     \(\mathrm{n_d}\): numero di giorni in cui entrambe le serie hanno misure valide.
 \end{itemize}
 
-I match sono stati cercati nell'insieme delle stazioni distanti al più \(15\:\mathrm{km}\) le une dalle altre. Sono stati calcolati i parametri introducendo nelle sequenze offset di -1, 0 e +1 giorni, per trovare match anche nelle situazioni in cui la stima è stata attribuita alla giornata precedente o successiva (cosa che capita ad esempio quando le definizioni di giornata meteorologica sono diverse).
+\begin{figure}[ht]
+  \includegraphics[height=.3\textheight]{images/stima_normali/raccolta_dati/reggio_series_graph.pdf}
+  \caption{Grafo delle sequenze presentate nella figura~\ref{fig:reggio-osm}. Si può notare come la varietà di nomi forniti in anagrafica (riportati sulle etichette), l'estensione dei possibili \(\mathrm{f}_0\) e delle distanze a cui sono collocate rendono la procedura di identificazione dei \emph{match} non banale e difficilmente esaustiva.}\label{fig:reggio-graph}
+\end{figure}
+
+Nell'elaborazione del dataset italiano i \emph{match} sono stati cercati nell'insieme delle stazioni distanti al più \(15\:\mathrm{km}\) le une dalle altre. Sono stati calcolati i parametri introducendo nelle sequenze offset di -1, 0 e +1 giorni, per trovare \emph{match} anche nelle situazioni in cui le stime sono state attribuite alla giornata precedente o successiva a quella dichiarata (cosa che capita ad esempio quando le definizioni di giornata meteorologica sono diverse).
 
 Per ogni accoppiamento di dataset o di network di stazioni si sono fissati empiricamente dei valori-soglia per i parametri sopra elencati da utilizzare nei test di confronto dell'albero decisionale. Si è partiti dalle seguenti considerazioni:
 
@@ -118,7 +131,7 @@ Per ogni accoppiamento di dataset o di network di stazioni si sono fissati empir
   \item
     distanze ridotte (\(< 500\:\mathrm{m}\)) o valori di somiglianza tra anagrafiche alti (\(> \qty{90}{\percent}\)) potrebbero indicare sia match ``orizzontali'' che ``verticali'';
   \item
-    valori rilevanti di \(\mathrm{f}_0\) associati a valori estremi di \(|\mathrm{b}|\) (\(\ge 0.8\)) e di segno discorde per le sequenze di minime e massime potrebbero indicare match tra serie con estremi assoluti a confronto con estremi delle medie.
+    valori rilevanti di \(\mathrm{f}_0\) associati a valori estremi di \(|\mathrm{b}|\) (\(\ge 0.8\)) e di segno discorde per le sequenze di minime e massime potrebbero indicare \emph{match} tra serie di estremi assoluti e di estremi delle medie orarie.
 \end{itemize}
 
 Tali criteri sono stati adattati e integrati a seconda dei casi confrontando le analisi dei candidati match in tabelle. La bontà delle soglie scelte è stata valutata esaminando manualmente un campione rappresentativo dei risultati di ogni passaggio del merging controllando i grafici delle differenze tra valori delle stazioni accoppiate, le posizioni in anagrafica su Google Earth e tutti i casi in cui la media delle differenze fosse maggiore di \(\qty{0.5}{\degreeCelsius}\).
@@ -126,11 +139,11 @@ Tali criteri sono stati adattati e integrati a seconda dei casi confrontando le 
 In alcune situazioni le soglie individuate non sono risultate sufficienti a stabilire i \emph{match} alla perfezione: si sono dovute fare integrazioni manuali sia per dichiarare situazioni di \emph{match} che per negare quelle trovate dalla procedura automatica.
 
 \subsubsection{Unione delle sequenze}
-L'ultimo passaggio del merging consiste nella combinazione di dati e metadati delle sequenze che compongono ogni serie. L'operazione viene effettuata integrando con gli elementi dei gruppi presi uno alla volta una serie master. Ciò richiede di stabilire criteri d'ordine e di metodo per l'unione sia dei metadati che dei dati.
+L'ultimo passaggio del merging consiste nella combinazione di dati e metadati delle sequenze che compongono ogni serie. L'operazione viene effettuata integrando con gli elementi di ciascuna componente del grafo, presi uno alla volta, una serie master. Ciò richiede di stabilire criteri di preferenza e di metodo per l'unione sia dei metadati che dei dati.
 
-Per quanto riguarda l'ordine di unione, tenendo conto delle osservazioni esposte nella @sec-sources, si è generalmente scelto di preferire i metadati delle agenzie regionali/provinciali a quelli dei dataset nazionali; per i dati invece si sono prese come riferimento le sequenze omogeneizzate ISAC-CNR, seguite in ordine da quelle delle agenzie regionali/provinciali, SCIA e infine DPC. Sia per i metadati che per i dati il secondo criterio d'ordine, usato nei casi di pareggio del primo, è la lontananza temporale dei dati forniti, con priorità data alle sequenze più recenti (che hanno generalmente metadati più accurati).
+Per quanto riguarda l'ordine di unione, tenendo conto delle osservazioni esposte nella sezione~\ref{ch:sources}, si è generalmente scelto di preferire i metadati delle agenzie regionali/provinciali a quelli dei dataset nazionali; per i dati invece si sono prese come riferimento le sequenze omogeneizzate ISAC-CNR, seguite in ordine da quelle delle agenzie regionali/provinciali, SCIA e infine DPC. Sia per i metadati che per i dati il secondo criterio d'ordine, usato nei casi di pareggio del primo, è la lontananza temporale dei dati forniti, con priorità data alle sequenze più recenti (che hanno generalmente metadati più accurati).
 
-Per quanto riguarda invece il protocollo di integrazione delle stime giornaliere si è scelto di inserire iterativamente valori nella sequenza master, ove mancanti, se i contributi della sequenza integrante superano i due anni. L'aggiunta viene fatta sommando ai dati grezzi della serie integrante una correzione modellizzata in funzione del giorno dell'anno. Tale modello è scelto tra una serie di Fourier troncata al terzo ordine, uno scalare o lo zero a seconda della dimensione e della distribuzione del sample di anomalie:
+Per quanto riguarda invece il protocollo di integrazione delle stime giornaliere si è scelto di inserire iterativamente valori nella sequenza master, ove mancanti, se i contributi della sequenza integrante superano i due anni. L'aggiunta viene fatta sommando ai dati grezzi della serie integrante una correzione modellizzata in funzione del giorno dell'anno. Tale modello è scelto tra una serie di Fourier troncata al terzo ordine, la media o zero a seconda della dimensione e della distribuzione del sample di anomalie:
 
 \[
   \Delta T_{m,i}(d) \sim
@@ -141,4 +154,4 @@ Per quanto riguarda invece il protocollo di integrazione delle stime giornaliere
   \end{cases}
 \]
 
-dove \(d\) è una data, \(t(d)\) il numero del giorno \(d\) normalizzato rispetto alla lunghezza del suo anno e \(\mathcal{I}_{i,m}\) il numero di mesi dell'anno diversi aventi almeno 20 anomalie valide.
+dove \(d\) è una data, \(t(d)\) il numero del giorno \(d\) normalizzato rispetto alla lunghezza del suo anno e \(\mathcal{I}_{i,m}\) il numero di diversi mesi dell'anno aventi almeno 20 anomalie valide.
