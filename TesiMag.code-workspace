@@ -4,7 +4,5 @@
 			"path": "."
 		}
 	],
-	"settings": {
-		"julia.environmentPath": "/Users/davidenicoli/Local_Workspace/TesiMag/notebooks/julia"
-	}
+	"settings": {}
 }
