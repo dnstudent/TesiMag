@@ -1,6 +1,7 @@
 library(dplyr, warn.conflicts = FALSE)
 library(lubridate, warn.conflicts = FALSE)
 library(assertr, warn.conflicts = FALSE)
+library(openxlsx, warn.conflicts = FALSE)
 
 source("src/database/query/spatial.R")
 
