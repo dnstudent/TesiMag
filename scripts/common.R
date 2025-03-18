@@ -1,5 +1,24 @@
 library(ggplot2)
 library(duckplyr)
+library(sf)
+library(units)
+
+source("src/database/query/data.R")
+
+linetype_values <- c(SCIA = "dashed", ISAC = "dotted", merged = "solid", DPC = "dotdash")
+arpas_ds <- c(
+    "Friuli-Venezia Giulia" = "ARPAFVG",
+    "Liguria" = "ARPAL",
+    "Lombardia" = "ARPALombardia",
+    "Marche" = "ARPAM",
+    "Piemonte" = "ARPAPiemonte",
+    "Umbria" = "ARPAUmbria",
+    "Veneto" = "ARPAV",
+    "Emilia-Romagna" = "Dext3r",
+    "Toscana" = "SIRToscana",
+    "Trentino-Alto Adige" = "TAA",
+    "Valle D'aosta" = NA_character_
+)
 
 tesisave <- function(file, plot = last_plot(), width = 12, ...) {
     ggsave(file, plot, width = width, dpi = 300, unit = "cm", ...)
@@ -24,4 +43,47 @@ load_merged_meta <- function(conns, boundaries = NULL) {
         st_as_sf(coords = c("lon", "lat"), crs = "EPSG:4326", remove = FALSE) |>
         st_filter(boundaries, .predicate = st_is_within_distance, dist = set_units(50, m)) |>
         st_drop_geometry()
+}
+
+load_merged_data <- function(conns, meta = NULL, boundaries = NULL) {
+    full_isac_meta <- query_checkpoint_meta("ISAC", "raw", conns$data) |>
+        select(dataset, sensor_key, network)
+    if (is.null(boundaries)) boundaries <- load_regional_boundaries(conns)
+    if (is.null(meta)) meta <- load_merged_meta(conns, boundaries)
+    meta <- st_as_sf(meta, coords = c("lon", "lat"), crs = "EPSG:4326") |>
+        st_filter(boundaries, .predicate = st_is_within_distance, dist = set_units(10, m)) |>
+        st_drop_geometry() |>
+        select(dataset, sensor_key, network) |>
+        mutate(dataset = if_else(dataset == "DPC", "ISAC", dataset))
+    query_checkpoint_data("full", "merged_corrected", conns$data) |>
+        rename(sensor_key = series_key) |>
+        left_join(full_isac_meta, by = c("from_dataset" = "dataset", "from_sensor_key" = "sensor_key")) |>
+        mutate(from_dataset = if_else(from_dataset == "ISAC", network, from_dataset)) |>
+        select(-network) |>
+        semi_join(meta, by = c("dataset", "sensor_key"), copy = TRUE)
+}
+
+load_raw_metas <- function(ds, conns, boundaries = NULL) {
+    if (is.null(boundaries)) boundaries <- load_regional_boundaries(conns)
+    query_checkpoint_meta(ds, "raw", conns$data) |>
+        collect() |>
+        st_as_sf(coords = c("lon", "lat"), crs = "EPSG:4326", remove = FALSE) |>
+        st_filter(regional_boundaries, .predicate = st_is_within_distance, dist = set_units(50, m)) |>
+        st_drop_geometry() |>
+        mutate(dataset = if_else(dataset == "ISAC", network, dataset))
+}
+
+load_raw_datas <- function(ds, conns, meta = NULL, boundaries = NULL) {
+    if (is.null(boundaries)) boundaries <- load_regional_boundaries(conns)
+    if (is.null(meta)) meta <- load_raw_meta(ds, conns, boundaries)
+    meta <- st_as_sf(meta, coords = c("lon", "lat"), crs = "EPSG:4326") |>
+        st_filter(boundaries, .predicate = st_is_within_distance, dist = set_units(50, m)) |>
+        st_drop_geometry() |>
+        select(dataset, sensor_key, network) |>
+        mutate(dataset = if_else(dataset == "DPC", "ISAC", dataset))
+
+    query_checkpoint_data(ds, "raw", conns$data) |>
+        inner_join(meta, by = c("dataset", "sensor_key"), copy = TRUE) |>
+        mutate(dataset = if_else(dataset == "ISAC", network, dataset)) |>
+        select(-network)
 }

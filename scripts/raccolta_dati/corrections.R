@@ -24,14 +24,18 @@ conns <- load_dbs()
 on.exit(close_dbs(conns))
 sets <- c("ER", "FVG", "LOM", "MAR", "TAA2", "TOS", "UMB", "VDA", "PIE", "LIG", "VEN")
 # Load the data
-merged_metadata <- merged_metadata <- query_checkpoint_meta(sets, "merged", conns$data) |>
+merged_metadata <- query_checkpoint_meta(sets, "merged", conns$data) |>
     collect() |>
     st_as_sf(coords = c("lon", "lat"), crs = "EPSG:4326", remove = FALSE) |>
-    st_filter(load_regional_boundaries(conns), .predicate = st_is_within_distance, dist = set_units(50, m)) |>
+    st_filter(load_regional_boundaries(conns), .predicate = st_is_within_distance, dist = set_units(10, m)) |>
     st_drop_geometry()
-
+m <- merged_metadata |>
+    rowwise() |>
+    mutate(from_datasets = paste0(from_datasets, collapse = ";"), from_sensor_keys = paste0(from_sensor_keys, collapse = ";")) |>
+    ungroup()
 corrections <- fs::path_abs("./external/correzioni") |>
-    load_corrections()
+    load_corrections() |>
+    semi_join(m, by = c("from_datasets", "from_sensor_keys"))
 
 corrected <- prepare_corrections(corrections, merged_metadata) |> filter(manual_loc_correction | manual_elev_correction)
 
@@ -68,5 +72,5 @@ ggsave(fs::path(image_dir, "corrections_deltas.pdf"), width = 10, height = 3, dp
 
 deltas |>
     summarise(n = n(), n_discarded = n - sum(coalesce(keep, TRUE)), n_loc_corrections = sum(spostamento >= 10), n_elev_corrections = sum(delH >= 10)) |>
-    knitr::kable(format = "latex", col.names = c("Totale serie", "Scartate", "Correzioni collocazione", "Correzioni quota"), caption = "", label = "tab:n-corrections") |>
-    cat(file = fs::path(image_dir, "corrections_summary.tex"), sep = "\n")
+    knitr::kable(format = "markdown", col.names = c("Totale serie", "Scartate", "Correzioni collocazione", "Correzioni quota"))
+# cat(file = fs::path(image_dir, "corrections_summary.tex"), sep = "\n")
