@@ -23,6 +23,13 @@
 \usepackage{caption}
 \usepackage{subcaption}
 \usepackage{threeparttable}
+\usepackage[font=small]{caption}
+\usepackage{pgf,tikz}
+\usepackage{etoolbox}
+\AtBeginEnvironment{figure}{\small}
+
+% TODO: rimuovere!
+\setlength{\marginparwidth}{2cm}
 \usepackage{todonotes}
 
 % Meta

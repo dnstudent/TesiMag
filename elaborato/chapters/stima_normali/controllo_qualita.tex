@@ -1,0 +1,37 @@
+Il controllo qualità dei dati è stato elaborato sulla traccia di quanto fatto in~\cite{brunettiHighresolutionTemperatureClimatology2014}\todo{è davvero così?}. Il procedimento è articolato a causa delle problematiche che caratterizzano la combinazione di misure di stazioni meccaniche ed automatiche, come, ad esempio, l'attribuzione della giornata di misura e la presenza di errori significativi legati ai malfunzionamenti episodici degli strumenti automatici.
+
+Prima di effettuare il controllo qualità sono state eliminate le serie che forniscono pochi dati: meno di \(365 \cdot 5\) giorni di misure e meno di \(4 \cdot \mathrm{N_i}\) valori per ogni mese \(i\) (dove \(\mathrm{N_i}\) è il numero di giorni del mese).
+% Si sono rimosse così 592 serie di minime e 589 di massime.
+
+Il controllo qualità è quindi stato effettuato in tre passaggi:
+\begin{enumerate}
+  \item identificazione degli errori grezzi e delle sequenze ripetute;
+  \item confronto delle serie misurate con la rianalisi ERA5~\cite{hersbachERA5GlobalReanalysis2020};
+  \item confronto con serie limitrofe.
+\end{enumerate}
+
+La presenza del punto 2 è dovuta alla necessità di tenere conto dell'alto tasso di errore delle misure automatiche, che potrebbe inficiare il confronto diretto tra serie rilevate.
+
+\paragraph{Identificazione degli errori grezzi}
+In prima battuta si sono invalidati gli errori palesi, rimuovendo tutte le misure con \(\lvert \mathrm{T} \rvert > \qty{50}{\degreeCelsius}\) e le sequenze di dati uguali per almeno 7 giorni consecutivi (o intervallati da dati assenti).
+% Si sono rimossi così un totale di 35047 e 15206 valori di minime e massime per le ripetizioni e 461 e 762 per i valori anomali, coinvolgendo 565 e 456 serie.
+
+\paragraph{Confronto con ERA5}
+% TODO controllare tutti il riferimento alla procedura di qc in Brunetti 2014
+Le serie giornaliere del dataset sono state confrontate con serie sintetiche costruite combinando il metodo delle anomalie di Mitchell e Jones~\cite{mitchellImprovedMethodConstructing2005} e quello dei contributi relativi giornalieri di Di Luzio et al.~\cite{diluzioConstructingRetrospectiveGridded2008}.\todo{Spiegare le assunzioni relative a climatologie e anomalie e il ruolo dei contributi relativi}
+
+Per ogni serie di minime e di massime giornaliere si è costruita una sequenza mensile sintetica sommando alle climatologie 1961--1990 prodotte da Brunetti et al.~\cite{brunettiHighresolutionTemperatureClimatology2014} le anomalie delle medie mensili '91--'20 di ERA5 rispetto allo stesso periodo. Si sono quindi calcolati i contributi relativi delle temperature giornaliere ERA5 al proprio mese come
+\[\mathrm{R_{m,i}} = \frac{\mathrm{T_{m,i}} - \mathrm{\overline{T}_m}}{\mathrm{\overline{T}_m}}\]
+Successivamente, questi contributi relativi sono stati interpolati sulle posizioni delle serie e, utilizzando le nuove medie mensili sintetiche, si sono ottenuti i valori giornalieri sintetici finali, riconvertendo i contributi relativi in temperature assolute.
+
+Il controllo qualità infine si è basato direttamente sul confronto tra le anomalie rispetto al proprio ciclo annuale delle serie sintetiche e delle serie misurate, prendendo come ciclo non direttamente le medie interannuali di ciascun giorno dell'anno disponibile, ma l'interpolazione delle prime tre armoniche, al fine di ovviare alle incertezze derivanti dalla ricostruzione delle normali\todo{?}. Per ogni coppia di anomalie relative alla stessa data (o alle date a distanza di un giorno in base a quale avesse la differenza minore, per i citati problemi di asincronia), si è dichiarata incompatibilità se la differenza in valore assoluto superava una soglia definita come \(\mathrm{Th_{ERA5}} = \mathrm{RMSE_{ERA5}}\cdot\mathrm{Th_0}\), troncata all'intervallo [\(\num{8}\)--\(\qty{16}{\degreeCelsius}]\). Qui \(\mathrm{RMSE_{ERA5}}\) è la radice dell'errore quadratico medio delle anomalie della serie sintetica e \(\mathrm{Th_0}\) una soglia scelta. L'intervallo di troncamento è stato scelto in modo da non dare né soglie troppo lasche in casi di serie altamente variabili né troppo selettive nel caso opposto. Il controllo è stato ripetuto due volte con soglie \(\mathrm{Th_0} = \qty{10}{\degreeCelsius}\) e \(\mathrm{Th_0} = \qty{5}{\degreeCelsius}\) per rimuovere in un primo passo errori grossolani che avrebbero potuto interferire con la qualità del controllo stesso.
+% I valori invalidati sono 6368...
+
+\paragraph{Confronto con serie limitrofe}
+Per ogni serie giornaliera (``serie di test'') si selezionano sequenze limitrofe adatte, e con esse si costruisce una serie di riferimento. I valori del test vengono rimossi se più distanti di una certa soglia da quelli di riferimento.
+
+La selezione delle serie limitrofe è stata effettuata tra quelle entro \qty{300}{\kilo\meter} di distanza orizzontale e \(\max(\qty{500}{\meter}, \mathrm{H_{test}}/2)\) di distanza verticale, con \(\mathrm{H_{test}}\) la quota della serie test.
+
+Per ogni giorno con misura della serie test si è preso un set di valori da ciascuna delle serie limitrofe in caso di soddisfacimento di certi requisiti di completezza: la serie di riferimento doveva avere almeno \(\mathrm{N_{min}}\) giorni validi in una finestra di \(\pm\mathrm{N_w}\) giorni centrata sul giorno di test, sia nell'anno corrispondente che negli \(\mathrm{N_y}\) anni precedenti e successivi; \(\mathrm{N_{min}} = \mathrm{N_{min}}^0 + INT(0.3\cdot\mathrm{N_{min}}^0\cdot2\mathrm{N_y})\), con \(\mathrm{N_{min}}^0 = 15\), \(\mathrm{N_w} \in [25, 35]\) e \(\mathrm{N_y} \in \{1, 2\} \). Dal set di valori di valori di riferimento giornalieri si è ricavato un set di valori ricostruiti riportando l'anomalia rispetto alla media dei riferimenti sulla finestra definita da \(\pm \mathrm{N_w}\) sulla media dei test sulla stessa finestra: \(\mathrm{T_{rec,i}} = \mathrm{T_{ref,i}} - \mathrm{\overline{T}_{ref}^W} + \mathrm{\overline{T}_{test}^W}\). Delle serie così ricostruite si sono prese al massimo le \(\mathrm{NR_{max}} + 2\) (\(\mathrm{NR_{MAX}} = 15\)) con la correlazione più alta (considerando offset di -1, 0 e 1 giorno) e per ognuna di esse per ogni giorno si sono scartate la misura più alta e più bassa. Si è infine presa come stima giornaliera ricostruita \(\mathrm{T_{rec,i}^{best}}\) la media ponderata dei valori rimanenti, usando come peso una funzione delle distanze orizzontale e verticale.
+
+L'eliminazione dei valori di test è avvenuta qualora \(\lvert \mathrm{T_{rec,i}^{best}} - \mathrm{T_{test,i}} \rvert > \Delta_\mathrm{i}\), con \(\Delta_\mathrm{i} = \frac{1}{2}(\mathrm{T_{rec,i}^{max} - T_{rec,i}^{min}})\cdot\frac{1}{\overline{R^2}}\cdot5\frac{\mathrm{NR_{max}}}{\mathrm{NR_{real}}}\) troncato all'intervallo [\(\num{4}\)--\(\qty{6}{\degreeCelsius}\)]. La soglia è dinamica e dipende dalla variabilità delle ricostruzioni a livello giornaliero tramite la prima differenza e a livello globale tramite la media dei quadrati delle correlazioni \(\overline{R^2}\) e dalla disponibilità di serie tramite \(\frac{\mathrm{NR_{max}}}{\mathrm{NR_{real}}}\), con \(\mathrm{NR_{real}}\) l'effettivo numero di serie tenute. A fronte dell'eliminazione di più di tre valori per mese si è scartato tutto il mese.
