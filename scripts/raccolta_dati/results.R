@@ -3,6 +3,7 @@ library(arrow)
 library(ggplot2)
 library(patchwork)
 library(ggsci)
+library(grid)
 library(tidyr)
 library(lubridate)
 library(withr)
@@ -11,16 +12,18 @@ library(stars)
 library(sf)
 library(units)
 library(assertr)
+library(tikzDevice)
 source("src/database/startup.R")
 source("src/database/query/data.R")
 source("scripts/common.R")
 
-theme_set(theme_bw())
+theme_set(theme_bw() + theme_defaults)
 
 conns <- load_dbs()
 on.exit(close_dbs(conns))
 regional_boundaries <- load_regional_boundaries(conns)
 
+options(tikzDefaultEngine = "xetex")
 dotenv::load_dot_env("scripts/.env")
 image_dir <- fs::path(Sys.getenv("IMAGES_DIR"), "stima_normali", "dataset")
 if (!fs::dir_exists(image_dir)) {
@@ -128,32 +131,38 @@ climav_metas <- purrr::map2(metas, clavails, ~ {
 # Temporali
 tmavails <- purrr::map(mavails, monthly_availability)
 
-p <- ggplot(mapping = aes(date, n, fill = NA, color = is_month_available, linetype = dataset)) +
-    geom_line(data = tmavails$merged |> mutate(dataset = "merged") |> filter(variable == -1L), position = "stack") +
-    geom_line(data = tmavails$scia |> mutate(dataset = "SCIA") |> filter(variable == -1L), position = "stack") +
-    geom_line(data = tmavails$isac |> mutate(dataset = "ISAC") |> filter(variable == -1L), position = "stack") +
-    geom_line(data = tmavails$dpc |> mutate(dataset = "DPC") |> filter(variable == -1L), position = "stack") +
+p <- ggplot(mapping = aes(date, n, fill = NA, linetype = dataset)) +
+    geom_line(data = tmavails$merged |> mutate(dataset = "merged") |> filter(variable == -1L, is_month_available), position = "stack") +
+    geom_line(data = tmavails$scia |> mutate(dataset = "SCIA") |> filter(variable == -1L, is_month_available), position = "stack") +
+    geom_line(data = tmavails$isac |> mutate(dataset = "ISAC") |> filter(variable == -1L, is_month_available), position = "stack") +
+    geom_line(data = tmavails$dpc |> mutate(dataset = "DPC") |> filter(variable == -1L, is_month_available), position = "stack") +
     scale_linetype_manual(values = linetype_values) +
     labs(color = "Mese disponibile", linetype = "Dataset", x = "Mese", y = "Numero di serie")
 
 p1 <- p + scale_x_date(limits = c(min(tmavails$merge |> pull(date)), as.Date("1991-01-01")))
 p2 <- p + scale_x_date(limits = c(as.Date("1991-01-01"), max(tmavails$merge |> pull(date))))
 
-(p1 + p2 + plot_layout(ncol = 1L, axes = "collect", guides = "collect")) + plot_annotation(title = "Disponibilità di serie nei dataset nazionali", subtitle = "Centro-nord Italia, pre e post 1991")
+with_seed(0L, {
+    (p1 / p2 + plot_layout(axes = "collect", guides = "collect")) + plot_annotation(title = "Disponibilità di serie nei dataset nazionali", subtitle = "Centro-nord Italia, pre e post 1991")
 
-ggsave(fs::path(image_dir, "monthly_availability.pdf"), width = 10, height = 7, dpi = 300)
+    ggsave(fs::path(image_dir, "monthly_availability.tex"), width = 13.5, height = 10, units = "cm", dpi = 300, device = tikz)
+})
 
 # Spaziali
 ## Crude
-p1 <- clavails$merged |>
-    left_join(metas$merged |> select(dataset, sensor_key, lon, lat)) |>
-    st_as_sf(coords = c("lon", "lat"), crs = "EPSG:4326", remove = FALSE) |>
-    ggplot() +
-    geom_sf(data = regional_boundaries, fill = NA, linewidth = .1) +
-    # geom_density_2d_filled(aes(x = lon, y = lat), color = "black", alpha = 0.5) +
-    geom_sf(aes(color = is_clim_available), size = .2) +
-    labs(color = "Climatologie", x = "", y = "") +
-    theme(legend.position = "bottom")
+p1 <- with_seed(0L, {
+    clavails$merged |>
+        left_join(metas$merged |> select(dataset, sensor_key, lon, lat)) |>
+        st_as_sf(coords = c("lon", "lat"), crs = "EPSG:4326", remove = FALSE) |>
+        ggplot() +
+        geom_sf(data = regional_boundaries, fill = NA, linewidth = .1) +
+        # geom_density_2d_filled(aes(x = lon, y = lat), color = "black", alpha = 0.5) +
+        geom_sf(aes(color = is_clim_available), size = .2) +
+        labs(color = "Climatologie", x = "", y = "") +
+        guides(color = guide_legend(override.aes = list(size = 2))) +
+        scale_x_continuous(breaks = seq(6, 13, by = 2)) +
+        theme(legend.position = "bottom")
+})
 
 ## Integr SCIA
 merged_from_scia <- metas$merged |>
@@ -161,17 +170,24 @@ merged_from_scia <- metas$merged |>
     mutate(fromSCIA = ("SCIA" %in% from_datasets), ) |>
     ungroup() |>
     assert(not_na, dataset, sensor_key, fromSCIA)
-p2 <- ggplot(st_as_sf(merged_from_scia, coords = c("lon", "lat"), crs = "EPSG:4326")) +
-    geom_sf(data = regional_boundaries, fill = NA, linewidth = .1) +
-    geom_sf(aes(color = fromSCIA), size = .2) +
-    labs(color = "SCIA", x = "", y = "") +
-    theme(
-        legend.position = "bottom",
-        axis.text.y = element_blank(),
-        axis.ticks.y = element_blank()
-    )
-p1 + p2 + plot_layout(axes = "collect") + plot_annotation(title = "Serie del dataset merged")
-ggsave(fs::path(image_dir, "merged", "spatial_availability.pdf"), width = 7, height = 4, dpi = 300)
+p2 <- with_seed(0L, {
+    ggplot(st_as_sf(merged_from_scia, coords = c("lon", "lat"), crs = "EPSG:4326")) +
+        geom_sf(data = regional_boundaries, fill = NA, linewidth = .1) +
+        geom_sf(aes(color = fromSCIA), size = .2) +
+        labs(color = "SCIA", x = "", y = "") +
+        guides(color = guide_legend(override.aes = list(size = 2))) +
+        scale_x_continuous(breaks = seq(6, 13, by = 2)) +
+        theme(
+            legend.position = "bottom",
+            axis.text.y = element_blank(),
+            axis.ticks.y = element_blank(),
+        )
+})
+
+with_seed(0L, {
+    (p1 + p2) + plot_layout(axes = "collect") + plot_annotation(title = "Serie del dataset merged") + theme(plot.margin = unit(c(0, 0, 0, 0), "cm"))
+    ggsave(fs::path(image_dir, "merged", "spatial_availability.pdf"), width = 13.5, height = 10, units = "cm")
+})
 
 
 # Distribuzione in quota
@@ -185,39 +201,36 @@ elevations_sample <- with_seed(0L, {
         rename(elevation = 1L)
 })
 
-bind_rows(
-    merged = climav_metas$merged,
-    SCIA = climav_metas$scia,
-    ISAC = climav_metas$isac,
-    DPC = climav_metas$dpc,
-    dem = elevations_sample,
-    .id = "Origine"
-) |>
-    mutate(Origine = factor(Origine, levels = c("dem", "merged", "SCIA", "ISAC", "DPC"))) |>
-    filter(!is.na(elevation)) |>
-    ggplot() +
-    geom_histogram(aes(elevation, fill = Origine, after_stat(density)), position = "dodge", binwidth = 250) +
-    labs(x = "Elevazione [m]", y = "Densità", fill = "Sorgente", title = "Distribuzione delle quote", subtitle = "Centro-nord Italia")
-ggsave(fs::path(image_dir, "elevation_distribution.pdf"), width = 10, height = 3, dpi = 300)
-
+with_seed(0L, {
+    bind_rows(
+        merged = climav_metas$merged,
+        dem = elevations_sample,
+        .id = "Origine"
+    ) |>
+        mutate(Origine = factor(Origine, levels = c("dem", "merged", "SCIA", "ISAC", "DPC"))) |>
+        filter(!is.na(elevation)) |>
+        ggplot() +
+        geom_histogram(aes(elevation, fill = Origine, after_stat(density)), position = "dodge", binwidth = 250) +
+        labs(x = "Elevazione [m]", y = "Densità", fill = "Sorgente", title = "Distribuzione delle quote", subtitle = "Centro-nord Italia")
+    # ggsave(fs::path(image_dir, "elevation_distribution.pdf"), width = 13.5, height = 6.75, units = "cm")
+    ggsave(fs::path(image_dir, "elevation_distribution.tex"), width = 13.5, height = 6.75, units = "cm", device = tikz)
+})
 
 # Contributi a merged
 contribs <- datas$merged |>
     filter(between(year(date), 1991L, 2020L), !(from_dataset %in% c("WSL", "ARSO"))) |>
     count(date, from_dataset, variable) |>
     collect()
-ds_levels <- datas$merged |>
-    count(from_dataset) |>
-    collect() |>
-    arrange(n) |>
-    filter(!(from_dataset %in% c("ARSO", "WSL"))) |>
-    pull(from_dataset)
-ggplot(contribs |> filter(variable == 1L) |> mutate(from_dataset = factor(from_dataset, levels = ds_levels, ordered = TRUE))) +
-    geom_area(aes(date, n, fill = from_dataset)) +
-    scale_fill_igv() +
-    labs(x = "Data", y = "Numero di serie", fill = "Dataset", title = "Contributi al merging", subtitle = "Centro-nord Italia, 1991-2020")
-ggsave(fs::path(image_dir, "merged_contributions.pdf"), width = 10, height = 4, dpi = 300)
-
+ds_levels <- c("ISAC", "ARPAPiemonte", "SIRToscana", "Dext3r", "ARPAV", "ARPALombardia", "ARPAL", "TAA", "ARPAM", "ARPAUmbria", "ARPAFVG", "SCIA", "DPC") |> rev()
+with_seed(0L, {
+    ggplot(contribs |> filter(variable == 1L) |> mutate(from_dataset = factor(from_dataset, levels = ds_levels, ordered = TRUE))) +
+        geom_line(aes(date, n, color = from_dataset), position = "stack") +
+        scale_color_igv() +
+        labs(x = "Data", y = "Numero di serie", color = "Dataset", title = "Contributi al merging", subtitle = "Centro-nord Italia, 1991-2020") +
+        theme(legend.text = element_text(size = rel(0.6)))
+    ggsave(fs::path(image_dir, "merged_contributions.pdf"), width = 13.5, height = 13.5 / 1.618, units = "cm")
+    ggsave(fs::path(image_dir, "merged_contributions.tex"), width = 13.5, height = 13.5 / 1.618, units = "cm", device = tikz)
+})
 
 # Miglioramenti nelle climatologie
 raw_mavs <- bind_rows(merged = mavails$merged, SCIA = mavails$scia, ISAC = mavails$isac, DPC = mavails$dpc, .id = "Origine") |>
@@ -227,15 +240,18 @@ raw_mavs <- bind_rows(merged = mavails$merged, SCIA = mavails$scia, ISAC = mavai
     summarise(n_mavail = min(n_mavail), .groups = "drop")
 
 threshs <- tibble(at_least = seq(1L, 30L, by = 1L))
-raw_mavs |>
-    cross_join(threshs) |>
-    filter(n_mavail >= at_least) |>
-    count(Origine, at_least) |>
-    ggplot() +
-    geom_step(aes(at_least, n, linetype = Origine)) +
-    scale_linetype_manual(values = linetype_values) +
-    labs(x = "Anni", linetype = "Origine", title = "Climatologie calcolabili per requisito di anni disponibili", subtitle = "Centro-nord Italia, 1991-2020")
-ggsave(fs::path(image_dir, "improvements.pdf"), width = 10, height = 3, dpi = 300)
+with_seed(0L, {
+    raw_mavs |>
+        cross_join(threshs) |>
+        filter(n_mavail >= at_least) |>
+        count(Origine, at_least) |>
+        ggplot() +
+        geom_step(aes(at_least, n, linetype = Origine)) +
+        scale_linetype_manual(values = linetype_values) +
+        labs(x = "Anni", y = "Numero di serie", linetype = "Origine", title = "Climatologie calcolabili per requisito di anni disponibili", subtitle = "Centro-nord Italia, 1991-2020")
+    # ggsave(fs::path(image_dir, "improvements.pdf"), width = 10, height = 3, dpi = 300)
+    ggsave(fs::path(image_dir, "improvements.tex"), width = 13.5, height = 6, units = "cm", device = tikz)
+})
 
 # Densità
 area <- regional_boundaries |>

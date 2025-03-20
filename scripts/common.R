@@ -2,8 +2,21 @@ library(ggplot2)
 library(duckplyr)
 library(sf)
 library(units)
+library(extrafont)
+loadfonts()
 
 source("src/database/query/data.R")
+
+theme_defaults <- theme(
+    text = element_text(family = "CM Roman"),
+    plot.title = element_text(size = rel(1)),
+    plot.subtitle = element_text(size = rel(0.8)),
+    axis.title = element_text(size = rel(0.8)),
+    axis.title.y = element_text(margin = margin(r = 5)),
+    axis.text = element_text(size = rel(0.75)),
+    legend.title = element_text(size = rel(0.8)),
+    legend.text = element_text(size = rel(0.75)),
+)
 
 linetype_values <- c(SCIA = "dashed", ISAC = "dotted", merged = "solid", DPC = "dotdash")
 arpas_ds <- c(

@@ -45,3 +45,4 @@ _freeze
 _book/
 /elaborato/**/*_cache/
 /elaborato/**/*_files/
+/elaborato/images/**/*.tex
