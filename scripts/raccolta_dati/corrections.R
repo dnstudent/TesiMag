@@ -5,19 +5,23 @@ library(sf)
 library(units)
 library(patchwork)
 library(latex2exp)
+library(withr)
+library(tikzDevice)
 
 source("scripts/common.R")
 source("src/database/startup.R")
 source("src/database/query/data.R")
 source("notebooks/corrections/manual_corrections.R")
 
+options(tikzDefaultEngine = "xetex")
 dotenv::load_dot_env("scripts/.env")
 image_dir <- fs::path(Sys.getenv("IMAGES_DIR"), "stima_normali", "correzioni")
 if (!fs::dir_exists(image_dir)) {
     fs::dir_create(image_dir)
 }
 
-theme_set(theme_bw())
+theme_set(theme_bw() + theme_defaults)
+
 linetype_values <- c(SCIA = "dashed", ISAC = "dotted", merged = "solid", DPC = "dotdash")
 
 conns <- load_dbs()
@@ -50,25 +54,26 @@ deltas <- merged_metadata |>
         )),
         delH = abs(ele_ok - elevation)
     )
+with_seed(0L, {
+    p1 <- deltas |>
+        filter(manual_loc_correction, spostamento >= 10) |>
+        ggplot() +
+        geom_histogram(aes(spostamento)) +
+        scale_x_log10() +
+        labs(x = ("$\\Delta \\textrm{x [m]}$"), y = "") +
+        ylim(0, 49)
 
-p1 <- deltas |>
-    filter(manual_loc_correction, spostamento >= 10) |>
-    ggplot() +
-    geom_histogram(aes(spostamento)) +
-    scale_x_log10() +
-    labs(x = TeX("\\Delta x [m]"), y = "") +
-    ylim(0, 49)
+    p2 <- deltas |>
+        filter(manual_elev_correction, delH >= 10) |>
+        ggplot() +
+        geom_histogram(aes(delH)) +
+        scale_x_log10() +
+        labs(x = ("$\\Delta \\textrm{H [m]}$"), y = "") +
+        ylim(0, 49)
 
-p2 <- deltas |>
-    filter(manual_elev_correction, delH >= 10) |>
-    ggplot() +
-    geom_histogram(aes(delH)) +
-    scale_x_log10() +
-    labs(x = TeX("\\Delta H [m]"), y = "") +
-    ylim(0, 49)
-
-p1 + p2 + plot_layout(axes = "collect_y") + plot_annotation(title = "Anagrafiche corrette manualmente")
-ggsave(fs::path(image_dir, "corrections_deltas.pdf"), width = 10, height = 3, dpi = 300)
+    p1 + p2 + plot_layout(axes = "collect_y") + plot_annotation(title = "Anagrafiche corrette manualmente")
+    ggsave(fs::path(image_dir, "corrections_deltas.tex"), width = 13.5, height = 4, units = "cm", device = tikz)
+})
 
 deltas |>
     summarise(n = n(), n_discarded = n - sum(coalesce(keep, TRUE)), n_loc_corrections = sum(spostamento >= 10), n_elev_corrections = sum(delH >= 10)) |>
