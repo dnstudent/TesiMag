@@ -3,17 +3,19 @@
 Nella sezione seguente si presenta da dove sono stati reperiti i dati di partenza e quali scelte sono state fatte nella costruzione di serie di estremi di temperatura giornalieri.
 
 \subsection{Disponibilità e qualità di dati e metadati}
-Al fine di preparare il dataset delle climatologie si è reso necessario raccogliere, controllare e combinare i dati rilevati dalle stazioni meteorologiche distribuite sul territorio italiano e nelle zone limitrofe all'arco alpino, in modo da avere a disposizione serie giornaliere di estremi di temperatura. Tale operazione è risultata particolarmente complessa, per le misure effettuate nel trentennio 1991--2020, a causa della frammentarietà e disomogeneità delle sorgenti di dati, attribuibili a tre ragioni principali. Innanzitutto, vi è un elevato numero di soggetti coinvolti nella gestione delle principali reti di rilevazione meteorologica e dei dati da esse derivanti. Questo fenomeno ha avuto origine nel trasferimento di competenze del Sistema Idrografico e Mareografico Nazionale (SIMN) a centri funzionali, Dipartimento di Protezione Civile (DPC) e Agenzie Regionali per la Protezione dell'Ambiente (ARPA)~\cite{InquadramentoStoricoMonitoraggio} avvenuto all'inizio degli anni 2000. Tali enti ed agenzie non seguono un protocollo nazionale che omogenizzi i criteri di gestione della rete e dell'elaborazione e distribuzione dei dati, per cui persino raccogliere i dataset risulta un problema non banale. In secondo luogo, dalla fine degli anni '80 vi è stata una progressiva diffusione dei sistemi di rilevamento automatico, accompagnata dalla dismissione di quelli meccanici. Questo cambiamento ha introdotto significative disomogeneità nelle serie temporali e spesso ha portato al loro troncamento, laddove la stazione di riferimento non sia stata rimpiazzata. Infine si riscontra una generale carenza di documentazione relativa alle stazioni stesse: di norma si trovano liste di anagrafiche, posizioni e quote (non di rado imprecise), ma solo pochi enti forniscono uno storico delle modifiche apportate alle stazioni (eventuali ricollocamenti, cambiamenti nelle tipologie di sensori, ecc.).
+Al fine di preparare il dataset delle climatologie si è reso necessario raccogliere, controllare e combinare i dati rilevati dalle stazioni meteorologiche distribuite sul territorio italiano e nelle zone limitrofe all'arco alpino, in modo da avere a disposizione serie di valori minimi e massimi giornalieri di temperatura (si userà in seguito anche il termine ``estremi'' di temperatura). Tale operazione è risultata particolarmente complessa, per le misure effettuate nel trentennio 1991--2020, a causa della frammentarietà e disomogeneità delle sorgenti di dati, attribuibili a tre ragioni principali. Innanzitutto, vi è un elevato numero di soggetti coinvolti nella gestione delle principali reti di rilevazione meteorologica e dei dati da esse derivanti. Questo fenomeno ha avuto origine nel trasferimento di competenze del Servizio Idrografico e Mareografico Nazionale (SIMN) a centri funzionali, Dipartimento di Protezione Civile (DPC) e Agenzie Regionali per la Protezione dell'Ambiente (ARPA)~\cite{InquadramentoStoricoMonitoraggio} avvenuto all'inizio degli anni 2000. Tali enti ed agenzie non seguono un protocollo nazionale che omogenizzi i criteri di gestione della rete e dell'elaborazione e distribuzione dei dati, per cui persino raccogliere i dataset risulta un problema non banale, avendo a che fare con più di 20 tra archivi regionali e provinciali con interfacce per l'accesso ai dati di varia efficacia. In secondo luogo, dalla fine degli anni '80 vi è stata una progressiva diffusione dei sistemi di rilevamento automatico, accompagnata dalla dismissione di quelli meccanici. Questo cambiamento ha introdotto significative disomogeneità nelle serie temporali e spesso ha portato al loro troncamento, laddove la stazione di riferimento non sia stata rimpiazzata. Infine si riscontra una generale carenza di documentazione relativa alle stazioni stesse: di norma si trovano liste di nominativi di stazione, posizioni e quote (non di rado imprecise), mentre sono pochi gli enti che forniscono uno storico delle modifiche apportate alle stazioni (eventuali ricollocamenti, cambiamenti nelle tipologie di sensori, ecc.).
 
-La maggior parte dei dati raccolti sono stati forniti come aggregazioni a livello giornaliero, solo in poche situazioni si è fatto ricorso ai dati grezzi. Da un'analisi preliminare è risultato evidente che ogni rete o gestore di dataset utilizza un proprio criterio nel calcolare tali stime a partire dai dati rilevati dai sensori. In particolare, si sono incontrate scelte differenti riguardo i seguenti ambiti:
+Nell'ambito di questo lavoro di tesi mi sono concentrato sulle regioni del centro-nord Italia, fino a Toscana, Umbria e Marche comprese, e sulle zone circostanti l'arco alpino (fino a \qty{200}{\kilo\meter} nei territori di Francia, Svizzera, Austria e Slovenia).
+
+La maggior parte dei dati raccolti sono stati forniti come aggregazioni a livello giornaliero, solo in poche situazioni si è fatto ricorso ai dati grezzi sub-giornalieri. Da un'analisi preliminare è risultato evidente che ogni rete o gestore di dataset utilizza un proprio criterio nel calcolare tali stime a partire dai dati rilevati dai sensori. In particolare, si sono incontrate scelte differenti riguardo i seguenti ambiti:
 
 \begin{itemize}
   \item
-    definizione di ``giornata di misura'': in alcuni casi va dalle 09:00 del giorno corrente alle 09:00 del giorno seguente (approccio tradizionale), in altri va dalle 00:00 alle 00:00 (approccio moderno);
+    definizione di ``giornata di misura'': in alcuni casi inizia alle 09:00 del giorno dichiarato (approccio dell'ex Servizio Idrografico), in altri alle 00:00 (approccio moderno);
   \item
     timezone delle date: vengono utilizzati GMT o CET;
   \item
-    aggregazione dei dati grezzi: vengono forniti gli estremi assoluti delle temperature rilevate nel corso della giornata (in linea con quanto cercato per la tesi) o gli estremi delle medie orarie (sempre distanti al più qualche decimo di grado dagli estremi assoluti e sempre ``meno estremi'' rispetto ad essi).
+    aggregazione dei dati sub-giornalieri: vengono forniti gli estremi assoluti delle temperature rilevate nel corso della giornata (in linea con quanto cercato per la tesi) o gli estremi delle medie orarie (sempre distanti al più qualche decimo di grado dagli estremi assoluti e sempre ``meno estremi'' rispetto ad essi).
 \end{itemize}
 
 La disponibilità temporale e spaziale delle serie nei singoli dataset infine risulta essere perlopiù incompleta: ad esempio dataset nazionali come SCIA, quello del DPC e del CNR-ISAC risultano essere incompleti sulla dimensione della distribuzione spaziale delle serie, mentre quelli regionali non registrano le misure antecedenti al passaggio di competenze citato in precedenza.
@@ -23,6 +25,7 @@ La presenza delle problematiche illustrate e la necessità di serie giornaliere 
 \subsection{Sorgenti utilizzate}\label{ch:sources}
 Di seguito i dataset impiegati per il lavoro. Nell'appendice~\ref{app:datasets} viene fornita una descrizione dettagliata di contenuti, problematiche e disponibilità dati di ciascuno di essi.
 
+% TODO: quante serie forniscono?
 \begin{table}[ht]
   \centering
   \begin{tabular}{l l}
@@ -82,20 +85,14 @@ Se si considerano le sequenze recuperate dai vari dataset come i vertici di un g
 Idealmente, per individuare un \emph{match}, basterebbe controllare l'uguaglianza delle sequenze di dati attribuite ai sensori nei vari dataset, o degli identificativi univoci delle stazioni, oppure la coincidenza o prossimità delle loro posizioni. Non è però questo il caso per i cataloghi a disposizione. In particolare, i problemi riscontrati nell'effettuare \emph{matching} tra serie inter- e intra-dataset sono legati a:
 
 \begin{itemize}
-  \item
-    inaccuratezza nel collocamento spaziale legata alla precisione numerica del dato registrato (generalmente accade per le stazioni meno recenti) e a conversioni del sistema di riferimento (si osservi, ad esempio, la figura~\ref{fig:reggio-osm});
-  \item
-    prossimità di stazioni differenti, come avviene in particolare nei contesti cittadini;
-  \item
-    differenze nelle anagrafiche: dal semplice utilizzo di caratteri accentati o simboli all'impiego di nomi di località differenti;
-  \item
-    assenza o incompletezza dei codici identificativi univoci delle stazioni;
-  \item
-    differenze nella stima degli estremi giornalieri: estremi delle medie orarie o estremi assoluti giornalieri;
-  \item
-    presenza di serie già integrate con i dati di altre;
-  \item
-    differenti definizioni di ``giornata meteorologica'' come esposto in precedenza.
+  \item inaccuratezza nel collocamento spaziale legata alla precisione numerica del dato registrato (generalmente accade per le stazioni meno recenti) e a conversioni del sistema di riferimento (si osservi, ad esempio, la figura~\ref{fig:reggio-osm});
+  \item prossimità di stazioni differenti, come avviene in particolare nei contesti cittadini o in compresenza di reti diverse (ad esempio DPC, regionali, e servizi agrometeorologici);
+  \item differenze nelle anagrafiche: dal semplice utilizzo di caratteri accentati o simboli all'impiego di nomi di località differenti;
+  \item assenza o incompletezza dei codici identificativi univoci delle stazioni;
+  \item differenze nella stima degli estremi giornalieri: estremi delle medie orarie o estremi assoluti giornalieri;
+  \item presenza di serie già integrate con i dati di altre;
+  \item differenti definizioni di ``giornata meteorologica'' come esposto in precedenza.
+  \item presenza di serie già integrate con i dati di altre o, viceversa, incomplete (si veda la figura~\ref{fig:reggio-plot}).
 \end{itemize}
 
 Queste osservazioni e la generale mancanza di una documentazione approfondita dei cataloghi che spieghi i criteri di raccolta dati, impongono l'elaborazione di metodi empirici e parametrici (adattabili quindi a combinazioni di network diversi) per determinare i \emph{match} tra le sequenze. Si è scelto di utilizzare per la classificazione un approccio ad albero decisionale, che porta alla dichiarazione di \emph{match} avvenuto sottoponendo le coppie candidate ad una successione di test di confronto ad esito binario su parametri scelti in maniera ponderata. Partendo da considerazioni banali (due sequenze della stessa serie dovrebbero avere dati uguali o ``simili'', nomi simili ed essere ragionevolmente vicine) e confrontando dati e metadati per via grafica e tabulare si è giunti alla scelta del seguente set di parametri:
@@ -145,7 +142,7 @@ L'unione delle sequenze consiste nella combinazione di dati e metadati delle seq
 
 Per quanto riguarda l'ordine di unione, tenendo conto delle osservazioni generali esposte nella sezione~\ref{ch:sources}, si è generalmente scelto di preferire i metadati delle agenzie regionali/provinciali a quelli dei dataset nazionali; per i dati invece si sono prese come riferimento le sequenze omogeneizzate ISAC-CNR, seguite in ordine da quelle delle agenzie regionali/provinciali, quelle di SCIA e infine quelle del DPC. Come secondo criterio d'ordine, usato nei casi di pareggio del primo, si è presa la lontananza temporale dei dati forniti, con priorità data alle sequenze più recenti (che hanno generalmente metadati più accurati), nell'ottica che il database possa essere aggiornato in maniera continuativa e riflettere la situazione attuale delle stazioni italiane.
 
-Per quanto riguarda il protocollo di integrazione delle stime giornaliere, si è scelto di aggiungere alla sequenza master i valori delle sequenze integranti prese una alla volta nell'ordine stabilito dai criteri di preferenza, a condizione che i contributi di ogni sequenza integrante superino i due anni.
+Per quanto riguarda il protocollo d'integrazione delle stime giornaliere, si è scelto di aggiungere alla sequenza master i valori delle sequenze integranti prese una alla volta nell'ordine stabilito dai criteri di preferenza, a condizione che i contributi di ogni sequenza integrante superino i due anni.
 L'inserimento avviene dopo aver sommato ai dati grezzi della serie integrante una correzione modellizzata sulle anomalie rispetto alla master in funzione del giorno dell'anno. Tale modello viene scelto tra una serie di Fourier troncata al terzo ordine, la media o lo zero, in base alla dimensione e alla distribuzione del campione di anomalie:
 
 \begin{align*}
@@ -163,7 +160,7 @@ dove \(d\) è una data, \(t(d)\) indica il numero di giorno dell'anno di \(d\) n
 Le serie scartate in fase di merging vanno perdute: si è notato, lavorandoci, che spesso sono serie con errori evidenti. Lo scarto inoltre è stato utilizzato come criterio di valutazione a ritroso dei parametri di soglia scelti per il merging, e in vari casi ha portato a ridefinire manualmente alcuni \emph{match}.
 
 \subsubsection{Correzione delle anagrafiche}
-Si è quindi effettuata una correzione delle informazioni spaziali ottenute nelle anagrafiche delle serie combinate, al fine di migliorare la qualità delle variabili su cui si basano i modelli di interpolazione geostatistica. Dato l'elevato numero di stazioni ci si è concentrati su un sottoinsieme di casi sospetti, identificati confrontando le quote dichiarate in anagrafica con quelle del DEM Copernicus GLO 30~\cite{europeanspaceagencyCopernicusGlobalEuropean2022} e esaminando tutti i casi di discrepanze superiori a \qty{10}{\meter}. Si è quindi cercato, tramite immagini satellitari e fotografie (reperite tramite Google Earth, Google Street View e raccolte di anagrafiche di terze parti~\cite{associazionelineameteoStazioniReteLinea}), di determinare latitudine, longitudine e quote esatte delle stazioni. L'operazione è risultata più semplice, naturalmente, per stazioni moderne (di cui spesso si riesce a trovare traccia nelle fotografie); in tutti i casi analizzati si è tenuto traccia nel database delle modifiche apportate. La figura~\ref{fig:corrections-deltas} mostra le distribuzioni delle correzioni apportate alle posizioni e alle quote, che in circa la metà dei casi sono molto significative per le quote (\(\Delta \mathrm{H} > \qty{50}{\meter}\)).
+Si è quindi effettuata una correzione delle informazioni spaziali ottenute nelle anagrafiche delle serie combinate, al fine di migliorare la qualità delle variabili su cui si basano i modelli di interpolazione geostatistica. Dato l'elevato numero di stazioni ci si è concentrati su un sottoinsieme di casi sospetti, identificati confrontando le quote dichiarate in anagrafica con quelle del DEM a risoluzione \qty{30}{\meter} Copernicus GLO 30~\cite{europeanspaceagencyCopernicusGlobalEuropean2022} e esaminando tutti i casi di discrepanze superiori a \qty{10}{\meter} verticali. Si è quindi cercato, tramite immagini satellitari e fotografie (reperite tramite Google Earth, Google Street View e raccolte di anagrafiche di terze parti~\cite{associazionelineameteoStazioniReteLinea}), di determinare latitudine, longitudine e quote esatte delle stazioni. L'operazione è risultata più semplice, naturalmente, per stazioni moderne (di cui spesso si riesce a trovare traccia nelle fotografie); in tutti i casi analizzati si è tenuto traccia nel database delle modifiche apportate. La figura~\ref{fig:corrections-deltas} mostra le distribuzioni delle correzioni apportate alle posizioni e alle quote, che in circa la metà dei casi sono molto significative per le quote (\(\Delta \mathrm{H} > \qty{50}{\meter}\)).
 % La tabella~\ref{tab:n-corrections} invece riporta il numero di correzioni apportate.
 
 \begin{figure}[ht]
@@ -185,9 +182,10 @@ Si è quindi effettuata una correzione delle informazioni spaziali ottenute nell
 Ultimo passaggio della procedura è un secondo merge effettuato esclusivamente all'interno del dataset ottenuto tramite i passaggi precedenti, al fine di eliminare eventuali duplicati rimasti. Effettuando la procedura di volta in volta tra un determinato dataset regionale e quelli nazionali infatti si possono perdere eventuali ridondanze tra i dataset regionali. Tale passaggio ha portato all'eliminazione di 66 serie, perlopiù provenienti da Dext3r e ARPAPiemonte.
 
 \subsubsection{Risultati}\label{ch:results}
-Si riportano di seguito alcune caratteristiche del dataset ottenuto tramite merging, per il trentennio 1991--2020. Tale dataset è, a questo punto del procedimento, un catalogo di stime degli estremi giornalieri di temperatura non controllati e non omogeneizzati, ma che rappresenta una base di partenza per la stima delle normali climatiche. Sono state considerate, nella presentazione che segue, soltanto le serie con almeno di cinque anni di dati (anche non validi ai fini delle climatologie).
+Si riportano di seguito alcune caratteristiche del dataset ottenuto tramite merging, per il trentennio 1991--2020. Tale dataset è, a questo punto del procedimento, un catalogo di stime degli estremi giornalieri di temperatura non controllati e non omogeneizzati, ma che rappresenta una base di partenza per la stima delle normali climatiche. Sono state considerate, nella presentazione che segue, soltanto le serie con almeno cinque anni di dati (anche non validi ai fini delle climatologie).
 
-In tabella~\ref{tab:series-stats} si può vedere a confronto i numeri che caratterizzano i dataset nazionali. Mentre SCIA rimane quello con più sequenze in termini assoluti (considerando l'intero dataset), le colonne ``Climatologie'' e ``Numero di mesi'' mostrano che le integrazioni di dati hanno portato ad un incremento apprezzabile delle serie con i requisiti necessari ad elaborare le climatologie nel trentennio 1991--2000 e notevole dei dati a dispozione rispetto agli altri dataset.
+In tabella~\ref{tab:series-stats} si può vedere a confronto i numeri che caratterizzano i dataset nazionali. Mentre SCIA rimane quello con più sequenze in termini assoluti (considerando l'intero dataset), le colonne ``Climatologie'' e ``Numero di mesi'' mostrano che le integrazioni di dati hanno portato a un incremento apprezzabile delle serie con i requisiti necessari a elaborare le climatologie nel trentennio 1991--2000 e notevole dei dati a disposizione rispetto agli altri dataset.
+
 \begin{table}[ht]
   \centering
   \begin{threeparttable}
@@ -226,12 +224,12 @@ La figura~\ref{fig:merged-elevations} mostra la rappresentatività delle quote d
   \caption{Distribuzione normalizzata delle quote delle serie e dell'elevazione del territorio.}\label{fig:merged-elevations}
 \end{figure}
 
-La figura~\ref{fig:merged-contributions} rappresenta i contributi assoluti di ciascun dataset utilizzato per il merging al prodotto finale: ad ogni data è associato il numero di sequenze dalle quali è stata ottenuta una stima giornaliera di temperatura. ISAC è risultato essere il maggior contributore (compatibilmente con la scelta di dargli massima priorità nel merging), seguito da SCIA (i cui contributi sono rilevanti soprattutto prima del 2005). Il grafico mostra uno scambio netto tra i contributi di SCIA e DPC nel 2012 dovuto al drastico calo delle disponibilità del primo in Friuli-Venezia Giulia, dove la sorgente regionale è relativamente carente, come si può osservare in figura~\ref{fig:regional-monthly}.
+La figura~\ref{fig:merged-contributions} rappresenta i contributi assoluti di ciascun dataset utilizzato per il merging al prodotto finale, ordinati dal basso all'alto come la priorità di integrazione: ad ogni data è associato il numero di sequenze dalle quali è stata ottenuta una stima giornaliera di temperatura. ISAC è risultato essere il maggior contributore (compatibilmente con la scelta di dargli massima priorità nel merging), seguito da SCIA (i cui contributi sono rilevanti soprattutto prima del 2005). Il grafico mostra uno scambio netto tra i contributi di SCIA e DPC nel 2012 dovuto al drastico calo delle disponibilità del primo in Friuli-Venezia Giulia, dove la sorgente regionale è relativamente carente, come si può osservare in figura~\ref{fig:regional-monthly}.
 \begin{figure}[ht]
   \centering
   \includegraphics[width=\textwidth]{images/stima_normali/dataset/merged_contributions.pdf}
   % \input{images/stima_normali/dataset/merged_contributions.tex}
-  \caption{Contributi dei dataset sorgenti al merging giorno per giorno. Le bande sono ordinate dal basso verso l'alto secondo la priorità di integrazione (da massima a minima).}\label{fig:merged-contributions}
+  \caption{Contributi dei dataset sorgenti al merging giorno per giorno. Le bande sono ordinate dal basso verso l'alto secondo la priorità d'integrazione (da massima a minima).}\label{fig:merged-contributions}
 \end{figure}
 
 Infine, la figura~\ref{fig:merged-improvements} mostra la disponibilità di serie con un numero minimo di anni utilizzabili per le climatologie nei dataset nazionali. Il risultato del merging offre un incremento significativo rispetto a SCIA in termini relativi in particolare per serie con almeno tra i 15 e i 25 anni di mesi validi, dove la disponibilità è quasi doppia.
