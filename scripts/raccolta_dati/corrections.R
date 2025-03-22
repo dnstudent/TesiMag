@@ -20,9 +20,8 @@ if (!fs::dir_exists(image_dir)) {
     fs::dir_create(image_dir)
 }
 
+loadfonts()
 theme_set(theme_bw() + theme_defaults)
-
-linetype_values <- c(SCIA = "dashed", ISAC = "dotted", merged = "solid", DPC = "dotdash")
 
 conns <- load_dbs()
 on.exit(close_dbs(conns))

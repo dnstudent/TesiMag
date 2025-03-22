@@ -9,10 +9,12 @@ library(sf)
 library(tsibble)
 library(withr)
 library(tikzDevice)
+library(extrafont)
 source("src/database/startup.R")
 source("src/database/query/data.R")
 source("scripts/common.R")
 
+loadfonts()
 theme_set(theme_bw() + theme_defaults)
 options(tikzDefaultEngine = "xetex")
 
@@ -24,7 +26,6 @@ if (!fs::dir_exists(image_dir)) {
 
 conns <- load_dbs()
 on.exit(close_dbs(conns))
-
 
 reggio_series <- query_checkpoint_meta(c("Dext3r", "SCIA", "ISAC"), "raw", conns$data) |>
     filter(between(lon, 10.42, 10.80), between(lat, 44.64, 44.774642)) |>
@@ -40,6 +41,7 @@ stat_points <- reggio_series |>
     st_drop_geometry() |>
     unnest(coords) |>
     select(dataset = display_dataset, sequence, x = X, y = Y)
+# TODO: sistemare con misure in cm ecc.
 with_seed(0L, {
     autoplot(sa_map) +
         geom_point(data = stat_points, aes(color = dataset, shape = dataset), size = 3) +
@@ -48,7 +50,6 @@ with_seed(0L, {
         theme(plot.margin = grid::unit(c(0, 0, 0, 0), "mm"))
     ggsave(fs::path(image_dir, "reggio_series_osm.pdf"), width = 10, height = 5, dpi = 300)
 })
-
 
 
 # Series
@@ -108,7 +109,7 @@ with_seed(24L, {
         labs(color = "Dataset", shape = "Dataset", edge_linetype = "Distanza [km]") +
         scale_edge_linetype_manual(values = c("[0, 0.3)" = "solid", "[0.3, 1)" = "dotdash", "[1, 11)" = "dotted"))
 
-    ggsave(fs::path(image_dir, "reggio_series_graph.pdf"), width = 10, height = 5)
+    ggsave(fs::path(image_dir, "reggio_series_graph_1.pdf"), width = 10, height = 5)
 })
 
 library(knitr)

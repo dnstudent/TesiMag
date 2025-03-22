@@ -13,10 +13,12 @@ library(sf)
 library(units)
 library(assertr)
 library(tikzDevice)
+library(extrafont)
 source("src/database/startup.R")
 source("src/database/query/data.R")
 source("scripts/common.R")
 
+loadfonts()
 theme_set(theme_bw() + theme_defaults)
 
 conns <- load_dbs()
@@ -100,7 +102,6 @@ load_isac_dpc_meta <- function() {
 }
 
 
-
 #  Load everything
 metas <- local({
     isacdpc <- load_isac_dpc_meta()
@@ -129,23 +130,26 @@ climav_metas <- purrr::map2(metas, clavails, ~ {
 })
 
 # Temporali
-tmavails <- purrr::map(mavails, monthly_availability)
+tmavails <- purrr::map(mavails, monthly_availability) |>
+    bind_rows(.id = "dataset") |>
+    mutate(dataset = case_match(dataset, "scia" ~ "SCIA", "isac" ~ "ISAC", "dpc" ~ "DPC", .default = dataset))
 
-p <- ggplot(mapping = aes(date, n, fill = NA, linetype = dataset)) +
-    geom_line(data = tmavails$merged |> mutate(dataset = "merged") |> filter(variable == -1L, is_month_available), position = "stack") +
-    geom_line(data = tmavails$scia |> mutate(dataset = "SCIA") |> filter(variable == -1L, is_month_available), position = "stack") +
-    geom_line(data = tmavails$isac |> mutate(dataset = "ISAC") |> filter(variable == -1L, is_month_available), position = "stack") +
-    geom_line(data = tmavails$dpc |> mutate(dataset = "DPC") |> filter(variable == -1L, is_month_available), position = "stack") +
+p <- ggplot(data = tmavails |> filter(variable == -1L, is_month_available), mapping = aes(date, n, linetype = dataset)) +
+    geom_line() +
+    # geom_line(data = tmavails$merged |> mutate(dataset = "merged") |> filter(variable == -1L, is_month_available), position = "stack") +
+    # geom_line(data = tmavails$scia |> mutate(dataset = "SCIA") |> filter(variable == -1L, is_month_available), position = "stack") +
+    # geom_line(data = tmavails$isac |> mutate(dataset = "ISAC") |> filter(variable == -1L, is_month_available), position = "stack") +
+    # geom_line(data = tmavails$dpc |> mutate(dataset = "DPC") |> filter(variable == -1L, is_month_available), position = "stack") +
     scale_linetype_manual(values = linetype_values) +
     labs(color = "Mese disponibile", linetype = "Dataset", x = "Mese", y = "Numero di serie")
 
-p1 <- p + scale_x_date(limits = c(min(tmavails$merge |> pull(date)), as.Date("1991-01-01")))
-p2 <- p + scale_x_date(limits = c(as.Date("1991-01-01"), max(tmavails$merge |> pull(date))))
+p1 <- p + scale_x_date(limits = c(min(tmavails |> filter(dataset == "merged") |> pull(date)), as.Date("1991-01-01")))
+p2 <- p + scale_x_date(limits = c(as.Date("1991-01-01"), max(tmavails |> filter(dataset == "merged") |> pull(date))))
 
 with_seed(0L, {
     (p1 / p2 + plot_layout(axes = "collect", guides = "collect")) + plot_annotation(title = "Disponibilità di serie nei dataset nazionali", subtitle = "Centro-nord Italia, pre e post 1991")
 
-    ggsave(fs::path(image_dir, "monthly_availability.tex"), width = 13.5, height = 10, units = "cm", dpi = 300, device = tikz)
+    ggsave(fs::path(image_dir, "monthly_availability.tex"), width = 13.5, height = 10, units = "cm", device = tikz)
 })
 
 # Spaziali
@@ -185,7 +189,7 @@ p2 <- with_seed(0L, {
 })
 
 with_seed(0L, {
-    (p1 + p2) + plot_layout(axes = "collect") + plot_annotation(title = "Serie del dataset merged") + theme(plot.margin = unit(c(0, 0, 0, 0), "cm"))
+    (p1 + p2) + plot_layout(axes = "collect") + plot_annotation(title = "Serie del dataset merged")
     ggsave(fs::path(image_dir, "merged", "spatial_availability.pdf"), width = 13.5, height = 10, units = "cm")
 })
 
@@ -224,11 +228,11 @@ contribs <- datas$merged |>
 ds_levels <- c("ISAC", "ARPAPiemonte", "SIRToscana", "Dext3r", "ARPAV", "ARPALombardia", "ARPAL", "TAA", "ARPAM", "ARPAUmbria", "ARPAFVG", "SCIA", "DPC") |> rev()
 with_seed(0L, {
     ggplot(contribs |> filter(variable == 1L) |> mutate(from_dataset = factor(from_dataset, levels = ds_levels, ordered = TRUE))) +
-        geom_line(aes(date, n, color = from_dataset), position = "stack") +
-        scale_color_igv() +
-        labs(x = "Data", y = "Numero di serie", color = "Dataset", title = "Contributi al merging", subtitle = "Centro-nord Italia, 1991-2020") +
+        geom_area(aes(date, n, fill = from_dataset), position = "stack") +
+        scale_fill_igv() +
+        labs(x = "Data", y = "Numero di serie", fill = "Dataset", title = "Contributi al merging", subtitle = "Centro-nord Italia, 1991-2020") +
         theme(legend.text = element_text(size = rel(0.6)))
-    ggsave(fs::path(image_dir, "merged_contributions.pdf"), width = 13.5, height = 13.5 / 1.618, units = "cm")
+    ggsave(fs::path(image_dir, "merged_contributions.pdf"), width = 13.5, height = 13.5 / 1.618 + 1, units = "cm")
     ggsave(fs::path(image_dir, "merged_contributions.tex"), width = 13.5, height = 13.5 / 1.618, units = "cm", device = tikz)
 })
 
@@ -284,14 +288,15 @@ kable_cols <- c(
     "Numero di mesi\\tnote{*} \\tnote{2}",
     "Numero di dati\\tnote{*} \\tnote{3}"
 )
-bind_rows(metas, .id = "Origine") |>
-    group_by(Origine) |>
-    summarise(n = n(), Densità = n / area, .groups = "drop") |>
-    left_join(cldisps |> select(Origine, Climatologie = n), by = "Origine") |>
-    left_join(mdisps |> select(Origine, Mesi = n), by = "Origine") |>
-    left_join(counts |> select(Origine, entries = n), by = "Origine") |>
-    mutate(Origine = factor(case_match(Origine, "scia" ~ "SCIA", "isac" ~ "ISAC", "dpc" ~ "DPC", .default = Origine), levels = c("merged", "SCIA", "ISAC", "DPC"))) |>
-    arrange(Origine) |>
-    select(Origine, Densità, n, Climatologie, Mesi, entries) |>
-    knitr::kable(format = "latex", col.names = kable_cols, row.names = FALSE, digits = c(0L, 3L, 0L, 0L, 0L, 0L), escape = FALSE) |>
-    cat(file = fs::path(image_dir, "data.tex"), sep = "\n")
+#  Attivare in caso di bisogno! Sovrascrive il file data.tex ed elimina le modifiche manuali
+# bind_rows(metas, .id = "Origine") |>
+#     group_by(Origine) |>
+#     summarise(n = n(), Densità = n / area, .groups = "drop") |>
+#     left_join(cldisps |> select(Origine, Climatologie = n), by = "Origine") |>
+#     left_join(mdisps |> select(Origine, Mesi = n), by = "Origine") |>
+#     left_join(counts |> select(Origine, entries = n), by = "Origine") |>
+#     mutate(Origine = factor(case_match(Origine, "scia" ~ "SCIA", "isac" ~ "ISAC", "dpc" ~ "DPC", .default = Origine), levels = c("merged", "SCIA", "ISAC", "DPC"))) |>
+#     arrange(Origine) |>
+#     select(Origine, Densità, n, Climatologie, Mesi, entries) |>
+#     knitr::kable(format = "latex", col.names = kable_cols, row.names = FALSE, digits = c(0L, 3L, 0L, 0L, 0L, 0L), escape = FALSE) |>
+#     cat(file = fs::path(image_dir, "data.tex"), sep = "\n")
