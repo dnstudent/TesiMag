@@ -1,0 +1,141 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+\documentclass[
+]{article}
+\usepackage{xcolor}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{graphicx}
+\makeatletter
+\newsavebox\pandoc@box
+\newcommand*\pandocbounded[1]{% scales image to fit in text height/width
+  \sbox\pandoc@box{#1}%
+  \Gscale@div\@tempa{\textheight}{\dimexpr\ht\pandoc@box+\dp\pandoc@box\relax}%
+  \Gscale@div\@tempb{\linewidth}{\wd\pandoc@box}%
+  \ifdim\@tempb\p@<\@tempa\p@\let\@tempa\@tempb\fi% select the smaller of both
+  \ifdim\@tempa\p@<\p@\scalebox{\@tempa}{\usebox\pandoc@box}%
+  \else\usebox{\pandoc@box}%
+  \fi%
+}
+% Set default figure placement to htbp
+\def\fps@figure{htbp}
+\makeatother
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  pdftitle={Elaborazione di un dataset degli estremi di temperatura mensili per il territorio italiano},
+  pdfauthor={Davide Nicoli},
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+
+\title{Elaborazione di un dataset degli estremi di temperatura mensili
+per il territorio italiano}
+\author{Davide Nicoli}
+\date{}
+
+\begin{document}
+\maketitle
+
+\subsection{Introduzione}\label{introduzione}
+
+Il lavoro ha avuto l'obiettivo di elaborare un dataset delle normali
+climatologiche mensili relative al trentennio 1991-2020 delle
+temperatura minime e massime giornaliere per le serie registrate nel
+centro-nord italia, nell'ambito di un più ampio progetto volto alla
+costruzione di un dataset ad alta risoluzione esteso all'intero
+territorio italiano. In particolare si cerca di aggiornare
+
+Il dataset risultante è stato costruito attraverso la raccolta, il
+controllo e l'integrazione di dati provenienti da diverse fonti
+provinciali, regionali e nazionali.
+
+\subsection{Metodologia}\label{metodologia}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  Raccolta dei dati: sono stati acquisiti dati da vari enti, tra cui
+  ARPA, SCIA (dataset ISPRA), CNR-ISAC e il dataset del Dipartimento di
+  Protezione Civile, prestando particolare attenzione a coprire il
+  periodo 1991-2020. La frammentazione e l'eterogeneità delle fonti
+  hanno richiesto un attento lavoro di standardizzazione;
+\item
+  Merging: le serie di dati sono state integrate attraverso un processo
+  che ha combinato fonti diverse per garantire una maggiore copertura
+  spaziale e temporale ed eliminare le serie duplicate;
+\item
+  Controllo qualità: è stata eseguita un'analisi dei dati per
+  individuare errori e incongruenze, utilizzando confronti con la
+  rianalisi ERA5 e con stazioni meteorologiche limitrofe tramite
+  tecniche appositamente studiate in altri lavori;
+\item
+  Stima delle normali climatiche: sono state calcolate medie
+  climatologiche mensili, considerando solo le serie con almeno cinque
+  anni di dati validi e completando quelle con un numero non troppo
+  elevato di dati mancanti.
+\end{enumerate}
+
+\subsection{Risultati}\label{risultati}
+
+\begin{itemize}
+\tightlist
+\item
+  Il dataset finale comprende 2508 serie, con un miglioramento
+  significativo rispetto alle fonti originali in termini di continuità e
+  accuratezza.
+\item
+  È stata riscontrata una discrepanza maggiore nelle temperature minime
+  rispetto alle massime, particolarmente evidente in aree montane e
+  costiere.
+\item
+  L'analisi ha evidenziato la necessità di ulteriori miglioramenti nel
+  trattamento dei dati di regioni con orografia complessa.
+\end{itemize}
+
+\subsection{Conclusioni}\label{conclusioni}
+
+L'integrazione delle diverse fonti ha permesso di ottenere un dataset
+più completo e affidabile per lo studio del clima italiano. Tuttavia,
+permangono alcune criticità, come la difficoltà di omogeneizzare dati
+provenienti da strumenti e metodologie differenti. Il lavoro rappresenta
+un passo avanti nella disponibilità di dati climatologici per analisi
+ambientali e previsioni a lungo termine.
+
+\end{document}
