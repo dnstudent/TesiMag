@@ -1,9 +1,13 @@
 ---
-title: Elaborazione di un dataset degli estremi di temperatura mensili per il territorio italiano
+title: ""
 author: "Davide Nicoli"
 date: "2025-03-24"
 output:
-  pdf_document: default
+  pdf_document:
+    latex_engine: xelatex
+    keep_tex: true
+    includes:
+      in_header: "preamble.tex"
   html_document:
     df_print: paged
 bibliography: rbiblio.bib
@@ -25,7 +29,7 @@ Dopo aver finalizzato la raccolta si è proceduto ad una valutazione di massima 
 ## Risultati
 - Il dataset finale comprende 2501 serie sul territorio del centro-nord Italia, più 1294 nelle zone limitrofe dell'arco alpino;
 - è stata riscontrata una discrepanza maggiore tra modello ed osservazioni nelle temperature minime rispetto alle massime, particolarmente evidente in aree montane e costiere, in determinate regioni più che in altre;
-- l'analisi ha evidenziato la necessità di studiare in maniera più approfondita la procedura di interpolazione spaziale dei dati.
+- l'analisi ha evidenziato la necessità di studiare in maniera più approfondita la procedura di interpolazione spaziale dei dati aggiungendo al modello ulteriori algoritmi per meglio catturare il legame tra le caratteristiche geografiche del territorio e le normali climatiche.
 
 ## Conclusioni
 L'integrazione delle diverse fonti ha permesso di ottenere un dataset con disponibilità di dati molto maggiore di quelli preesistenti per lo studio del clima italiano. Tuttavia, permangono alcune criticità, come la difficoltà di omogeneizzare dati provenienti da strumenti e metodologie differenti.
