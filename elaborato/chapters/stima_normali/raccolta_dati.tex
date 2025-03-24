@@ -23,31 +23,38 @@ La disponibilità temporale e spaziale delle serie nei singoli dataset infine ri
 La presenza delle problematiche illustrate e la necessità di serie giornaliere il più possibile complete e consistenti sotto il profilo sia temporale che spaziazle hanno reso necessaria l'elaborazione di procedure adeguate di meging dei singoli dataset e saranno presentate nella sezione~\ref{ch:merging}.
 
 \subsection{Sorgenti utilizzate}\label{ch:sources}
-Di seguito i dataset impiegati per il lavoro. Nell'appendice~\ref{app:datasets} viene fornita una descrizione dettagliata di contenuti, problematiche e disponibilità dati di ciascuno di essi.
+Nella tabella~\ref{tab:quick-datasets} sono elencati i dataset impiegati per il lavoro. Nell'appendice~\ref{app:datasets} viene fornita una descrizione dettagliata di contenuti, problematiche e disponibilità dati di ciascuno di essi.\todo{Rimuovere se non faccio}
 
-% TODO: quante serie forniscono?
 \begin{table}[ht]
+  %  TODO: aggiungere dataset esteri
   \centering
-  \begin{tabular}{l l}
-    \toprule
-    Nome & Copertura \\
-    \midrule
-    SCIA & Italia \\
-    DPC & Italia \\
-    CNR-ISAC & Italia \\
-    ARPA Piemonte & Regione \\
-    ARPA Lombardia & Regione \\
-    ARPA Veneto & Regione \\
-    MeteoTrentino & Provincia (Trento) \\
-    CIVIS Bolzano & Provincia \\
-    ARPA FVG/OSMER & Regione \\
-    ARPAL & Regione (Liguria) \\
-    SIR Toscana & Regione \\
-    Dext3r & Regione (Emilia-Romagna) \\
-    ARPAM & Regione (Marche) \\
-    ARPA Umbria & Regione \\
-    \bottomrule
-  \end{tabular}
+  \begin{threeparttable}
+    \caption{Elenco dei dataset utilizzati}\label{tab:quick-datasets}
+    \begin{tabular}{l l l}
+      \toprule
+      Nome & Copertura & Disponibilità\tnote{*} \\
+      \midrule
+      SCIA & Italia & 2563 \\
+      DPC & Italia & 2201 \\
+      CNR-ISAC & Italia & 280 \\
+      ARPA Piemonte & Regione & 326 \\
+      ARPA Lombardia & Regione & 255 \\
+      ARPA Veneto & Regione & 255 \\
+      MeteoTrentino & Provincia (Trento) & 194 \\
+      CIVIS Bolzano & Provincia & 66 \\
+      ARPA FVG/OSMER & Regione & 57 \\
+      ARPAL & Regione (Liguria) & 188 \\
+      SIR Toscana & Regione & 441 \\
+      Dext3r & Regione (Emilia-Romagna) & 623 \\
+      ARPAM & Regione (Marche) & 157 \\
+      ARPA Umbria & Regione & 75 \\
+      \bottomrule
+    \end{tabular}
+    \begin{tablenotes}
+    \item[*] \small Numero di stazioni presenti nel dataset come reperito. Per i dataset nazionali si calcolano solo quelle nel territorio del centro-nord Italia.
+    \end{tablenotes}
+  \end{threeparttable}
+
 \end{table}
 
 A livello qualitativo si è constatato che:
