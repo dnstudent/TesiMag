@@ -165,7 +165,6 @@ Si è quindi effettuata una correzione delle informazioni spaziali ottenute nell
 
 \begin{figure}[ht]
   \centering
-  % \includegraphics[width=\textwidth]{images/stima_normali/correzioni/corrections_deltas.pdf}
   \input{images/stima_normali/correzioni/corrections_deltas.tex}
   \caption{Distribuzione delle correzioni di posizione e quota. Sono stati inclusi solo i casi in cui la correzione è superiore a \qty{10}{\meter}.}\label{fig:corrections-deltas}
 \end{figure}
@@ -211,7 +210,6 @@ In figura~\ref{fig:merged-series} si può vedere la distribuzione spaziale delle
 La figura~\ref{fig:merged-timeseries} mette a confronto il numero di serie con mesi validi per il calcolo delle climatologie nei periodi pre- e post-1991. Nel periodo pre-1991 il nuovo dataset non offre un incremento significativo dei dati disponibili (del resto sono poche le serie regionali a dare contributi in questo periodo), mentre in quello successivo sì. In particolare SCIA mostra carenze importanti nell'ultimo decennio. In generale il numero di serie con assenza di disponibilità mensile risulta essere sempre poco rilevante rispetto al totale.
 \begin{figure}[ht]
   \centering
-  % \includegraphics[width=\textwidth]{images/stima_normali/dataset/monthly_availability.pdf}
   \input{images/stima_normali/dataset/monthly_availability.tex}
   \caption{Numero di serie con disponibilità mensile soddisfacente sul territorio del centro-nord Italia.}\label{fig:merged-timeseries}
 \end{figure}
@@ -219,7 +217,6 @@ La figura~\ref{fig:merged-timeseries} mette a confronto il numero di serie con m
 La figura~\ref{fig:merged-elevations} mostra la rappresentatività delle quote delle serie ottenute tramite merging e dei dataset nazionali sorgenti rispetto all'elevazione del territorio calcolata tramite un sample di \num{500000} punti del DEM~\cite{europeanspaceagencyCopernicusGlobalEuropean2022}. Il nuovo dataset tende a sottorappresentare le quote inferiori a \qty{300}{\meter} e a sovrarappresentare quelle fino a \qty{2000}{\meter}, anche se non in maniera irragionevole.
 \begin{figure}[ht]
   \centering
-  % \includegraphics[width=\textwidth]{images/stima_normali/dataset/elevation_distribution.tex}
   \input{images/stima_normali/dataset/elevation_distribution.tex}
   \caption{Distribuzione normalizzata delle quote delle serie e dell'elevazione del territorio.}\label{fig:merged-elevations}
 \end{figure}
@@ -234,9 +231,7 @@ La figura~\ref{fig:merged-contributions} rappresenta i contributi assoluti di ci
 
 Infine, la figura~\ref{fig:merged-improvements} mostra la disponibilità di serie con un numero minimo di anni utilizzabili per le climatologie nei dataset nazionali. Il risultato del merging offre un incremento significativo rispetto a SCIA in termini relativi in particolare per serie con almeno tra i 15 e i 25 anni di mesi validi, dove la disponibilità è quasi doppia.
 \begin{figure}[ht]
-  % TODO: rifare dopo qc
   \centering
-  % \includegraphics[width=\textwidth]{images/stima_normali/dataset/improvements.pdf}
   \input{images/stima_normali/dataset/improvements.tex}
   \caption{Disponibilità di serie con un numero minimo di anni a seconda del dataset.}\label{fig:merged-improvements}
 \end{figure}

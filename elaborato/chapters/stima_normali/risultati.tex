@@ -1,0 +1,65 @@
+Si riportano di seguito i risultati del confronto tra climatologie ricostruite con approccio \emph{leave one out} e interpolazione LWLR, sulla traccia di quanto fatto nel lavoro del 2014 da Brunetti et al.~\cite{brunettiHighresolutionTemperatureClimatology2014}. Di seguito con il termine ``BIAS'' si indica la differenza media tra le climatologie da modello e da ossevazioni, mentre con ``MAE'' ed ``RMSE'' rispettivamente la media delle differenze in valore assoluto e la radice dell'errore quadratico medio su un raggruppamento specificato.
+
+\begin{table}[ht]
+  \centering
+  \begin{adjustbox}{max width=\textwidth}
+    \begin{threeparttable}
+      \caption{Accuratezza delle climatologie stimate per le temperature minime e massime delle stazioni del centro-nord italia.}\label{tab:diffs-mese-ita}
+      \input{tables/stima_normali/risultati/table1_ita.tex}
+      \begin{tablenotes}
+      \item[*] Tabella 1 da~\cite[p.~10]{brunettiHighresolutionTemperatureClimatology2014} dei confronti per il trentennio 1961--1990 e l'intera penisola. I risultati sono mediati su serie sia minime che massime.
+      \end{tablenotes}
+    \end{threeparttable}
+  \end{adjustbox}
+\end{table}
+
+\begin{figure}[ht]
+  \centering
+  \input{images/stima_normali/risultati/diff_stats.tex}
+  \caption{Confronto tra le statistiche del 2014 e quelle del dataset prodotto. La variabile ``T14'' rappresenta i valori medi del 2014.}\label{fig:diffs-mese-ita}
+\end{figure}
+La tabella~\ref{tab:diffs-mese-ita} e la figura~\ref{fig:diffs-mese-ita} mostrano le statistiche degli scostamenti del modello per le stazioni del centro-nord Italia, che indicano un consistente scarto tra la capacità del modello di ricostruire le serie di temperature minime rispetto alle massime, in particolare nei mesi estivi ed invernali. In generale, a questo punto del lavoro, non si nota un miglioramento rispetto ai risultati del 2014: le statistiche delle massime sono generalmente in linea con le medie dei risultati precedenti, mentre quelle delle minime sono consistentemente peggiori. Ciononostante il bias rimane sempre entro margini accettabili, mentre gli scostamenti assoluti e quadratici delle minime sono considerevolmente più alti, a suggerire che rispetto al precedente dataset c'è una maggiore presenza di outliers che non vengono ricostruiti in maniera efficace.
+
+% TODO: inserire se si spiega con qualità dati o con distribuzione in quota o altro
+\begin{table}[ht]
+  \centering
+  \begin{threeparttable}
+    \caption{Accuratezza delle climatologie stimate per le temperature minime e massime delle stazioni francesi, svizzere, austriache e slovene.}\label{tab:bias-non-ita}
+    \input{tables/stima_normali/risultati/table1_non_ita.tex}
+    \begin{tablenotes}
+    \item[*] Tabella 1 da~\cite[p.~10]{brunettiHighresolutionTemperatureClimatology2014} dei confronti per il trentennio 1961--1990 e l'intera penisola. I risultati sono mediati su serie sia minime che massime.
+    \end{tablenotes}
+  \end{threeparttable}
+\end{table}
+
+\begin{figure}
+  % TODO: vedere se includere
+  \centering
+  \input{images/stima_normali/risultati/diff_stats_nonita.tex}
+  \caption{Confronto tra le statistiche del 2014 e quelle del dataset prodotto. La variabile ``T14'' rappresenta i valori medi del 2014 (stazioni non italiane).}\label{fig:diffs-mese-nonita}
+\end{figure}
+La situazione è differente se si considerano le stazioni esterne al territorio italiano: in questo caso i bias delle minime sono più importanti, mentre gli scostamenti assoluti e quadratici sono in linea.
+
+Si è quindi controllato se sono presenti errori sistematici nella procedura di ricostruzione a livello locale. In particolare, vista la numerosa quantità di sorgenti presenti nel dataset, si sono raggruppate le serie in funzione della regione di appartenenza. Il pannello sinistro della figura~\ref{fig:boxplots-ita} mostra come alcuni territori (in particolare Liguria, Lombardia, Piemonte, Toscana e Valle d'Aosta) contribuiscano in maniera più significativa a bias e varianza complessivi. Essendo territori dall'orografia complessa, si è andata a guardare la dipendenza del bias dalla quota: il pannello destro della stessa figura mostra che per le minime lo scostamento aumenta mediamente di importanza al crescere della quota, mentre per le massime ne aumenta la varianza, fino a divenire più importante rispetto alle minime. Il trend mensile delle differenze rimane
+
+% TODO: sistemare labels asse x
+\begin{figure}[ht]
+  \centering
+  \input{images/stima_normali/risultati/bplots.tex}
+  \caption{Distribuzioni dei bias del modello nei vari dataset italiani e su diverse fasce di quota.}\label{fig:boxplots-ita}
+\end{figure}
+
+In ultima battuta si è voluto verificare il legame tra BIAS e distanza dal mare delle serie a quota ridotta (inferiore a \qty{500}{\meter}). La figura~\ref{fig:sea-bias} mostra come le stazioni costiere siano ricostruite con una certa difficoltà rispetto alle altre, in particolare con BIAS e RMSE consistenti per le temperature minime e marcato effetto stagionale per le massime. Rispetto al lavoro del 2014 si è scelto di considerare ``vicine'' stazioni a meno di \qty{10}{\kilo\meter}, piuttosto che \qty{1.3}{\kilo\meter}, per avere un campione sufficientemente ampio di stazioni.
+
+\begin{figure}[ht]
+  \centering
+  \input{images/stima_normali/risultati/sea_lplot.tex}
+  \caption{BIAS e RMSE delle stazioni in funzione della distanza dal mare (quota < \qty{500}{\meter}).}\label{fig:sea-bias}
+\end{figure}
+
+%  TODO: inutile?
+% \begin{figure}[ht]
+%   \centering
+%   \includegraphics[width=\textwidth]{images/stima_normali/risultati/bias_dist.pdf}
+%   \caption{}\label{fig:bias-dist}
+% \end{figure}

@@ -29,22 +29,17 @@
 
 ### Controllo qualità
 
-- Posizione stazioni
 - Procedura Brunetti
 
-### Omogeneizzazione
+### Ricostruzione climatologie (metodo 2014)
 
-Procedura Brunetti
+- Procedura Brunetti
 
-### Aggregazione
+## Conclusioni
 
-Risultati
-
-## Risultati
-
--   merging: rappresentatività dataset merged. Numeri e percentuali di completezza del risultato vs dataset iniziali (regio x regio).
--   qc: numero di dati buttati, correlazioni con rete, quota...
--   omogeneizzazione: numero di serie ritoccate, già omogenee... (?)
+- tabella bias, mae, rmse
+- grafico spaziale bias/mae
+- considerazioni
 
 ## Appendici
 

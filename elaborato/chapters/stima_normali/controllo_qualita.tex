@@ -1,4 +1,4 @@
-Il controllo qualità dei dati è stato elaborato sulla traccia di quanto fatto in~\cite{brunettiHighresolutionTemperatureClimatology2014}\todo{è davvero così?}. Il procedimento è articolato a causa delle problematiche che caratterizzano la combinazione di misure di stazioni meccaniche ed automatiche, come, ad esempio, l'attribuzione della giornata di misura e la presenza di errori significativi legati ai malfunzionamenti episodici degli strumenti automatici.
+Il controllo qualità dei dati è stato elaborato sulla traccia di quanto fatto in~\cite{brunettiHighresolutionTemperatureClimatology2014}. Il procedimento è articolato a causa delle problematiche che caratterizzano la combinazione di misure di stazioni meccaniche ed automatiche, come, ad esempio, l'attribuzione della giornata di misura e la presenza di errori significativi legati ai malfunzionamenti episodici degli strumenti automatici.
 
 Prima di effettuare il controllo qualità sono state eliminate le serie che forniscono pochi dati: meno di \(365 \cdot 5\) giorni di misure e meno di \(4 \cdot \mathrm{N_i}\) valori per ogni mese \(i\) (dove \(\mathrm{N_i}\) è il numero di giorni del mese).
 % Si sono rimosse così 592 serie di minime e 589 di massime.
@@ -17,7 +17,7 @@ In prima battuta si sono invalidati gli errori palesi, rimuovendo tutte le misur
 % Si sono rimossi così un totale di 35047 e 15206 valori di minime e massime per le ripetizioni e 461 e 762 per i valori anomali, coinvolgendo 565 e 456 serie.
 
 \paragraph{Confronto con ERA5}
-% TODO controllare tutti il riferimento alla procedura di qc in Brunetti 2014
+% TODO controllare tutti i riferimenti alla procedura di qc in Brunetti 2014
 Le serie giornaliere del dataset sono state confrontate con serie sintetiche costruite combinando il metodo delle anomalie di Mitchell e Jones~\cite{mitchellImprovedMethodConstructing2005} e quello dei contributi relativi giornalieri di Di Luzio et al.~\cite{diluzioConstructingRetrospectiveGridded2008}.\todo{Spiegare le assunzioni relative a climatologie e anomalie e il ruolo dei contributi relativi}
 
 Per ogni serie di minime e di massime giornaliere si è costruita una sequenza mensile sintetica sommando alle climatologie 1961--1990 prodotte da Brunetti et al.~\cite{brunettiHighresolutionTemperatureClimatology2014} le anomalie delle medie mensili '91--'20 di ERA5 rispetto allo stesso periodo. Si sono quindi calcolati i contributi relativi delle temperature giornaliere ERA5 al proprio mese come
