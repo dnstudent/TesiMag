@@ -48,8 +48,8 @@
 \maketitle
 
 % Acknowledgement
-\chapter*{Acknowledgement}
-\noindent WRITE DOWN YOUR APPRECIATION
+% \chapter*{Acknowledgement}
+% \noindent WRITE DOWN YOUR APPRECIATION
 
 % Abstract
 \pagenumbering{roman} % Roman page numbering
@@ -57,8 +57,6 @@
 
 % Table of Contents
 \tableofcontents
-\listoffigures
-\listoftables
 
 % Reapply the page style to ensure consistency
 \pagenumbering{arabic} % Switch to Arabic numerals for the main content
@@ -68,14 +66,14 @@
 \input{chapters/intro}
 
 % Results
-\chapter{Stima delle normali}\label{ch:stima-normali}
-\input{chapters/stima_normali}
+\chapter{Creazione del dataset}
+\input{chapters/creazione_dataset.tex}
+
+\chapter{Valutazione preliminare del modello delle climatologie}
+\input{chapters/valutazione_modello.tex}
 
 \chapter{Conclusioni}\label{ch:conclusioni}
-
-\appendix
-\chapter{Dataset sorgenti}\label{app:datasets}
-\input{chapters/datasets}
+\input{chapters/conclusioni.tex}
 
 % Bibliography
 \clearpage

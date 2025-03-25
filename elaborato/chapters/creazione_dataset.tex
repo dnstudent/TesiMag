@@ -1,0 +1,16 @@
+% !TEX root = ../main.tex
+
+Scopo di questa parte del lavoro è raccogliere, combinare controllare la qualità delle serie di temperature massime e minime giornaliere. Il dataset risultante consterà di due tabelle: quella dei metadati di ogni serie (almeno latitudine, longitudine, quota, identificativo della serie) e quella dei dati delle serie (data di misura, identificativo della serie di appartenenza, valori di temperatura minima e massima in \(\unit{\degreeCelsius}\)).
+
+Il procedimento è stato suddiviso in due fasi principali:
+
+\begin{enumerate}
+  \item raccolta dei dati: combinazione delle informazioni fornite dai gestori delle reti di misura in serie giornaliere di estremi di temperatura;
+  \item controllo qualità: eliminazione degli errori presenti nelle serie giornaliere tramite un'analisi locale dei dati e il confronto di ogni serie con le rianalisi ERA5 e le serie limitrofe.
+\end{enumerate}
+
+\section{Raccolta dei dati}\label{ch:raccolta-dati}
+\input{chapters/creazione_dataset/raccolta_dati}
+
+\section{Controllo qualità}\label{ch:qc}
+\input{chapters/creazione_dataset/controllo_qualita}
