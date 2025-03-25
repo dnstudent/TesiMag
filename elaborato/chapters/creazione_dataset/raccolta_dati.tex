@@ -26,7 +26,6 @@ La presenza delle problematiche illustrate e la necessità di serie giornaliere 
 Nella tabella~\ref{tab:quick-datasets} sono elencati i dataset impiegati per il lavoro.
 
 \begin{table}[ht]
-  %  TODO: aggiungere dataset esteri
   \centering
   \begin{threeparttable}
     \caption{Elenco dei dataset utilizzati}\label{tab:quick-datasets}
@@ -34,7 +33,7 @@ Nella tabella~\ref{tab:quick-datasets} sono elencati i dataset impiegati per il 
       \toprule
       Nome & Copertura & Disponibilità\tnote{*} \\
       \midrule
-      SCIA & Italia & 2563 \\
+      SCIA\cite{} & Italia & 2563 \\
       DPC & Italia & 2201 \\
       CNR-ISAC & Italia & 280 \\
       ARPA Piemonte & Regione & 326 \\
@@ -48,10 +47,16 @@ Nella tabella~\ref{tab:quick-datasets} sono elencati i dataset impiegati per il 
       Dext3r & Regione (Emilia-Romagna) & 623 \\
       ARPAM & Regione (Marche) & 157 \\
       ARPA Umbria & Regione & 75 \\
+      MeteoFrance & Francia & 2196 \\
+      GeoSphere Austria & Austria & 625 \\
+      ARSO Meteo & Slovenia & 570 \\
+      Agrometeo CH & Svizzera & 196 \\
+      WSL & Svizzera & 223 \\
+      SwissMetNet & Svizzera & 857 \\
       \bottomrule
     \end{tabular}
     \begin{tablenotes}
-    \item[*] \small Numero di stazioni presenti nel dataset come reperito. Per i dataset nazionali si calcolano solo quelle nel territorio del centro-nord Italia.
+    \item[*] \small Numero di stazioni presenti nel dataset come reperito. Si calcolano solo quelle nel territorio in esame.
     \end{tablenotes}
   \end{threeparttable}
 \end{table}
@@ -77,12 +82,12 @@ Il procedimento definitivo si articola in due fasi: l'identificazione delle sequ
 \subsubsection{Identificazione delle serie}
 \begin{figure}[ht]
   \centering
-  \includegraphics[width=\textwidth]{images/stima_normali/raccolta_dati/reggio_series_osm.pdf}
+  \includegraphics[width=\textwidth]{images/creazione_dataset/raccolta_dati/reggio_series_osm.pdf}
   \caption{Sequenze originali nella zona di Reggio Emilia. Si possono notare quattro raggruppamenti principali più una stazione apparentemente isolata. Non tutte le sequenze sono etichettate per rendere più fruibile l'immagine. Mappa di base fornita da Esri~\autocite{esriWorldTopographicMap2013}.}\label{fig:reggio-osm}
 \end{figure}
 \begin{figure}[ht]
   \centering
-  \input{images/stima_normali/raccolta_dati/reggio_series_plot.tex}
+  \input{images/creazione_dataset/raccolta_dati/reggio_series_plot.tex}
   \caption{Estratto delle sequenze introdotte nella figura~\ref{fig:reggio-osm}, scelte tra quelle collocate nella città di Reggio Emilia. Sembrerebbero rappresentare una stazione ricollocata nel 2007 o nel 2008, tuttavia ogni sorgente dà una versione differente. Alcune hanno eliminato dei dati (buchi nella sequenza) probabilmente a causa di un controllo qualità con esito negativo.}\label{fig:reggio-plot}
 \end{figure}
 Se si considerano le sequenze recuperate dai vari dataset come i vertici di un grafo le cui connessioni sono costituite dalla relazione ``fanno parte della stessa serie'' (da qui in poi ``\emph{match}''), il problema in esame ha come soluzione le componenti connesse del suddetto grafo. Questo approccio consente di definire una relazione di connessione, che in generale potrebbe essere molto articolata, in maniera non necessariamente esaustiva, dal momento che automatizza il raggruppamento di più sequenze anche quando non ci sono \emph{match} tra tutte le componenti e ogni altra. Un esempio di grafo fatto in questo modo è presentato in figura~\ref{fig:reggio-graph}.
@@ -121,8 +126,8 @@ Queste osservazioni e la generale mancanza di una documentazione approfondita de
 
 \begin{figure}[ht]
   \centering
-  \includegraphics[width=0.8\paperwidth]{images/stima_normali/raccolta_dati/reggio_series_graph.pdf}
-  % \input{images/stima_normali/raccolta_dati/reggio_series_graph}
+  \includegraphics[width=0.8\paperwidth]{images/creazione_dataset/raccolta_dati/reggio_series_graph.pdf}
+  % \input{images/creazione_dataset/raccolta_dati/reggio_series_graph}
   \caption{Grafo delle sequenze presentate nella figura~\ref{fig:reggio-osm}. Si può notare come la varietà di nomi forniti in anagrafica (riportati sulle etichette), l'estensione dei possibili \(\mathrm{f}_0\) e delle distanze a cui sono collocate rendono la procedura di identificazione dei \emph{match} non banale e difficilmente esaustiva.}\label{fig:reggio-graph}
 \end{figure}
 
@@ -166,12 +171,12 @@ dove \(d\) è una data, \(t(d)\) indica il numero di giorno dell'anno di \(d\) n
 Le serie scartate in fase di merging vanno perdute: si è notato, lavorandoci, che spesso sono serie con errori evidenti. Lo scarto inoltre è stato utilizzato come criterio di valutazione a ritroso dei parametri di soglia scelti per il merging, e in vari casi ha portato a ridefinire manualmente alcuni \emph{match}.
 
 \subsubsection{Correzione delle anagrafiche}
-Si è quindi effettuata una correzione delle informazioni spaziali ottenute nelle anagrafiche delle serie combinate, al fine di migliorare la qualità delle variabili su cui si basano i modelli di interpolazione geostatistica. Dato l'elevato numero di stazioni ci si è concentrati su un sottoinsieme di casi sospetti, identificati confrontando le quote dichiarate in anagrafica con quelle del DEM a risoluzione \qty{30}{\meter} Copernicus GLO 30~\cite{europeanspaceagencyCopernicusGlobalEuropean2022} ed esaminando tutti i casi di discrepanze superiori a \qty{10}{\meter} verticali. Si è quindi cercato, tramite immagini satellitari e fotografie (reperite tramite Google Earth, Google Street View e raccolte di anagrafiche di terze parti~\cite{associazionelineameteoStazioniReteLinea}), di determinare latitudine, longitudine e quote esatte delle stazioni. L'operazione è risultata più semplice, naturalmente, per stazioni moderne (di cui spesso si riesce a trovare traccia nelle fotografie); in tutti i casi analizzati si è tenuto traccia nel database delle modifiche apportate. La figura~\ref{fig:corrections-deltas} mostra le distribuzioni delle correzioni apportate alle posizioni e alle quote, che in circa la metà dei casi sono molto significative per le quote (\(\Delta \mathrm{H} > \qty{50}{\meter}\)).
+È stata quindi effettuata una correzione delle informazioni spaziali ottenute nelle anagrafiche delle serie combinate, al fine di migliorare la qualità delle variabili su cui si basano i modelli di interpolazione geostatistica. Dato l'elevato numero di stazioni ci si è concentrati su un sottoinsieme di casi sospetti, identificati confrontando le quote dichiarate in anagrafica con quelle del DEM a risoluzione \qty{30}{\meter} Copernicus GLO 30~\cite{europeanspaceagencyCopernicusGlobalEuropean2022} ed esaminando tutti i casi di discrepanze superiori a \qty{10}{\meter} verticali. Si è quindi cercato, tramite immagini satellitari e fotografie (reperite tramite Google Earth, Google Street View e raccolte di anagrafiche di terze parti~\cite{associazionelineameteoStazioniReteLinea}), di determinare latitudine, longitudine e quote esatte delle stazioni. L'operazione è risultata più semplice, naturalmente, per stazioni moderne (di cui spesso si riesce a trovare traccia nelle fotografie); in tutti i casi analizzati si è tenuto traccia nel database delle modifiche apportate. La figura~\ref{fig:corrections-deltas} mostra le distribuzioni delle correzioni apportate alle posizioni e alle quote, che in circa la metà dei casi sono molto significative per le quote (\(\Delta \mathrm{H} > \qty{50}{\meter}\)).
 % La tabella~\ref{tab:n-corrections} invece riporta il numero di correzioni apportate.
 
 \begin{figure}[ht]
   \centering
-  \input{images/stima_normali/correzioni/corrections_deltas.tex}
+  \input{images/creazione_dataset/correzioni/corrections_deltas.tex}
   \caption{Distribuzione delle correzioni di posizione e quota. Sono stati inclusi solo i casi in cui la correzione è superiore a \qty{10}{\meter}.}\label{fig:corrections-deltas}
 \end{figure}
 
@@ -181,15 +186,16 @@ Ultimo passaggio della procedura è un secondo merging effettuato esclusivamente
 \subsection{Risultati}\label{ch:results}
 Si riportano di seguito alcune caratteristiche del dataset ottenuto tramite merging, per il trentennio 1991--2020. Tale dataset è, a questo punto del procedimento, un catalogo di stime degli estremi giornalieri di temperatura non controllati e non omogeneizzati, ma che rappresenta una base di partenza per la stima delle normali climatiche. Sono state considerate, nella presentazione che segue, soltanto le serie con almeno cinque anni di dati (anche non validi ai fini delle climatologie).
 
-Nella tabella~\ref{tab:series-stats} si può vedere a confronto i numeri che caratterizzano i dataset nazionali. Mentre SCIA rimane quello con più sequenze in termini assoluti (considerando l'intero dataset), le colonne ``Climatologie'' e ``Numero di mesi'' mostrano che le integrazioni di dati hanno portato a un incremento apprezzabile delle serie con i requisiti necessari a elaborare le climatologie nel trentennio 1991--2000 e notevole dei dati a disposizione rispetto agli altri dataset.
+Nella tabella~\ref{tab:series-stats} si può vedere a confronto i numeri di serie disponibili che caratterizzano i dataset nazionali (limitandosi al territorio del centro-nord Italia: le serie estere sono escluse). Mentre SCIA rimane quello con più sequenze in termini assoluti (considerando l'intero dataset, compresi duplicati e serie antecedenti al 1991), le colonne ``Climatologie'' e ``Numero di mesi'' mostrano che le integrazioni di dati hanno portato a un incremento apprezzabile delle serie con i requisiti necessari a elaborare le climatologie nel trentennio 1991--2000 e in generale notevole dei dati a disposizione rispetto agli altri dataset.
 
 \begin{table}[ht]
   \centering
   \begin{threeparttable}
     \caption{Serie nei dataset estesi.}\label{tab:series-stats}
     \scriptsize
-    \input{images/stima_normali/dataset/data.tex}
+    \input{tables/creazione_dataset/dataset/data.tex}
     \begin{tablenotes}
+    \item[\dag] Limitazione alle serie italiane.
     \item [*] Periodo 1991--2020.
     \item [1] Numero di serie con i requisiti minimi per calcolare le climatologie, ovvero cinque anni con mesi validi. Minimo tra temperature minime e massime.
     \item [2] Mesi con almeno venti giorni di misure e non più di quattro giorni consecutivi senza misure. Minimo tra temperature minime e massime.
@@ -198,38 +204,38 @@ Nella tabella~\ref{tab:series-stats} si può vedere a confronto i numeri che car
   \end{threeparttable}
 \end{table}
 
-Nella figura~\ref{fig:merged-series} si può vedere la distribuzione spaziale delle serie ottenute tramite merging nel centro-nord Italia. A sinistra si vede che le serie che presentano le carenze maggiori sono collocate in regioni specifiche, mentre a destra si nota dove SCIA ha le carenze maggiori nel trentennio considerato. Esclusa l'Emilia-Romagna, dove non si è fatto il merging con SCIA (salvo per le stazioni sinottiche), Lombardia, Toscana e Trentino-Alto Adige sono le regioni in cui l'integrazione con gli altri dataset (in particolar modo quelli regionali/provinciali) ha portato a un incremento significativo delle serie disponibili.
+Nella figura~\ref{fig:merged-series} si può vedere la distribuzione spaziale delle serie ottenute tramite merging nel centro-nord Italia. A sinistra si vede che le serie che presentano le lacune più significative sono collocate in regioni specifiche, mentre a destra si nota dove SCIA ha le carenze maggiori nel trentennio considerato. Esclusa l'Emilia-Romagna, dove non si è fatto il merging con SCIA (salvo per le stazioni sinottiche), Lombardia, Toscana e Trentino-Alto Adige sono le regioni in cui l'integrazione con gli altri dataset (in particolar modo quelli regionali/provinciali) ha portato a un incremento significativo delle serie disponibili.
 \begin{figure}[ht]
   \centering
-  \includegraphics[width=\textwidth]{images/stima_normali/dataset/merged/spatial_availability.pdf}
+  \includegraphics[width=\textwidth]{images/creazione_dataset/dataset/merged/spatial_availability.pdf}
   \caption{Distribuzione spaziale delle serie ottenute tramite merging nel centro-nord Italia. A sinistra la distribuzione di quelle che hanno la disponibilità di dati per calcolare delle climatologie. A destra le serie per cui esiste un \emph{match} con almeno una stazione di SCIA. Si trascuri l'Emilia-Romagna, dove SCIA è stato considerato in maniera parziale.}\label{fig:merged-series}
 \end{figure}
 
 La figura~\ref{fig:merged-timeseries} mette a confronto il numero di serie con mesi validi per il calcolo delle climatologie nei periodi pre- e post-1991. Nel periodo pre-1991 il nuovo dataset non offre un incremento significativo dei dati disponibili (del resto sono poche le serie regionali a dare contributi in questo periodo), mentre in quello successivo sì. In particolare SCIA mostra carenze importanti nell'ultimo decennio. In generale il numero di serie con assenza di disponibilità mensile risulta essere sempre poco rilevante rispetto al totale.
 \begin{figure}[ht]
   \centering
-  \input{images/stima_normali/dataset/monthly_availability.tex}
+  \input{images/creazione_dataset/dataset/monthly_availability.tex}
   \caption{Numero di serie con disponibilità mensile soddisfacente sul territorio del centro-nord Italia.}\label{fig:merged-timeseries}
 \end{figure}
 
 La figura~\ref{fig:merged-elevations} mostra la rappresentatività delle quote delle serie ottenute tramite merging e dei dataset nazionali sorgenti rispetto all'elevazione del territorio calcolata tramite un sample di \num{500000} punti del DEM~\cite{europeanspaceagencyCopernicusGlobalEuropean2022}. Il nuovo dataset tende a sottorappresentare le quote inferiori a \qty{300}{\meter} e a sovrarappresentare quelle fino a \qty{2000}{\meter}, anche se non in maniera irragionevole.
 \begin{figure}[ht]
   \centering
-  \input{images/stima_normali/dataset/elevation_distribution.tex}
+  \input{images/creazione_dataset/dataset/elevation_distribution.tex}
   \caption{Distribuzione normalizzata delle quote delle serie e dell'elevazione del territorio.}\label{fig:merged-elevations}
 \end{figure}
 
 La figura~\ref{fig:merged-contributions} rappresenta i contributi assoluti di ciascun dataset utilizzato per il merging al prodotto finale, ordinati dal basso all'alto come la priorità di integrazione: a ogni data è associato il numero di sequenze dalle quali è stata ottenuta una stima giornaliera di temperatura. ISAC è risultato essere il maggior contributore (compatibilmente con la scelta di dargli massima priorità nel merging), seguito da SCIA (i cui contributi sono rilevanti soprattutto prima del 2005). Il grafico mostra uno scambio netto tra i contributi di SCIA e DPC nel 2012 dovuto al drastico calo delle disponibilità del primo in Friuli-Venezia Giulia, dove la sorgente regionale è relativamente carente.
 \begin{figure}[ht]
   \centering
-  \includegraphics[width=\textwidth]{images/stima_normali/dataset/merged_contributions.pdf}
-  % \input{images/stima_normali/dataset/merged_contributions.tex}
+  \includegraphics[width=\textwidth]{images/creazione_dataset/dataset/merged_contributions.pdf}
+  % \input{images/creazione_dataset/dataset/merged_contributions.tex}
   \caption{Contributi dei dataset sorgenti al merging giorno per giorno. Le bande sono ordinate dal basso verso l'alto secondo la priorità d'integrazione (da massima a minima).}\label{fig:merged-contributions}
 \end{figure}
 
 Infine, la figura~\ref{fig:merged-improvements} mostra la disponibilità di serie con un numero minimo di anni utilizzabili per le climatologie nei dataset nazionali. Il risultato del merging offre un incremento significativo rispetto a SCIA in termini relativi in particolare per serie con almeno tra i 15 e i 25 anni di mesi validi, dove la disponibilità è quasi doppia.
 \begin{figure}[ht]
   \centering
-  \input{images/stima_normali/dataset/improvements.tex}
+  \input{images/creazione_dataset/dataset/improvements.tex}
   \caption{Disponibilità di serie con un numero minimo di anni a seconda del dataset.}\label{fig:merged-improvements}
 \end{figure}

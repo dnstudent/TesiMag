@@ -1,3 +1,5 @@
+% !TEX spellcheck = it_IT
+
 \documentclass[a4paper, 12pt]{report}
 % \usepackage{template} % Load your custom thesis package
 
@@ -27,16 +29,27 @@
 \usepackage{pgf,tikz}
 \usepackage{etoolbox}
 \usepackage{adjustbox}
+\usepackage{frontespizio}
 
 % TODO: rimuovere quando risolti tutti i todo!
 \setlength{\marginparwidth}{2cm}
 \usepackage{todonotes}
 
+\usepackage[a-1b]{pdfx}
+\usepackage{hyperref}    % Required for metadata
+\hypersetup{
+  pdftitle={Elaborazione di un dataset degli estremi di temperatura mensili per il territorio italiano},
+  pdfauthor={Davide Nicoli},
+  pdfsubject={Tesi di laurea magistrale},
+  unicode=true,
+  colorlinks=false,
+  pdfborder={0 0 0},
+  pdfpagemode=UseNone,
+}
+
 % Meta
 \title{
-  {Elaborazione di un dataset degli estremi di temperatura mensili per il territorio italiano}\\
-  {\large{Università degli Studi di Milano}}\\
-  {\includegraphics{tesiSCIENZE_TECNOLOGIE.jpg}}
+  {Elaborazione di un dataset degli estremi di temperatura mensili per il territorio italiano}
 }
 \author{Davide Nicoli}
 \date{\today}
@@ -44,8 +57,7 @@
 \begin{document}
 
 % Title Page
-% \mytitlepage{Fisica}{Elaborazione di un dataset degli estremi di temperatura mensili per il territorio italiano}{Maurizio Maugeri}{}{Davide Nicoli}{980508}{2023/24}
-\maketitle
+\include{frontespizio}
 
 % Acknowledgement
 % \chapter*{Acknowledgement}
@@ -72,10 +84,11 @@
 \chapter{Valutazione preliminare del modello delle climatologie}
 \input{chapters/valutazione_modello.tex}
 
-\chapter{Conclusioni}\label{ch:conclusioni}
+\chapter{Conclusioni e prospettive}\label{ch:conclusioni}
 \input{chapters/conclusioni.tex}
 
 % Bibliography
+% TODO: quale stile bibliografico?
 \clearpage
 \printbibliography{}
 

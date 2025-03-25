@@ -1,0 +1,27 @@
+% !TEX root = ./main.tex
+
+\begin{frontespizio}
+  \begin{Preambolo*}
+    \renewcommand{\frontinstitutionfont}{\fontsize{18}{21}\bfseries}
+    \renewcommand{\fronttitlefont}{\fontsize{20}{24}\bfseries}
+    \renewcommand{\frontpretitlefont}{\fontsize{14}{16}\bfseries}
+    \renewcommand{\frontsubtitlefont}{\fontsize{16}{18}\bfseries}
+    \renewcommand{\frontfixednamesfont}{\fontsize{16}{18}\bfseries}
+    \renewcommand{\frontnamesfont}{\fontsize{16}{18}\bfseries}
+    \renewcommand{\frontsmallfont}{\fontsize{13}{15}\bfseries}
+    \renewcommand{\frontfootfont}{\fontsize{16}{18}\bfseries}
+  \end{Preambolo*}
+  \Universita{Milano}
+  \Facolta{Scienze e Tecnologie}
+  \Corso[Laurea]{Fisica}
+  \Titoletto{Tesi di laurea magistrale}
+  \Titolo{Elaborazione di un dataset degli estremi di temperatura mensili per il territorio italiano}
+  \Candidato[980508]{Davide Nicoli}
+  \Relatore{Prof.\ Maurizio Maugeri}
+  \Correlatore{Dr.\ Michele Brunetti}
+  \Correlatore{Dr.ssa Veronica Manara}
+  \Annoaccademico{2023--2024}
+  \Logo{images/logo}
+\end{frontespizio}
+\IfFileExists{main-frn.pdf}{}{%
+\immediate\write18{pdflatex main-frn}}
