@@ -15,7 +15,7 @@ La maggior parte dei dati raccolti sono stati forniti come aggregazioni a livell
   \item
     timezone delle date: vengono utilizzati GMT o CET;
   \item
-    aggregazione dei dati sub-giornalieri: vengono forniti gli estremi assoluti delle temperature rilevate nel corso della giornata (in linea con quanto cercato per la tesi) o gli estremi delle medie orarie (sempre distanti al più qualche decimo di grado dagli estremi assoluti e sempre ``meno estremi'' rispetto ad essi).
+    aggregazione dei dati sub-giornalieri: vengono forniti gli estremi assoluti delle temperature rilevate nel corso della giornata (in linea con quanto cercato per la tesi) o gli estremi delle medie orarie (sempre distanti al più qualche decimo di grado dagli estremi assoluti e sempre ``meno estremi'' rispetto a essi).
 \end{itemize}
 
 La disponibilità temporale e spaziale delle serie nei singoli dataset infine risulta essere perlopiù incompleta: ad esempio dataset nazionali come SCIA, quello del DPC e del CNR-ISAC risultano essere incompleti nei termini della distribuzione spaziale delle serie, mentre quelli regionali non registrano le misure antecedenti al passaggio di competenze citato in precedenza.
@@ -23,7 +23,7 @@ La disponibilità temporale e spaziale delle serie nei singoli dataset infine ri
 La presenza delle problematiche illustrate e la necessità di serie giornaliere il più possibile complete e consistenti sotto il profilo sia temporale che spaziale hanno reso necessaria l'elaborazione di procedure adeguate di merging dei singoli dataset e saranno presentate nella sezione~\ref{ch:merging}.
 
 \subsection{Sorgenti utilizzate}\label{ch:sources}
-Nella tabella~\ref{tab:quick-datasets} sono elencati i dataset impiegati per il lavoro.
+Nella tabella~\ref{tab:quick-datasets} sono elencati i dataset impiegati per il lavoro. In appendice la figura~\ref{fig:regional-monthly} mostra la disponibilità di serie a scala mensile regione per regione.
 
 \begin{table}[ht]
   \centering
@@ -33,7 +33,7 @@ Nella tabella~\ref{tab:quick-datasets} sono elencati i dataset impiegati per il 
       \toprule
       Nome & Copertura & Disponibilità\tnote{*} \\
       \midrule
-      SCIA\cite{} & Italia & 2563 \\
+      SCIA & Italia & 2563 \\
       DPC & Italia & 2201 \\
       CNR-ISAC & Italia & 280 \\
       ARPA Piemonte & Regione & 326 \\
@@ -126,8 +126,9 @@ Queste osservazioni e la generale mancanza di una documentazione approfondita de
 
 \begin{figure}[ht]
   \centering
-  \includegraphics[width=0.8\paperwidth]{images/creazione_dataset/raccolta_dati/reggio_series_graph.pdf}
+  \makebox[\textwidth][c]{\includegraphics[width=1.4\textwidth]{images/creazione_dataset/raccolta_dati/reggio_series_graph.pdf}}
   % \input{images/creazione_dataset/raccolta_dati/reggio_series_graph}
+  % \includegraphics[width=\textwidth]{images/creazione_dataset/raccolta_dati/reggio_series_graph_p.pdf}
   \caption{Grafo delle sequenze presentate nella figura~\ref{fig:reggio-osm}. Si può notare come la varietà di nomi forniti in anagrafica (riportati sulle etichette), l'estensione dei possibili \(\mathrm{f}_0\) e delle distanze a cui sono collocate rendono la procedura di identificazione dei \emph{match} non banale e difficilmente esaustiva.}\label{fig:reggio-graph}
 \end{figure}
 

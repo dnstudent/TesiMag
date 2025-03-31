@@ -8,6 +8,8 @@ library(ggplot2)
 library(purrr)
 library(broom)
 library(units)
+library(geoarrow)
+library(sf)
 
 root <- fs::path_abs("/Users/davidenicoli/Local_Workspace/Datasets/climats")
 ftmin <- fs::path(root, "CLINO_GRID_ITA_TMN_v00REC_vs_OBS")
@@ -65,6 +67,8 @@ meta <- dbmin$meta |>
     )
 
 data <- bind_rows(tmax = dbmax$data, tmin = dbmin$data, .id = "variable") |> mutate(variable = factor(variable))
+
+geometa <- sf::st_as_sf(meta, coords = c("lon", "lat"), crs = "EPSG:4326")
 
 write_parquet(meta, fs::path(root, "meta.parquet"))
 write_parquet(data, fs::path(root, "data.parquet"))

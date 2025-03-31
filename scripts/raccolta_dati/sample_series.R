@@ -19,11 +19,14 @@ theme_set(theme_bw() + theme_defaults)
 options(tikzDefaultEngine = "xetex")
 
 dotenv::load_dot_env(fs::path("scripts", ".env"))
-image_dir <- fs::path(Sys.getenv("IMAGES_DIR"), "stima_normali", "raccolta_dati")
+image_dir <- fs::path(Sys.getenv("IMAGES_DIR"), "creazione_dataset", "raccolta_dati")
 if (!fs::dir_exists(image_dir)) {
     fs::dir_create(image_dir)
 }
-
+table_dir <- fs::path(Sys.getenv("TABLES_DIR"), "creazione_dataset", "raccolta_dati")
+if (!fs::dir_exists(table_dir)) {
+    fs::dir_create(table_dir)
+}
 conns <- load_dbs()
 on.exit(close_dbs(conns))
 
@@ -41,7 +44,7 @@ stat_points <- reggio_series |>
     st_drop_geometry() |>
     unnest(coords) |>
     select(dataset = display_dataset, sequence, x = X, y = Y)
-# TODO: sistemare con misure in cm ecc.
+
 with_seed(0L, {
     autoplot(sa_map) +
         geom_point(data = stat_points, aes(color = dataset, shape = dataset), size = 3) +
@@ -85,7 +88,7 @@ library(ggraph)
 
 breaks <- c(0, 300, 1000, 11000)
 labels <- c("[0, 0.3)", "[0.3, 1)", "[1, 11)")
-edges <- openxlsx::read.xlsx("elaborato/chapters/stima_normali/raccolta_dati/tagged_analysis.xlsx") |>
+edges <- openxlsx::read.xlsx("elaborato/chapters/creazione_dataset/raccolta_dati/tagged_analysis.xlsx") |>
     as_tibble() |>
     filter(variable == 1, tag_same_series) |>
     mutate(
@@ -100,7 +103,7 @@ graph <- tbl_graph(reggio_series, edges, directed = FALSE, node_key = "sequence"
 
 # best: 24
 # TODO: trovare un seed migliore
-with_seed(24L, {
+with_seed(17, {
     ggraph(graph, layout = "fr") +
         geom_edge_link(aes(edge_color = f0, edge_linetype = binned_distance)) +
         geom_node_point(aes(color = display_dataset)) +
@@ -109,25 +112,28 @@ with_seed(24L, {
         labs(color = "Dataset", shape = "Dataset", edge_linetype = "Distanza [km]") +
         scale_edge_linetype_manual(values = c("[0, 0.3)" = "solid", "[0.3, 1)" = "dotdash", "[1, 11)" = "dotted"))
 
-    ggsave(fs::path(image_dir, "reggio_series_graph_1.pdf"), width = 10, height = 5)
+    ggsave(fs::path(image_dir, "reggio_series_graph_p.pdf"), width = 13.5 * 1.5, height = 18 * 1.5, units = "cm")
 })
 
 library(knitr)
 options(knitr.kable.NA = "")
+library(kableExtra)
 col.names <- c(
     "Sequenza 1",
     "Sequenza 2",
     "Distanza [m]",
-    "∆ Quota [m]",
+    "$\\Delta \\mathrm{Quota [m]}$",
     "$\\mathrm{f}_0$",
     "$\\langle \\Delta T \\rangle$ [°C]",
     "$\\langle \\lvert \\Delta T \\rvert \\rangle$ [°C]",
     "b",
     "$\\mathrm{n_d}$"
 )
-tagged |>
+openxlsx::read.xlsx("elaborato/chapters/creazione_dataset/raccolta_dati/tagged_analysis.xlsx") |>
+    as_tibble() |>
+    slice_head(n = 5L) |>
     mutate(sequence_x = str_c(dataset_x, sensor_key_x, sep = "/"), sequence_y = str_c(dataset_y, sensor_key_y, sep = "/")) |>
     select(starts_with("sequence"), distance, delH, f0, delT, maeT, balance, valid_days_inters) |>
     arrange(desc(valid_days_inters)) |>
-    slice_head() |>
-    kable(col.names = col.names, digits = c(0, 0, 0, 0, 2, 2, 2, 2, 0))
+    kbl(col.names = col.names, digits = c(0, 0, 0, 0, 2, 2, 2, 2, 0), format = "latex", booktabs = TRUE, escape = FALSE) |>
+    cat(file = fs::path(table_dir, "analysis_sample.tex"))

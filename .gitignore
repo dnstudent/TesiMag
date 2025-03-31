@@ -46,3 +46,6 @@ _book/
 /elaborato/**/*_cache/
 /elaborato/**/*_files/
 /elaborato/images/**/*.tex
+/elaborato/build
+!/elaborato/build/main.pdf
+/elaborato/archs

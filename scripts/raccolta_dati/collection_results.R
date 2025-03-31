@@ -14,6 +14,7 @@ library(units)
 library(assertr)
 library(tikzDevice)
 library(extrafont)
+library(kableExtra)
 source("src/database/startup.R")
 source("src/database/query/data.R")
 source("scripts/common.R")
@@ -24,12 +25,19 @@ theme_set(theme_bw() + theme_defaults)
 conns <- load_dbs()
 on.exit(close_dbs(conns))
 regional_boundaries <- load_regional_boundaries(conns)
+northern_area_boundaries <- load_northern_area_boundaries(conns)
+only_ita <- TRUE
+boundaries <- if (only_ita) regional_boundaries else NULL
 
 options(tikzDefaultEngine = "xetex")
 dotenv::load_dot_env("scripts/.env")
-image_dir <- fs::path(Sys.getenv("IMAGES_DIR"), "stima_normali", "dataset")
+image_dir <- fs::path(Sys.getenv("IMAGES_DIR"), "creazione_dataset", "dataset")
 if (!fs::dir_exists(image_dir)) {
     fs::dir_create(image_dir)
+}
+table_dir <- fs::path(Sys.getenv("TABLES_DIR"), "creazione_dataset", "dataset")
+if (!fs::dir_exists(table_dir)) {
+    fs::dir_create(table_dir)
 }
 
 monthly_availability_by_series <- function(data, ...) {
@@ -40,34 +48,12 @@ monthly_availability_by_series <- function(data, ...) {
         summarise(is_month_available = (n() >= 20L) & (max(pdatediff, na.rm = TRUE) <= 4L), .groups = "drop")
 }
 
-clim_availability_by_series <- function(mavail.series, ..., .from_year = -Inf, .to_year = Inf, .min_years = 5L) {
+clim_availability_by_series <- function(mavail.series, ..., .from_year, .to_year, .min_years) {
     mavail.series |>
         filter(between(year, .from_year, .to_year)) |>
         group_by(..., month) |>
         summarise(is_clim_available = sum(is_month_available) >= .min_years, .groups = "drop_last") |>
         summarise(is_clim_available = all(is_clim_available), .groups = "drop")
-}
-
-plot_spatial_climav <- function(meta, data, dataset, boundaries = regional_boundaries) {
-    cavail <- monthly_availability_by_series(data |> filter(variable == 1L), dataset, sensor_key) |>
-        clim_availability_by_series(from_year = 1991L, to_year = 2020L)
-
-    nsp <- cavail |>
-        left_join(meta |> select(dataset, sensor_key, lon, lat), by = c("dataset", "sensor_key")) |>
-        ungroup() |>
-        collect() |>
-        sf::st_as_sf(coords = c("lon", "lat"), crs = "EPSG:4326") |>
-        st_filter(boundaries)
-
-    ggplot() +
-        # geom_sf(data = boundaries, fill = NA) +
-        geom_sf(data = nsp, aes(color = is_clim_available)) +
-        labs(color = "Almeno 5 anni disponibili", x = "Longitudine", y = "Latitudine")
-
-    if (!fs::dir_exists(fs::path(image_dir, dataset))) {
-        fs::dir_create(fs::path(image_dir, dataset))
-    }
-    ggsave(fs::path(image_dir, dataset, "spatial_availability.pdf"), width = 7, height = 7, dpi = 300)
 }
 
 monthly_availability <- function(mavails) {
@@ -81,36 +67,46 @@ clim_availability <- function(clavails) {
         count(variable, is_clim_available)
 }
 
-load_scia_meta <- function() {
-    query_checkpoint_meta("SCIA", "raw", conns$data) |>
-        collect() |>
-        st_as_sf(coords = c("lon", "lat"), crs = "EPSG:4326", remove = FALSE) |>
-        st_filter(regional_boundaries, .predicate = st_is_within_distance, dist = set_units(50, m)) |>
-        st_drop_geometry()
+load_scia_meta <- function(only_ita) {
+    meta <- query_checkpoint_meta("SCIA", "raw", conns$data) |>
+        collect()
+    if (only_ita) {
+        meta |>
+            st_as_sf(coords = c("lon", "lat"), crs = "EPSG:4326", remove = FALSE) |>
+            st_filter(regional_boundaries, .predicate = st_is_within_distance, dist = set_units(50, m)) |>
+            st_drop_geometry()
+    } else {
+        meta |> filter(lat > 42.4, !(district %in% c("Lazio", "Abruzzo")))
+    }
 }
 
-load_isac_dpc_meta <- function() {
+load_isac_dpc_meta <- function(only_ita) {
     metas <- query_checkpoint_meta("ISAC", "raw", conns$data) |>
-        collect() |>
-        st_as_sf(coords = c("lon", "lat"), crs = "EPSG:4326", remove = FALSE) |>
-        st_filter(regional_boundaries, .predicate = st_is_within_distance, dist = set_units(50, m)) |>
-        st_drop_geometry()
+        collect()
+    if (only_ita) {
+        metas <- maybe_st_filter(metas, regional_boundaries)
+    } else {
+        metas <- metas |> filter(lat > 42.4, !(district %in% c("Lazio", "Abruzzo")))
+    }
     list(
         isac = metas |> filter(network == "ISAC"),
         dpc = metas |> filter(network == "DPC")
     )
 }
 
+# Meta originali
+ometas <- query_checkpoint_meta(c("ARSO", "GeoSphereAustria", "MeteoFrance", "SwissMetNet", "WSL", "AgroMeteo", "MeteoSwiss"), "raw", conns$data) |> filter(district != "Corse")
 
 #  Load everything
 metas <- local({
-    isacdpc <- load_isac_dpc_meta()
-    list(merged = load_merged_meta(conns, regional_boundaries), scia = load_scia_meta(), isac = isacdpc$isac, dpc = isacdpc$dpc)
+    isacdpc <- load_isac_dpc_meta(only_ita)
+    list(fmerged = load_merged_meta(conns, NULL), merged = load_merged_meta(conns, boundaries), scia = load_scia_meta(only_ita), isac = isacdpc$isac, dpc = isacdpc$dpc)
 })
 
 datas <- local({
     list(
-        merged = load_merged_data(conns, metas$merged), #|> semi_join(metas$merged, by = c("dataset", "sensor_key"), copy = TRUE),
+        fmerged = load_merged_data(conns, metas$fmerged, NULL),
+        merged = load_merged_data(conns, metas$merged, NULL), #|> semi_join(metas$merged, by = c("dataset", "sensor_key"), copy = TRUE),
         scia = query_checkpoint_data("SCIA", "raw", conns$data) |> semi_join(metas$scia, by = c("dataset", "sensor_key"), copy = TRUE),
         isac = query_checkpoint_data("ISAC", "raw", conns$data) |> semi_join(metas$isac, by = c("dataset", "sensor_key"), copy = TRUE),
         dpc = query_checkpoint_data("ISAC", "raw", conns$data) |> semi_join(metas$dpc, by = c("dataset", "sensor_key"), copy = TRUE)
@@ -123,74 +119,79 @@ mavails <- purrr::map(datas, ~ {
         assert(not_na, dataset, sensor_key, variable, year, month)
 })
 clavails <- purrr::map(mavails, ~ {
-    clim_availability_by_series(.x, dataset, sensor_key, variable, .from_year = 1991L, .to_year = 2020L) |> assert(not_na, dataset, sensor_key, variable)
+    clim_availability_by_series(.x, dataset, sensor_key, variable, .from_year = 1991L, .to_year = 2020L, .min_years = 5L) |> assert(not_na, dataset, sensor_key, variable)
 })
 climav_metas <- purrr::map2(metas, clavails, ~ {
     anti_join(.x, filter(.y, !is_clim_available), by = c("dataset", "sensor_key")) |> assert(not_na, dataset, sensor_key)
 })
 
+# Datasets
+rmetas <- query_checkpoint_meta(c("Dext3r", "ARPAFVG", "ARPAL", "ARPALombardia", "ARPAM", "ARPAPiemonte", "ARPAUmbria", "ARPAV", "ARSO", "SIRToscana", "TAA", "WSL"), "raw", conns$data) |>
+    mutate(
+        display_dataset = case_when(
+            dataset %in% c("ISAC", "TAA") ~ network,
+            .default = dataset
+        )
+    )
+nmetas <- query_checkpoint_meta(c("SCIA", "ISAC"), "raw", conns$data) |>
+    collect() |>
+    maybe_st_filter(boundaries) |>
+    mutate(
+        display_dataset = case_when(
+            dataset == "ISAC" ~ network,
+            .default = dataset
+        )
+    )
+
 # Temporali
 tmavails <- purrr::map(mavails, monthly_availability) |>
     bind_rows(.id = "dataset") |>
+    filter(dataset != "fmerged") |>
     mutate(dataset = case_match(dataset, "scia" ~ "SCIA", "isac" ~ "ISAC", "dpc" ~ "DPC", .default = dataset))
 
-p <- ggplot(data = tmavails |> filter(variable == -1L, is_month_available), mapping = aes(date, n, linetype = dataset)) +
-    geom_line() +
-    # geom_line(data = tmavails$merged |> mutate(dataset = "merged") |> filter(variable == -1L, is_month_available), position = "stack") +
-    # geom_line(data = tmavails$scia |> mutate(dataset = "SCIA") |> filter(variable == -1L, is_month_available), position = "stack") +
-    # geom_line(data = tmavails$isac |> mutate(dataset = "ISAC") |> filter(variable == -1L, is_month_available), position = "stack") +
-    # geom_line(data = tmavails$dpc |> mutate(dataset = "DPC") |> filter(variable == -1L, is_month_available), position = "stack") +
-    scale_linetype_manual(values = linetype_values) +
-    labs(color = "Mese disponibile", linetype = "Dataset", x = "Mese", y = "Numero di serie")
-
-p1 <- p + scale_x_date(limits = c(min(tmavails |> filter(dataset == "merged") |> pull(date)), as.Date("1991-01-01")))
-p2 <- p + scale_x_date(limits = c(as.Date("1991-01-01"), max(tmavails |> filter(dataset == "merged") |> pull(date))))
-
 with_seed(0L, {
+    p <- ggplot(data = tmavails |> filter(variable == -1L, is_month_available), mapping = aes(date, n, linetype = dataset)) +
+        geom_line() +
+        scale_linetype_manual(values = linetype_values) +
+        labs(color = "Mese disponibile", linetype = "Dataset", x = "Mese", y = "Numero di serie")
+
+    p1 <- p + scale_x_date(limits = c(min(tmavails |> filter(dataset == "merged") |> pull(date)), as.Date("1991-01-01")))
+    p2 <- p + scale_x_date(limits = c(as.Date("1991-01-01"), max(tmavails |> filter(dataset == "merged") |> pull(date))))
+
     (p1 / p2 + plot_layout(axes = "collect", guides = "collect")) + plot_annotation(title = "Disponibilità di serie nei dataset nazionali", subtitle = "Centro-nord Italia, pre e post 1991")
 
     ggsave(fs::path(image_dir, "monthly_availability.tex"), width = 13.5, height = 10, units = "cm", device = tikz)
 })
 
 # Spaziali
-## Crude
-p1 <- with_seed(0L, {
-    clavails$merged |>
-        left_join(metas$merged |> select(dataset, sensor_key, lon, lat)) |>
-        st_as_sf(coords = c("lon", "lat"), crs = "EPSG:4326", remove = FALSE) |>
-        ggplot() +
-        geom_sf(data = regional_boundaries, fill = NA, linewidth = .1) +
-        # geom_density_2d_filled(aes(x = lon, y = lat), color = "black", alpha = 0.5) +
-        geom_sf(aes(color = is_clim_available), size = .2) +
-        labs(color = "Climatologie", x = "", y = "") +
-        guides(color = guide_legend(override.aes = list(size = 2))) +
-        scale_x_continuous(breaks = seq(6, 13, by = 2)) +
-        theme(legend.position = "bottom")
-})
-
 ## Integr SCIA
 merged_from_scia <- metas$merged |>
     rowwise() |>
     mutate(fromSCIA = ("SCIA" %in% from_datasets), ) |>
     ungroup() |>
     assert(not_na, dataset, sensor_key, fromSCIA)
-p2 <- with_seed(0L, {
-    ggplot(st_as_sf(merged_from_scia, coords = c("lon", "lat"), crs = "EPSG:4326")) +
-        geom_sf(data = regional_boundaries, fill = NA, linewidth = .1) +
-        geom_sf(aes(color = fromSCIA), size = .2) +
-        labs(color = "SCIA", x = "", y = "") +
-        guides(color = guide_legend(override.aes = list(size = 2))) +
-        scale_x_continuous(breaks = seq(6, 13, by = 2)) +
-        theme(
-            legend.position = "bottom",
-            axis.text.y = element_blank(),
-            axis.ticks.y = element_blank(),
-        )
-})
 
 with_seed(0L, {
-    (p1 + p2) + plot_layout(axes = "collect") + plot_annotation(title = "Serie del dataset merged")
-    ggsave(fs::path(image_dir, "merged", "spatial_availability.pdf"), width = 13.5, height = 10, units = "cm")
+    p1 <- clavails$fmerged |>
+        left_join(metas$fmerged |> select(dataset, sensor_key, lon, lat)) |>
+        st_as_sf(coords = c("lon", "lat"), crs = "EPSG:4326", remove = FALSE) |>
+        ggplot() +
+        geom_sf(data = regional_boundaries, fill = NA, linewidth = .1) +
+        geom_sf(aes(color = is_clim_available), size = .2) +
+        labs(color = "Climatologie", x = "Latitudine [°E]", y = "Longitudine [°N]")
+    p2 <- ggplot(st_as_sf(merged_from_scia, coords = c("lon", "lat"), crs = "EPSG:4326", remove = FALSE)) +
+        geom_sf(data = regional_boundaries, fill = NA, linewidth = .1) +
+        geom_sf(aes(color = fromSCIA), size = .2) +
+        labs(color = "SCIA", x = "Latitudine [°E]", y = "Longitudine [°N]")
+    (p1 + p2) +
+        plot_layout(axes = "collect") +
+        plot_annotation(title = "Serie del dataset merged") &
+        scale_x_continuous(labels = ~.) &
+        scale_y_continuous(labels = ~.) &
+        guides(color = guide_legend(override.aes = list(size = 2))) &
+        (theme(legend.position = "bottom", ) +
+            theme_quartz)
+    ggsave(fs::path(image_dir, "merged", "spatial_availability.pdf"), width = 13.5, height = 7.5, units = "cm")
 })
 
 
@@ -283,20 +284,21 @@ mdisps <- bind_rows(mavails, .id = "Origine") |>
 kable_cols <- c(
     "Dataset",
     "Densità [\\unit{\\kilo\\meter^{-2}}]",
-    "Numero di serie",
+    "Serie",
     "Climatologie\\tnote{*} \\tnote{1}",
     "Numero di mesi\\tnote{*} \\tnote{2}",
     "Numero di dati\\tnote{*} \\tnote{3}"
 )
 #  Attivare in caso di bisogno! Sovrascrive il file data.tex ed elimina le modifiche manuali
-# bind_rows(metas, .id = "Origine") |>
-#     group_by(Origine) |>
-#     summarise(n = n(), Densità = n / area, .groups = "drop") |>
-#     left_join(cldisps |> select(Origine, Climatologie = n), by = "Origine") |>
-#     left_join(mdisps |> select(Origine, Mesi = n), by = "Origine") |>
-#     left_join(counts |> select(Origine, entries = n), by = "Origine") |>
-#     mutate(Origine = factor(case_match(Origine, "scia" ~ "SCIA", "isac" ~ "ISAC", "dpc" ~ "DPC", .default = Origine), levels = c("merged", "SCIA", "ISAC", "DPC"))) |>
-#     arrange(Origine) |>
-#     select(Origine, Densità, n, Climatologie, Mesi, entries) |>
-#     knitr::kable(format = "latex", col.names = kable_cols, row.names = FALSE, digits = c(0L, 3L, 0L, 0L, 0L, 0L), escape = FALSE) |>
-#     cat(file = fs::path(image_dir, "data.tex"), sep = "\n")
+bind_rows(metas, .id = "Origine") |>
+    group_by(Origine) |>
+    summarise(n = n(), Densità = n / area, .groups = "drop") |>
+    left_join(cldisps |> select(Origine, Climatologie = n), by = "Origine") |>
+    left_join(mdisps |> select(Origine, Mesi = n), by = "Origine") |>
+    left_join(counts |> select(Origine, entries = n), by = "Origine") |>
+    mutate(Origine = factor(case_match(Origine, "scia" ~ "SCIA", "isac" ~ "ISAC", "dpc" ~ "DPC", .default = Origine), levels = c("merged", "SCIA", "ISAC", "DPC"))) |>
+    arrange(Origine) |>
+    select(Origine, Densità, n, Climatologie, Mesi, entries) |>
+    # knitr::kable(format = "latex", col.names = kable_cols, row.names = FALSE, digits = c(0L, 3L, 0L, 0L, 0L, 0L), escape = FALSE) |>
+    kbl(format = "latex", col.names = kable_cols, row.names = FALSE, digits = c(0L, 3L, 0L, 0L, 0L, 0L), escape = FALSE, booktabs = TRUE) |>
+    cat(file = fs::path(table_dir, "data.tex"), sep = "\n")

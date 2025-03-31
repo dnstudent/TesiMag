@@ -1,22 +1,30 @@
 library(ggplot2)
 library(lubridate)
 library(forcats)
-
+library(tikzDevice)
+library(withr)
 source("src/database/startup.R")
 source("src/database/query/data.R")
 source("scripts/common.R")
 
-theme_set(theme_bw())
+loadfonts()
+theme_set(theme_bw() + theme_defaults)
+
 linetype_values <- c(linetype_values, regionale = "solid")
 
 conns <- load_dbs()
 on.exit(close_dbs(conns))
 regional_boundaries <- load_regional_boundaries(conns)
 
+options(tikzDefaultEngine = "xetex")
 dotenv::load_dot_env("scripts/.env")
 image_dir <- fs::path(Sys.getenv("IMAGES_DIR"), "datasets")
 if (!fs::dir_exists(image_dir)) {
     fs::dir_create(image_dir)
+}
+table_dir <- fs::path(Sys.getenv("TABLES_DIR"), "datasets")
+if (!fs::dir_exists(table_dir)) {
+    fs::dir_create(table_dir)
 }
 
 monthly_availability_by_series <- function(data, ...) {
@@ -59,8 +67,21 @@ mmavails <- mdatas |>
     mutate(dataset = "merged") |>
     collect()
 
-ggplot(bind_rows(mavails, mmavails) |> filter(variable == 1L, between(year(date), 1990L, 2020L), !is.na(district), is_month_available)) +
-    geom_line(aes(date, n, color = dataset, linetype = dataset)) +
-    facet_wrap(~district, ncol = 3L) +
-    scale_linetype_manual(values = linetype_values)
-ggsave(fs::path(image_dir, "regional_monthly_availability.pdf"), width = 10, height = 10, dpi = 300)
+with_seed(0L, {
+    ggplot(bind_rows(mavails, mmavails) |> filter(variable == 1L, between(year(date), 1990L, 2020L), !is.na(district), is_month_available)) +
+        geom_line(aes(date, n, color = dataset, linetype = dataset)) +
+        facet_wrap(~district, ncol = 3L) +
+        scale_linetype_manual(values = linetype_values) +
+        labs(x = "Data")
+    ggsave(fs::path(image_dir, "regional_monthly_availability.tex"), width = 13.5, height = 16, units = "cm", device = tikz)
+})
+
+
+library(openxlsx)
+library(knitr)
+library(kableExtra)
+read.xlsx("/Users/davidenicoli/Local_Workspace/TesiMag/elaborato/tables/datasets/datasets.xlsx") |>
+    as_tibble() |>
+    select(1L, 2L, 3L) |>
+    kbl(format = "latex", col.names = c("Ente", "Sorgente", "Note"), booktabs = TRUE) |>
+    cat(file = fs::path(table_dir, "regio.tex"))

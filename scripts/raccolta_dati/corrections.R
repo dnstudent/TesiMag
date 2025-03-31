@@ -7,6 +7,7 @@ library(patchwork)
 library(latex2exp)
 library(withr)
 library(tikzDevice)
+library(kableExtra)
 
 source("scripts/common.R")
 source("src/database/startup.R")
@@ -15,7 +16,7 @@ source("notebooks/corrections/manual_corrections.R")
 
 options(tikzDefaultEngine = "xetex")
 dotenv::load_dot_env("scripts/.env")
-image_dir <- fs::path(Sys.getenv("IMAGES_DIR"), "stima_normali", "correzioni")
+image_dir <- fs::path(Sys.getenv("IMAGES_DIR"), "creazione_dataset", "correzioni")
 if (!fs::dir_exists(image_dir)) {
     fs::dir_create(image_dir)
 }
@@ -76,5 +77,5 @@ with_seed(0L, {
 
 deltas |>
     summarise(n = n(), n_discarded = n - sum(coalesce(keep, TRUE)), n_loc_corrections = sum(spostamento >= 10), n_elev_corrections = sum(delH >= 10)) |>
-    knitr::kable(format = "markdown", col.names = c("Totale serie", "Scartate", "Correzioni collocazione", "Correzioni quota"))
+    kbl(format = "markdown", col.names = c("Totale serie", "Scartate", "Correzioni collocazione", "Correzioni quota"))
 # cat(file = fs::path(image_dir, "corrections_summary.tex"), sep = "\n")

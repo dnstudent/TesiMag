@@ -1,7 +1,6 @@
 % !TEX spellcheck = it_IT
 
 \documentclass[a4paper, 12pt]{report}
-% \usepackage{template} % Load your custom thesis package
 
 % Italiano
 \usepackage{csquotes}
@@ -30,13 +29,9 @@
 \usepackage{etoolbox}
 \usepackage{adjustbox}
 \usepackage{frontespizio}
+\usepackage{rotating}
 
-% TODO: rimuovere quando risolti tutti i todo!
-\setlength{\marginparwidth}{2cm}
-\usepackage{todonotes}
-
-\usepackage[a-1b]{pdfx}
-\usepackage{hyperref}    % Required for metadata
+\usepackage[pdf14]{pdfx}
 \hypersetup{
   pdftitle={Elaborazione di un dataset degli estremi di temperatura mensili per il territorio italiano},
   pdfauthor={Davide Nicoli},
@@ -66,6 +61,7 @@
 % Abstract
 \pagenumbering{roman} % Roman page numbering
 \chapter*{Abstract}
+\input{chapters/abstract}
 
 % Table of Contents
 \tableofcontents
@@ -87,8 +83,13 @@
 \chapter{Conclusioni e prospettive}\label{ch:conclusioni}
 \input{chapters/conclusioni.tex}
 
-% Bibliography
-% TODO: quale stile bibliografico?
+\chapter*{Ringraziamenti}
+Si ringraziano gli enti indicati nella sezione~\ref{ch:sources} e le persone coinvolte per la gentile concessione dei dati meteorologici.
+
+\appendix
+\chapter{Dataset sorgenti}
+\input{chapters/datasets.tex}
+
 \clearpage
 \printbibliography{}
 
