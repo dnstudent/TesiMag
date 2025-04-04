@@ -25,7 +25,6 @@ convert_and_write_xlsx <- function(metadata, path) {
 dps |> mutate(a = list(list(1,2))) |> convert_and_write_xlsx("")
 ```
 
-
 ```{r}
 meta <- query_checkpoint_meta("full", "merged_corrected", conn = conns$data) |>
   window_order(dataset, series_key) |>
@@ -141,7 +140,6 @@ ranked_series_groups |> filter(from_dataset == "SWI")
 ```{r}
 meta |> semi_join(ranked_series_groups |> filter(gkey == 39L), by = c("dataset" = "from_dataset", "sensor_key" = "from_sensor_key"), copy = T) |> collect()
 ```
-
 
 ```{r}
 duplications <- ranked_series_groups |>

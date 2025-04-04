@@ -1,0 +1,252 @@
+---
+title: "Post-merge pairing"
+author: "Davide Nicoli"
+format: html
+editor: visual
+---
+
+```{r}
+setwd(fs::path_abs("~/Local_Workspace/TesiMag"))
+Sys.setlocale("LC_ALL", "UTF-8")
+library(duckplyr, warn.conflicts = FALSE)
+library(openxlsx, warn.conflicts = FALSE)
+library(arrow, warn.conflicts = FALSE)
+library(vroom, warn.conflicts = FALSE)
+library(tidyr, warn.conflicts = FALSE)
+source("src/database/query/data.R")
+source("src/database/startup.R")
+source("src/merging/analysis.R")
+source("src/merging/display.R")
+```
+
+```{r}
+source("notebooks/ds_regionali/procedure/common_steps.R")
+conns <- load_dbs()
+convert_and_write_xlsx <- function(metadata, path) {
+    metadata |> mutate(across(where(is.Date), as.character), across(where(is.list), ~ paste(unlist(.), sep = ";"))) #|> write.xlsx(path, asTable = TRUE)
+}
+```
+
+```{r}
+sud_dir <- fs::path_expand("~/Local_Workspace/Datasets/Dati_Bruno")
+meta_paths <- fs::dir_ls(sud_dir, recurse = TRUE, glob = "*/metadata.csv")
+data_paths <- fs::dir_ls(sud_dir, recurse = TRUE, glob = "*/data/*.csv")
+meta_col_types <- "cicccccccdddcccDDiiiilclld"
+# meta <- open_csv_dataset(meta_paths, schema = meta_schema, skip = 1L)
+sud_meta <- vroom::vroom(meta_paths, col_types = meta_col_types) |>
+    mutate(elevation = coalesce(elevation, as.integer(elevation_glo30))) |>
+    assertr::assert(not_na, lon, lat, elevation, dataset, series_key, from, network, data_ranks, merged, valid_days) |>
+    separate_longer_delim(from, delim = ";") |>
+    separate_wider_delim(from, delim = "/", names = c("from_datasets", "from_sensor_keys")) |>
+    group_by(dataset, series_key) |>
+    mutate(from_datasets = list(from_datasets), from_sensor_keys = list(from_sensor_keys)) |>
+    slice_head(n = 1L) |>
+    ungroup() |>
+    # separate_wider_delim(from, delim = "/", names = c("from_datasets", "from_sensor_keys")) |>
+    mutate(
+        district = case_match(dataset, "ABR_MOL" ~ "Abruzzo", "BAS" ~ "Basilicata", "CAL" ~ "Calabria", "CAM" ~ "CAMPANIA", "LAZ" ~ "Lazio", "PUG" ~ "Puglia", "SARD" ~ "Sardegna", "SIC" ~ "Sicilia", .default = NA_character_),
+        across(c(data_ranks, merged), ~ str_split(., pattern = ";"))
+    )
+# datas <- purrr::map(
+#     data_paths,
+#     ~ {
+#         fstem <- fs::path_file(.x) |> fs::path_ext_remove()
+#         vroom::vroom(.x,
+#             col_types = vroom::cols(
+#                 date = col_date(),
+#                 master = col_double(),
+#                 master_raw = col_double(),
+#                 from = col_character(),
+#                 .default = col_double()
+#             ),
+#             col_select = c("date", "master", "master_raw", "from")
+#         ) |>
+#             mutate(series = fstem)
+#     },
+#     .progress = TRUE
+# ) |> bind_rows()
+# datas |>
+#     separate_wider_delim(cols = from, delim = "/", names = c("from_dataset", "from_sensor_key"), too_few = "error") |>
+#     mutate(from_sensor_key = as.integer(from_sensor_key)) |>
+#     separate_wider_regex(series, patterns = c(variable = "TM(?:N|X)D", "_", dataset = ".+?", "_", series_key = "\\d{3}"), too_few = "error") |>
+#     mutate(series_key = as.integer(series_key), variable = case_match(variable, "TMND" ~ -1L, "TMXD" ~ 1L)) |>
+#     rename(value = master, value_raw = master_raw) |>
+#     write_dataset("db/tmp/sud2", partitioning = c("variable"))
+nord_meta <- query_checkpoint_meta("full", "merged_corrected", conns$data)
+nord_data <- open_dataset("db/data/merged_corrected/full", partitioning = c("variable"))
+sud_data <- open_dataset("db/tmp/sud2") |>
+    relocate(colnames(nord_data)) |>
+    filter(!is.na(value)) |>
+    compute()
+
+chkpt <- as_checkpoint(sud_meta, sud_data, check_schema = FALSE)
+chkpt |> save_checkpoint("sud", "merged_corrected", check_schema = FALSE, partitioning = c("variable"), key = "series_key")
+```
+
+
+```{r}
+dps |>
+    mutate(a = list(list(1, 2))) |>
+    convert_and_write_xlsx("")
+```
+
+```{r}
+nord_dupes <- vroom::vroom(file.path("db", "conv", "merged_corrected", "merge_duplicates.csv"), col_select = c("dataset", "series_key", "duplicate_of"), col_types = "cic") |> filter(!is.na(duplicate_of))
+meta <- query_checkpoint_meta(c("full", "sud"), "merged_corrected", conn = conns$data) |>
+    anti_join(nord_dupes, by = c("dataset", "series_key"), copy = TRUE) |>
+    window_order(dataset, series_key) |>
+    mutate(key = row_number(), sensor_key = series_key, sensor_first = series_first, sensor_last = series_last, .keep = "unused") |>
+    compute()
+data <- query_checkpoint_data(c("full", "sud"), "merged_corrected", conn = conns$data, hive_types = list("variable" = "INT")) |>
+    filter(abs(value) < 50) |>
+    rename(sensor_key = series_key) |>
+    inner_join(meta |> select(dataset, sensor_key, key), by = c("dataset", "sensor_key"))
+```
+
+```{r}
+sensor_matches <- close_matches(meta, 2500, conns$stations)
+var_matches <- series_matches(data, sensor_matches, meta)
+```
+
+```{r}
+involved_series <- var_matches |> pivot_longer(cols = c(key_x, key_y), names_to = "key_type", values_to = "key")
+metaf <- meta |>
+    semi_join(involved_series, by = "key", copy = T) |>
+    compute()
+```
+
+```{r}
+data |>
+    semi_join(involved_series, by = c("key", "variable"), copy = T) |>
+    to_arrow() |>
+    write_parquet("temp.parquet")
+analysis <- series_matches_analysis(var_matches,
+    query_parquet("temp.parquet", conns$data),
+    metaf,
+    matches_offsets = c(-1L, 0L, 1L)
+)
+analysis |> write_parquet(file.path("notebooks", "ds_nazionali", "TESIDB", "ita_raw_analysis.parquet"))
+analysis |> write_xlsx_analysis(file.path("notebooks", "ds_nazionali", "TESIDB", "ita_raw_analysis.xlsx"), name_x, name_y, .format = FALSE)
+```
+
+```{r}
+analysis <- read_parquet(file.path("notebooks", "ds_nazionali", "TESIDB", "ita_raw_analysis.parquet")) |>
+    left_join(meta |> select(dataset, sensor_key, key), by = c("dataset_x" = "dataset", "sensor_key_x" = "sensor_key"), copy = T) |>
+    left_join(meta |> select(dataset, sensor_key, key), by = c("dataset_y" = "dataset", "sensor_key_y" = "sensor_key"), copy = T, suffix = c("_x", "_y"))
+
+source("src/merging/pairing.R")
+tagged_analysis <- analysis |>
+    mutate(
+        tag_dupe = (dataset_x != dataset_y) & (
+            distance < 50 |
+                ((valid_days_inters > 100L &
+                    (!is.na(f0noint) & f0noint > 0.26)
+                ))) |
+            (
+                !!user_codes_are("ZON", "ZON") | # Monte Zoncolan
+                    !!user_codes_are_("08CABANNE", "01675") | # Cabanne
+                    !!user_codes_are_("01602", "01397") # Busalla
+            )
+    ) |>
+    group_by(dataset_x, dataset_y, sensor_key_x, sensor_key_y) |>
+    mutate(
+        tag_alldupe = all(tag_dupe)
+    ) |>
+    ungroup()
+tagged_analysis |> write_xlsx_analysis(file.path("notebooks", "ds_nazionali", "TESIDB", "ita_tagged_analysis.xlsx"), starts_with("name"), starts_with("user_code"), starts_with("series_id"), tag_dupe, tag_alldupe, .format = FALSE)
+```
+
+```{r}
+source("notebooks/ds_regionali/procedure/common_steps.R")
+new_dataset <- "tesids"
+rm(data)
+gc()
+data <- query_checkpoint_data("full", "merged_corrected", conns$data, hive_types = list("variable" = "INT")) |>
+    rename(sensor_key = series_key) |>
+    inner_join(meta |> select(dataset, sensor_key, key), by = c("dataset", "sensor_key")) |>
+    compute()
+path_from <- prepare_data_for_merge(conns$data, fs::path("db", "data", "merged_corrected"), fs::path("db", "tmp", "prepared4remerge"), FALSE, key_column = "series_key")
+saved_to <- merge_same_series(path_from, fs::path("db", "tmp", "rawremerged"), new_dataset, tagged_analysis |> rename(tag_same_series = tag_anydupe), meta |> collect(), data, 1, 2L * 365L, NULL, desc(dataset), desc(sensor_last), desc(network))
+merged_checkpoint(new_dataset, saved_to, metadata)
+```
+
+```{r}
+gs <- series_groups(tagged_analysis, collect(meta), data, tag_anydupe)
+```
+
+```{r}
+regional_dataset <- tribble(
+    ~dataset, ~dataset_district,
+    "PIE", "Piemonte",
+    "TOS", "Toscana",
+    "VEN", "Veneto",
+    "LOM", "Lombardia",
+    "VDA", "Valle D'aosta",
+    "FVG", "Friuli Venezia Giulia",
+    "ER", "Emilia-Romagna",
+    "LIG", "Liguria",
+    "TAA2", "Trentino-Alto Adige",
+    "MAR", "Marche",
+    "SWI", "Switzerland",
+    "FRA", "France",
+    "SLO", "Slovenia",
+    "AUT", "Austria"
+)
+```
+
+```{r}
+ranked_series_groups <- gs$table |>
+    left_join(collect(meta) |> select(from_dataset = dataset, from_sensor_key = sensor_key, key, district_in = district), by = "key") |>
+    left_join(regional_dataset, by = c("from_dataset" = "dataset")) |>
+    mutate(set = "tesidb", right_district = district_in == dataset_district) |>
+    rank_metadata(collect(meta), dataset_rankings = NULL, desc(right_district), desc(valid90))
+```
+
+```{r}
+ranked_series_groups |> filter(from_dataset == "SWI")
+```
+
+```{r}
+meta |>
+    semi_join(ranked_series_groups |> filter(gkey == 39L), by = c("dataset" = "from_dataset", "sensor_key" = "from_sensor_key"), copy = T) |>
+    collect()
+```
+
+```{r}
+duplications <- ranked_series_groups |>
+    group_by(gkey) |>
+    arrange(metadata_rank) |>
+    mutate(duplicate_of = if_else(metadata_rank == 1L, "", first(str_c(from_dataset, from_sensor_key, sep = "/")))) |>
+    ungroup() |>
+    select(dataset = from_dataset, series_key = from_sensor_key, duplicate_of) |>
+    distinct()
+dps <- duplications |>
+    left_join(meta |> select(dataset, series_key = sensor_key, name, series_first = sensor_first, series_last = sensor_last, valid90, lon, lat, elevation, district), by = c("dataset", "series_key"), copy = T)
+
+dps |> vroom::vroom_write(file.path("db", "conv", "merged_corrected", "merge_duplicates.csv"))
+options("openxlsx.dateFormat" = "yyyy/mm/dd")
+wb <- createWorkbook()
+addWorksheet(wb, "duplicates")
+writeDataTable(wb, 1, dps)
+addStyle(wb, 1, style = createStyle(numFmt = "DATE"), rows = 2:nrow(dps), cols = 5:6, gridExpand = TRUE)
+saveWorkbook(wb, file.path("db", "conv", "merged_corrected", "merge_duplicates.xlsx"), overwrite = TRUE)
+# dps |> write.xlsx(file.path("db", "conv", "merged_corrected", "merge_duplicates.xlsx"), asTable = TRUE)
+```
+
+```{r}
+anti_join(meta, duplications, by = c("dataset", "sensor_key" = "series_key"), copy = T) |> collect()
+```
+
+```{r}
+meta |>
+    filter(dataset == "FVG", sensor_key == 184L) |>
+    collect() |>
+    View()
+```
+
+```{r}
+query_checkpoint_meta("ARPAFVG", "raw") |> filter(sensor_key == 36L)
+```
+
+```{r}
+```
