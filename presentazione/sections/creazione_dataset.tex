@@ -3,12 +3,33 @@
 % !TEX spellcheck = it-IT
 % !TEX program = xelatex
 
-\section{Creazione del dataset}
-\begin{frame}{Raccolta dati}
-  \begin{itemize}
-    \item Disponibilità e qualità dei dati
-    \item Problematiche
-  \end{itemize}
+\section{Composizione del dataset}
+\begin{frame}{Raccolta dei dati giornalieri}
+  \begin{columns}
+    \begin{column}{0.45\textwidth}
+      Esigenze:
+      \begin{itemize}
+        \item completezza temporale e spaziale per il trentennio 1991--2020;
+        \item completezza dei metadati e accuratezza delle collocazioni;;
+        \item possibilità di aggiornamento futuro.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.55\textwidth}
+      Problemi riscontrati:
+      \begin{itemize}
+        \item disomogeneità e grande varietà nelle interfacce e informazioni fornite;
+        \item incoerenze intra- e inter-dataset in merito a:
+          \begin{itemize}
+            \item nomi delle stazioni;
+            \item codici identificativi;
+            \item collocazioni geografiche ed altimetriche;
+            \item definizioni di ``giornata di misura'';
+            \item definizioni di estremo di temperatura.
+          \end{itemize}
+      \end{itemize}
+    \end{column}
+  \end{columns}
+
 \end{frame}
 
 \begin{frame}{Merging - Procedura}

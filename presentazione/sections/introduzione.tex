@@ -8,23 +8,50 @@
   Le normali climatiche sono la sintesi dei dati meteorologici di un determinato trentennio
   \begin{figure}
     \centering
-    \begin{subfigure}[b]{0.3\textwidth}
-      \caption{Dati grezzi}
-    \end{subfigure}
-    \begin{subfigure}[b]{0.3\textwidth}
-      \caption{Normali climatiche di stazione}
+    \begin{subtable}[m]{0.3\textwidth}
+      \centering
+      \small
+      \input{ASSETS/introduzione/reggio_series_sample}
+      \caption{Esempio di dato grezzo}
+    \end{subtable}
+    \hfill
+    \begin{subfigure}[m]{0.3\textwidth}
+      \centering
+      \input{ASSETS/introduzione/clino_jan}
+      \caption{Normali climatiche di stazione della temperatura massima in gennaio}
     \end{subfigure}
     \hfill
-    \begin{subfigure}[b]{0.3\textwidth}
+    \begin{subfigure}[m]{0.3\textwidth}
       \caption{Normali climatiche interpolate}
     \end{subfigure}
   \end{figure}
-  % Figura rappresentante le normali climatiche di gennaio in formato puntuale e su griglia
 \end{frame}
 
 \begin{frame}{Lavori di riferimento}
-  \begin{itemize}
-    \item SCIA;
-    \item Brunetti 2014;
-  \end{itemize}
+  Aggiornamento del dataset preparato da Brunetti et al. (2014) per le normali climatiche 1961--1990.
+
+  Si sono presi come riferimento e confronto altri dataset italiani a risoluzione giornaliera:
+  \begin{columns}
+    \begin{column}{0.5\textwidth}
+      \begin{itemize}
+        \item il dataset SCIA (ISPRA):
+          \begin{itemize}
+            \item controllato e validato (con qualche caveat);
+            \item anagrafiche non molto accurate;
+            \item disponibilità di dati disomogenea.
+          \end{itemize}
+        \item il dataset del CNR-ISAC:
+          \begin{itemize}
+            \item controllato, validato ed omogeneizzato;
+            \item serie lunghe ma in numero ridotto.
+          \end{itemize}
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \begin{figure}
+        \input{ASSETS/introduzione/scia_monthly_availability}
+        \caption{Disponibilità mensile di serie in SCIA}
+      \end{figure}
+    \end{column}
+  \end{columns}
 \end{frame}
