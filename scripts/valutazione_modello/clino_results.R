@@ -35,6 +35,10 @@ table_dir <- fs::path(Sys.getenv("TABLES_DIR"), "valutazione_modello", "risultat
 if (!fs::dir_exists(table_dir)) {
     fs::dir_create(table_dir)
 }
+pres_dir <- fs::path(Sys.getenv("PRES_DIR"), "introduzione")
+if (!fs::dir_exists(pres_dir)) {
+    fs::dir_create(pres_dir)
+}
 tntx_scale <- c(TN = "dodgerblue", TX = "firebrick1")
 
 # Dbs init
@@ -305,3 +309,16 @@ things |>
 close <- function(x, y) {
     abs(x - y) < 0.00001
 }
+
+# Presentazione: clino
+data |>
+    filter(month == 1L, kind == "obs", dataset %in% ita_dss) |>
+    pivot_wider(names_from = variable, values_from = value) |>
+    collect() |>
+    left_join(geometa |> select(dataset, series_key), by = c("dataset", "series_key"), copy = TRUE) |>
+    st_as_sf() |>
+    ggplot() +
+    geom_sf(aes(color = tmax), show.legend = FALSE, size = 0.1) +
+    scale_color_viridis_c() +
+    theme(axis.text = element_blank(), axis.title = element_blank(), axis.ticks = element_blank())
+ggsave(fs::path(pres_dir, "clino_jan.tex"), width = 3.5, height = 3.3, units = "cm", device = tikz)

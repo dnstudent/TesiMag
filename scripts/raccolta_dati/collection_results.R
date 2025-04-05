@@ -39,6 +39,11 @@ table_dir <- fs::path(Sys.getenv("TABLES_DIR"), "creazione_dataset", "dataset")
 if (!fs::dir_exists(table_dir)) {
     fs::dir_create(table_dir)
 }
+pres_dir <- fs::path(Sys.getenv("PRES_DIR"), "introduzione")
+if (!fs::dir_exists(pres_dir)) {
+    fs::dir_create(pres_dir)
+}
+
 
 monthly_availability_by_series <- function(data, ...) {
     data |>
@@ -125,6 +130,11 @@ climav_metas <- purrr::map2(metas, clavails, ~ {
     anti_join(.x, filter(.y, !is_clim_available), by = c("dataset", "sensor_key")) |> assert(not_na, dataset, sensor_key)
 })
 
+climav_metas$scia |>
+    st_as_sf(coords = c("lon", "lat"), crs = "EPSG:4326", remove = FALSE) |>
+    ggplot() +
+    geom_sf()
+
 # Datasets
 rmetas <- query_checkpoint_meta(c("Dext3r", "ARPAFVG", "ARPAL", "ARPALombardia", "ARPAM", "ARPAPiemonte", "ARPAUmbria", "ARPAV", "ARSO", "SIRToscana", "TAA", "WSL"), "raw", conns$data) |>
     mutate(
@@ -162,6 +172,16 @@ with_seed(0L, {
 
     ggsave(fs::path(image_dir, "monthly_availability.tex"), width = 13.5, height = 10, units = "cm", device = tikz)
 })
+
+with_seed(0L, {
+    ggplot(data = tmavails |> filter(variable == 1L, is_month_available, dataset == "SCIA", between(year(date), 1991L, 2020L)), mapping = aes(date, n)) +
+        geom_line() +
+        labs(y = NULL) +
+        theme(axis.title = element_blank(), axis.title.x = element_blank())
+
+    ggsave(fs::path(pres_dir, "scia_monthly_availability.tex"), width = 6, height = 3, units = "cm", device = tikz)
+})
+
 
 # Spaziali
 ## Integr SCIA

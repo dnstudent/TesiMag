@@ -10,6 +10,7 @@ library(tsibble)
 library(withr)
 library(tikzDevice)
 library(extrafont)
+library(kableExtra)
 source("src/database/startup.R")
 source("src/database/query/data.R")
 source("scripts/common.R")
@@ -27,6 +28,11 @@ table_dir <- fs::path(Sys.getenv("TABLES_DIR"), "creazione_dataset", "raccolta_d
 if (!fs::dir_exists(table_dir)) {
     fs::dir_create(table_dir)
 }
+pres_dir <- fs::path(Sys.getenv("PRES_DIR"), "introduzione")
+if (!fs::dir_exists(pres_dir)) {
+    fs::dir_create(pres_dir)
+}
+
 conns <- load_dbs()
 on.exit(close_dbs(conns))
 
@@ -34,7 +40,7 @@ reggio_series <- query_checkpoint_meta(c("Dext3r", "SCIA", "ISAC"), "raw", conns
     filter(between(lon, 10.42, 10.80), between(lat, 44.64, 44.774642)) |>
     collect() |>
     mutate(display_dataset = if_else(dataset == "ISAC", network, dataset), sequence = str_c(display_dataset, sensor_key, sep = "/")) |>
-    sf::st_as_sf(coords = c("lon", "lat"), crs = "EPSG:4326")
+    sf::st_as_sf(coords = c("lon", "lat"), crs = "EPSG:4326", remove = FALSE)
 
 wdbbox <- sf::st_bbox(reggio_series |> sf::st_buffer(units::set_units(1, "km")))
 sa_map <- openmap(c(wdbbox$ymax, wdbbox$xmin), c(wdbbox$ymin, wdbbox$xmax), type = "esri-topo")
@@ -82,6 +88,28 @@ with_seed(0L, {
         theme(strip.text.y = element_text(angle = 0))
     ggsave(fs::path(image_dir, "reggio_series_plot.tex"), width = 13.5, height = 13.5 * 0.618, units = "cm", device = tikz)
 })
+
+meta1 <- query_checkpoint_meta(c("Dext3r", "SCIA", "ISAC"), "raw", conns$data) |>
+    select(dataset, sensor_key, name, lon, lat, elevation) |>
+    collect() |>
+    sample_n(50L)
+# filter(
+#     (dataset == "Dext3r" & sensor_key %in% c(446L, 447L, 448L)) |
+#         (dataset == "SCIA" & sensor_key %in% c(3183L, 3276L, 3184L))
+# )
+d <- query_checkpoint_data(c("Dext3r", "ISAC", "SCIA"), "raw", conns$data) |>
+    filter(between(date, "1991-01-01", "2020-12-31")) |>
+    inner_join(meta1, by = c("dataset", "sensor_key"), copy = TRUE) |>
+    pivot_wider(names_from = variable, values_from = value) |>
+    slice_sample(n = 1L) |>
+    rename(Stazione = name, Longitudine = lon, Latitudine = lat, Quota = elevation, Data = date, tmin = `-1`, tmax = `1`) |>
+    select(Stazione, Longitudine, Latitudine, Quota, Data, tmin, tmax) |>
+    collect()
+cbind(colnames(d), t(d)) |>
+    as_tibble() |>
+    kbl(format = "latex", booktabs = TRUE, escape = FALSE, col.names = NULL) |>
+    cat(file = fs::path(pres_dir, "reggio_series_sample.tex"))
+
 
 library(tidygraph)
 library(ggraph)
