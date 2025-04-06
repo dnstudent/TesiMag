@@ -174,12 +174,12 @@ with_seed(0L, {
 })
 
 with_seed(0L, {
-    ggplot(data = tmavails |> filter(variable == 1L, is_month_available, dataset == "SCIA", between(year(date), 1991L, 2020L)), mapping = aes(date, n)) +
+    ggplot(data = tmavails |> filter(variable == 1L, is_month_available, dataset %in% c("SCIA", "ISAC", "DPC"), between(year(date), 1991L, 2020L)), mapping = aes(date, n, linetype = dataset)) +
         geom_line() +
         labs(y = NULL) +
         theme(axis.title = element_blank(), axis.title.x = element_blank())
 
-    ggsave(fs::path(pres_dir, "scia_monthly_availability.tex"), width = 6, height = 3, units = "cm", device = tikz)
+    ggsave(fs::path(pres_dir, "monthly_availabilities.tex"), width = 8, height = 3, units = "cm", device = tikz)
 })
 
 
@@ -214,6 +214,18 @@ with_seed(0L, {
     ggsave(fs::path(image_dir, "merged", "spatial_availability.pdf"), width = 13.5, height = 7.5, units = "cm")
 })
 
+with_seed(0L, {
+    mmeta <- metas$fmerged
+    clino_meta <- load_clino_meta(conns$data) |>
+        collect() |>
+        semi_join(metas$fmerged, by = c("dataset" = "dataset", "series_key" = "sensor_key")) |>
+        st_as_sf(coords = c("lon", "lat"), crs = "EPSG:4326")
+    # st_filter(mmeta, .predicate = st_is_within_distance, dist = set_units(10, m))
+    ggplot() +
+        geom_sf(data = clino_meta, size = 0.1) +
+        theme_quartz
+    ggsave(fs::path(pres_dir, "merged_map.pdf"), width = 6 * 1.1, height = 4.3 * 1.1, units = "cm")
+})
 
 # Distribuzione in quota
 dem_tiles <- fs::dir_ls(fs::path(fs::dir_ls("/Users/davidenicoli/Local_Workspace/Datasets/COPERNICUS_DEM30/", type = "directory", regexp = "Copernicus_DSM_.+"), "DEM"), glob = "*.tif")

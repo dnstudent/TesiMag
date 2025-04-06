@@ -4,54 +4,84 @@
 % !TeX program = xelatex
 
 \section{Introduzione}
-\begin{frame}{Normali climatiche: un'istantanea di trent'anni}
-  Le normali climatiche sono la sintesi dei dati meteorologici di un determinato trentennio
+\begin{frame}{Normali climatiche}
+  \begin{itemize}
+    \item Caratterizzazione climatica locale e di area: dai dati grezzi all'interpolazione;
+    \item requisiti di rappresentatività: copertura spaziale e temporale;
+    \item requisiti di qualità di dati e metadati: precisione, omogeneità, accuratezza.
+  \end{itemize}
   \begin{figure}
     \centering
     \begin{subtable}[m]{0.3\textwidth}
       \centering
-      \small
+      \footnotesize
       \input{ASSETS/introduzione/reggio_series_sample}
-      \caption{Esempio di dato grezzo}
+      \caption{Dato meteorologico giornaliero}
     \end{subtable}
     \hfill
     \begin{subfigure}[m]{0.3\textwidth}
       \centering
       \input{ASSETS/introduzione/clino_jan}
-      \caption{Normali climatiche di stazione della temperatura massima in gennaio}
+      \caption{Normali climatiche di stazione}
     \end{subfigure}
     \hfill
     \begin{subfigure}[m]{0.3\textwidth}
-      \caption{Normali climatiche interpolate}
+      \input{ASSETS/introduzione/bgkrig}
+      % \includegraphics{ASSETS/introduzione/bgkrig.pdf}
+      \caption{Normali climatiche di area}
     \end{subfigure}
   \end{figure}
 \end{frame}
 
-\begin{frame}{Lavori di riferimento}
-  Aggiornamento del dataset preparato da Brunetti et al. (2014) per le normali climatiche 1961--1990.
-
-  Si sono presi come riferimento e confronto altri dataset italiani a risoluzione giornaliera:
+\begin{frame}{Caratteristiche del dataset preparato}
   \begin{columns}
     \begin{column}{0.5\textwidth}
+
       \begin{itemize}
-        \item il dataset SCIA (ISPRA):
-          \begin{itemize}
-            \item controllato e validato (con qualche caveat);
-            \item anagrafiche non molto accurate;
-            \item disponibilità di dati disomogenea.
-          \end{itemize}
-        \item il dataset del CNR-ISAC:
-          \begin{itemize}
-            \item controllato, validato ed omogeneizzato;
-            \item serie lunghe ma in numero ridotto.
-          \end{itemize}
+        \item Temperature minime e massime giornaliere;
+        \item accurato controllo di qualità sia dei dati che dei metadati ed omogeneizzazione;
+        \item copertura del centro-nord Italia e delle regioni alpine limitrofe (estensione al centro-sud e alle isole e alla piovosità cumulata ad opera di altri).
       \end{itemize}
     \end{column}
     \begin{column}{0.5\textwidth}
       \begin{figure}
-        \input{ASSETS/introduzione/scia_monthly_availability}
-        \caption{Disponibilità mensile di serie in SCIA}
+        \includegraphics{ASSETS/introduzione/merged_map.pdf}
+        \caption*{Distribuzione delle serie risultanti}
       \end{figure}
+
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Lavori di riferimento}
+  Aggiornamento del dataset preparato da Brunetti et al. (2014) delle normali climatiche 1961--1990.
+
+  Si sono presi come riferimento, confronto e base di dati altri dataset italiani a risoluzione giornaliera:
+  \begin{columns}[t]
+    \begin{column}{0.55\textwidth}
+      \begin{itemize}
+        \item SCIA (ISPRA):
+          \begin{itemize}
+            \item controllato e validato (con caveat);
+            \item anagrafiche non molto accurate;
+            \item disponibilità di dati disomogenea.
+          \end{itemize}
+        \item dataset CNR-ISAC:
+          \begin{itemize}
+            \item controllato, validato, completato e omogeneizzato;
+            \item serie lunghe ma in numero ridotto.
+          \end{itemize}
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \begin{itemize}
+        \item dataset DPC:
+          \begin{itemize}
+            \item controllato, validato, completato e omogeneizzato;
+            \item serie numerose ma dal 2002;
+            \item aggregazione dati differente.
+          \end{itemize}
+      \end{itemize}
     \end{column}
   \end{columns}
 \end{frame}

@@ -318,7 +318,12 @@ data |>
     left_join(geometa |> select(dataset, series_key), by = c("dataset", "series_key"), copy = TRUE) |>
     st_as_sf() |>
     ggplot() +
-    geom_sf(aes(color = tmax), show.legend = FALSE, size = 0.1) +
+    geom_sf(aes(color = tmax), size = 0.1) +
     scale_color_viridis_c() +
-    theme(axis.text = element_blank(), axis.title = element_blank(), axis.ticks = element_blank())
-ggsave(fs::path(pres_dir, "clino_jan.tex"), width = 3.5, height = 3.3, units = "cm", device = tikz)
+    theme(axis.text = element_blank(), axis.title = element_blank(), axis.ticks = element_blank(), legend.margin = margin(0, 0, 0, -0.3, unit = "cm")) +
+    labs(color = "°C") +
+    guides(color = guide_colourbar(theme = theme(
+        legend.key.width  = unit(0.08, "cm"),
+        legend.key.height = unit(1.5, "cm")
+    )))
+ggsave(fs::path(pres_dir, "clino_jan.tex"), width = 4, height = 3.3, units = "cm", device = tikz)

@@ -35,6 +35,10 @@ arpas_ds <- c(
     "Valle D'aosta" = NA_character_
 )
 
+dss <- c("VDA", "PIE", "LIG", "LOM", "TOS", "UMB", "MAR", "VEN", "FVG", "ER", "TAA2", "FRA", "AUT", "SLO", "SWI")
+ita_dss <- c("VDA", "PIE", "LIG", "LOM", "TOS", "UMB", "MAR", "VEN", "FVG", "ER", "TAA2")
+clino_path <- fs::path("/Users/davidenicoli/Local_Workspace/Datasets/climats")
+
 tesisave <- function(file, plot = last_plot(), width = 12, ...) {
     ggsave(file, plot, width = width, dpi = 300, unit = "cm", ...)
 }
@@ -109,4 +113,8 @@ load_raw_datas <- function(ds, conns, meta, boundaries) {
         inner_join(meta, by = c("dataset", "sensor_key"), copy = TRUE) |>
         mutate(dataset = if_else(dataset == "ISAC", network, dataset)) |>
         select(-network)
+}
+
+load_clino_meta <- function(conn) {
+    query_parquet(fs::path(clino_path, "meta.parquet"), conn)
 }
