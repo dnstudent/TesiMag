@@ -4,11 +4,14 @@
 <svg
    version="1.1"
    id="svg1"
-   width="123.87615"
+   width="151.32761"
    height="141.70039"
-   viewBox="0 0 123.87615 141.7004"
+   viewBox="0 0 151.3276 141.7004"
    sodipodi:docname="reggio_series_graph_pmod.svg"
    inkscape:version="1.4 (e7c3feb1, 2024-10-09)"
+   inkscape:export-filename="reggio_series_graph_pmod.pdf"
+   inkscape:export-xdpi="96"
+   inkscape:export-ydpi="96"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:xlink="http://www.w3.org/1999/xlink"
@@ -252,6 +255,21 @@
          transform="matrix(1,0,0,-1,-73.000002,97.320002)"
          id="path58" />
     </clipPath>
+    <clipPath
+       clipPathUnits="userSpaceOnUse"
+       id="clipPath52-5">
+      <path
+         d="m 32.63,32.63 h 107.56 v 79.22 H 32.63 Z"
+         transform="matrix(1,0,0,-1,-115.43001,77.720002)"
+         id="path52-2" />
+    </clipPath>
+    <clipPath
+       clipPathUnits="userSpaceOnUse"
+       id="clipPath51-2">
+      <path
+         d="m 32.63,32.63 h 107.56 v 79.22 H 32.63 Z"
+         id="path51-7" />
+    </clipPath>
   </defs>
   <sodipodi:namedview
      id="namedview1"
@@ -263,20 +281,20 @@
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
      inkscape:zoom="1.7968965"
-     inkscape:cx="39.790829"
+     inkscape:cx="39.790828"
      inkscape:cy="112.6943"
-     inkscape:window-width="1200"
-     inkscape:window-height="730"
+     inkscape:window-width="1440"
+     inkscape:window-height="872"
      inkscape:window-x="0"
      inkscape:window-y="0"
-     inkscape:window-maximized="0"
+     inkscape:window-maximized="1"
      inkscape:current-layer="g1">
     <inkscape:page
        x="0"
        y="0"
        inkscape:label="1"
        id="page1"
-       width="123.87615"
+       width="151.32761"
        height="141.70039"
        margin="0"
        bleed="0" />
@@ -480,5 +498,21 @@
          x="0"
          dx="0 0 0 -0.31999999 0 -0.44 -0.47999999"
          y="0">RIVALTA</tspan></text>
+    <path
+       id="path50-9"
+       d="m 113.99,74.12 h 20.44 -0.09 l 0.35,0.02 0.34,0.06 0.33,0.13 0.3,0.17 0.27,0.22 0.23,0.26 0.18,0.3 0.14,0.32 0.08,0.33 0.03,0.35 v 0 5.75 0 l -0.03,0.35 -0.08,0.34 -0.14,0.32 -0.18,0.29 -0.23,0.26 -0.27,0.22 -0.3,0.17 -0.33,0.13 -0.34,0.07 -0.26,0.01 h -20.44 l 0.26,-0.01 -0.35,0.01 -0.34,-0.04 -0.34,-0.1 -0.31,-0.15 -0.29,-0.2 -0.25,-0.24 -0.2,-0.27 -0.17,-0.31 -0.11,-0.33 -0.05,-0.34 -0.01,-0.18 v -5.75 l 0.01,0.17 v -0.34 l 0.05,-0.35 0.11,-0.33 0.17,-0.3 0.2,-0.28 0.25,-0.24 0.29,-0.2 0.31,-0.15 0.34,-0.1 0.34,-0.04 z"
+       style="fill:#ffffff;fill-opacity:1;fill-rule:nonzero;stroke:#619cff;stroke-width:0.53;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;stroke-dasharray:none;stroke-opacity:1"
+       transform="matrix(2.155494,0,0,-1.4218694,-52.428009,226.38412)"
+       clip-path="url(#clipPath51-2)" />
+    <text
+       xml:space="preserve"
+       style="font-size:8px;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#619cff;fill-opacity:1;stroke-width:0.0982677"
+       x="193.02792"
+       y="116.29285"
+       id="text1"><tspan
+         sodipodi:role="line"
+         x="193.02792"
+         y="116.29285"
+         id="tspan2">CORREGIO</tspan></text>
   </g>
 </svg>

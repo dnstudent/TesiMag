@@ -4,12 +4,30 @@
 % !TeX program = xelatex
 
 \section{Introduzione}
+
+\begin{frame}{Caratteristiche del dataset}
+  \begin{columns}
+    \begin{column}{0.5\textwidth}
+      \begin{itemize}
+        \item Temperature minime e massime giornaliere;
+        \item copertura del centro-nord Italia e delle regioni alpine limitrofe;
+        \item copertura del trentennio 1991--2020;
+        \item orientato al calcolo delle normali climatiche mensili di stazione e su griglia fine.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \begin{figure}
+        \includegraphics{ASSETS/introduzione/merged_map.pdf}
+        \caption*{Distribuzione delle serie risultanti}
+      \end{figure}
+    \end{column}
+  \end{columns}
+\end{frame}
+
 \begin{frame}{Normali climatiche}
-  \begin{itemize}
-    \item Caratterizzazione climatica locale e di area: dai dati grezzi all'interpolazione;
-    \item requisiti di rappresentatività: copertura spaziale e temporale (almeno 5 anni);
-    \item requisiti di qualità di dati e metadati: precisione, omogeneità, accuratezza.
-  \end{itemize}
+  Intento: caratterizzare il clima di un'area, determinato dalla topografia;
+
+  Requisiti: alta rappresentatività temporale e geografica delle serie, controllo qualità ed omogeneizzazione dei dati;
   \begin{figure}
     \centering
     \begin{subtable}[m]{0.3\textwidth}
@@ -27,61 +45,50 @@
     \hfill
     \begin{subfigure}[m]{0.3\textwidth}
       \input{ASSETS/introduzione/bgkrig}
-      % \includegraphics{ASSETS/introduzione/bgkrig.pdf}
       \caption{Normali climatiche di area}
     \end{subfigure}
   \end{figure}
 \end{frame}
 
-\begin{frame}{Caratteristiche del dataset preparato}
-  \begin{columns}
-    \begin{column}{0.5\textwidth}
-
-      \begin{itemize}
-        \item Temperature minime e massime giornaliere;
-        \item accurato controllo di qualità sia dei dati che dei metadati ed omogeneizzazione;
-        \item copertura del centro-nord Italia e delle regioni alpine limitrofe (estensione al centro-sud e alle isole e alla piovosità cumulata ad opera di altri).
-      \end{itemize}
-    \end{column}
-    \begin{column}{0.5\textwidth}
-      \begin{figure}
-        \includegraphics{ASSETS/introduzione/merged_map.pdf}
-        \caption*{Distribuzione delle serie risultanti}
-      \end{figure}
-
-    \end{column}
-  \end{columns}
-\end{frame}
-
 \begin{frame}[t]{Lavori di riferimento}
-  Aggiornamento del dataset di Brunetti et al. (2014) per le normali climatiche 1961--1990.
+  \textbf{Brunetti et al. (2014)}
 
-  Si sono presi come riferimento, confronto e base di dati altri dataset italiani a risoluzione giornaliera:
-  \begin{columns}[t]
+  Aggiornamento del lavoro per le normali climatiche 1961--1990, riprendendone in particolare le procedure di controllo qualità.
+
+  \begin{columns}
     \begin{column}{0.55\textwidth}
+      \textbf{SCIA (ISPRA)}
       \begin{itemize}
-        \item dataset CNR-ISAC:
-          \begin{itemize}
-            \item controllato, validato, completato e omogeneizzato;
-            \item serie lunghe ma in numero ridotto.
-          \end{itemize}
-        \item dataset DPC:
-          \begin{itemize}
-            \item controllato, validato, completato e omogeneizzato;
-            \item serie numerose ma dal 2002;
-            \item aggregazione dati differente.
-          \end{itemize}
+        \item dataset di misure meteorologiche giornaliere sottoposte a controllo qualità;
+        \item rappresentatività temporale parziale e presenza di serie duplicate;
+        \item informazioni topografiche non sempre accurate.
       \end{itemize}
     \end{column}
     \begin{column}{0.45\textwidth}
-      \begin{itemize}
-        \item SCIA (ISPRA):
-          \begin{itemize}
-            \item controllato e validato (con caveat);
-            \item anagrafiche non molto accurate;
-            \item disponibilità di dati disomogenea, buona per il passato.
-          \end{itemize}
-      \end{itemize}
+      \begin{figure}
+        \input{ASSETS/composizione_dataset/monthly_availabilities}
+        \caption*{\small Disponibilità di serie a livello mensile.}
+      \end{figure}
     \end{column}
   \end{columns}
+
+  % \begin{columns}[t]
+  %   \begin{column}[t]{0.5\textwidth}
+  %     \begin{itemize}
+  %       \item dataset CNR-ISAC:
+  %         \begin{itemize}
+  %           \item controllato, validato, completato e omogeneizzato;
+  %           \item serie lunghe ma in numero ridotto.
+  %         \end{itemize}
+  %       \item dataset DPC:
+  %         \begin{itemize}
+  %           \item controllato, validato, completato e omogeneizzato;
+  %           \item serie numerose ma dal 2002;
+  %           \item estremi giornalieri delle medie orarie.
+  %         \end{itemize}
+  %     \end{itemize}
+  %   \end{column}
+  % \begin{column}[t]{0.5\textwidth}
+  % \end{column}
+  % \end{columns}
 \end{frame}
