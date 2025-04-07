@@ -11,10 +11,11 @@ library(units)
 library(geoarrow)
 library(sf)
 
-root <- fs::path_abs("/Users/davidenicoli/Local_Workspace/Datasets/climats")
-ftmin <- fs::path(root, "CLINO_GRID_ITA_TMN_v00REC_vs_OBS")
-ftmax <- fs::path(root, "CLINO_GRID_ITA_TMX_v00REC_vs_OBS")
-col_names <- c("name", "lon", "lat", "elevation", "slope", "orientation", "dsea", paste0("rec_", 1:12), paste0("obs_", 1:12))
+root <- fs::path_abs("/Users/davidenicoli/Local_Workspace/Datasets/CLINO7.5")
+# ftmin <- fs::path(root, "CLINO_GRID_ITA_TMN_v00REC_vs_OBS")
+# ftmax <- fs::path(root, "CLINO_GRID_ITA_TMX_v00REC_vs_OBS")
+ftmean <- fs::path(root, "CLINO_TM_test_HRESREC_vs_OBS")
+col_names <- c("name", "lon", "lat", "elevation", "slope", "orientation", "dsea", "X1", paste0("rec_", 1:12), paste0("obs_", 1:12))
 col_types <- paste0(c("c", rep("d", length(col_names) - 1L)), collapse = "")
 load_climats <- function(path) {
     table <- vroom::vroom_fwf(
@@ -24,7 +25,7 @@ load_climats <- function(path) {
         col_positions = fwf_empty(path, skip = 0, n = 7000, col_names = col_names),
         show_col_types = FALSE
     ) |>
-        separate_wider_regex(name, patterns = c("mesTM(?:N|X)D", "_", dataset = ".+?", "_", series_key = "\\d+", "\\.dgf"), too_few = "error") |>
+        separate_wider_regex(name, patterns = c("mesTM(?:N|X|M)D", "_", dataset = ".+?", "_", series_key = "\\d+", "\\.dgf"), too_few = "error") |>
         mutate(series_key = as.integer(series_key), dataset = factor(dataset), orientation = na_if(orientation, -1)) |>
         assert(not_na, dataset, series_key, lon, lat, elevation, slope) |>
         verify(between(slope, 0, 1)) |>
@@ -33,9 +34,9 @@ load_climats <- function(path) {
         verify(between(lon, 2.46, 20.74)) |>
         verify(between(lat, 35.50, 49.61))
     meta <- table |>
-        select(dataset, series_key, lon, lat, elevation, slope, orientation, dsea)
+        select(dataset, series_key, lon, lat, elevation, slope, orientation, dsea, X1)
     data <- table |>
-        select(-lon, -lat, -elevation, -slope, -orientation, -dsea) |>
+        select(-lon, -lat, -elevation, -slope, -orientation, -dsea, -X1) |>
         pivot_longer(cols = 3:26, names_sep = "_", names_to = c("kind", "month")) |>
         mutate(month = as.integer(month), kind = factor(kind))
 
@@ -44,6 +45,7 @@ load_climats <- function(path) {
 
 dbmin <- load_climats(ftmin)
 dbmax <- load_climats(ftmax)
+dbmean <- load_climats(ftmean)
 
 eq_or_na <- function(x, y) {
     e <- x == y
@@ -67,11 +69,12 @@ meta <- dbmin$meta |>
     )
 
 data <- bind_rows(tmax = dbmax$data, tmin = dbmin$data, .id = "variable") |> mutate(variable = factor(variable))
-
+dbmean$data <- dbmean$data |> mutate(variable = "tmean")
+meta <- dbmean$meta
 geometa <- sf::st_as_sf(meta, coords = c("lon", "lat"), crs = "EPSG:4326")
 
-write_parquet(meta, fs::path(root, "meta.parquet"))
-write_parquet(data, fs::path(root, "data.parquet"))
+write_parquet(dbmean$meta, fs::path(root, "meta.parquet"))
+write_parquet(dbmean$data, fs::path(root, "data.parquet"))
 
 meta |>
     sf::st_as_sf(coords = c("lon", "lat"), crs = "EPSG:4326") |>

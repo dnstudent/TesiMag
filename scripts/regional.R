@@ -81,12 +81,11 @@ with_seed(0L, {
 })
 
 with_seed(0L, {
-    ggplot(bind_rows(mavails, mmavails) |> filter(variable == 1L, between(year(date), 1991L, 2020L), !is.na(district), is_month_available, district %in% c("Piemonte", "Friuli-Venezia Giulia", "Veneto"))) +
-        geom_line(aes(date, n, color = dataset, linetype = dataset)) +
+    ggplot(bind_rows(mavails, mmavails) |> filter(variable == 1L, !(dataset %in% c("ISAC")), between(year(date), 1991L, 2020L), !is.na(district), is_month_available, district %in% c("Piemonte", "Friuli-Venezia Giulia", "Veneto"))) +
+        geom_line(aes(date, n, color = dataset)) +
         facet_wrap(~district, ncol = 6L) +
-        scale_linetype_manual(values = linetype_values) +
-        theme(axis.text.x = element_text(angle = 30, vjust = 1), axis.title.x = element_blank(), axis.title.y = element_blank(), legend.margin = margin(l = -0.1, unit = "cm"))
-    ggsave(fs::path(pres_dir, "sources_availability.tex"), width = 14, height = 4, units = "cm", device = tikz)
+        theme(axis.text.x = element_text(angle = 30), axis.title.x = element_blank(), axis.title.y = element_blank(), legend.margin = margin(l = -0.1, unit = "cm"), legend.title = element_blank(), plot.margin = margin(0, 0, 0, 0))
+    ggsave(fs::path(pres_dir, "sources_availability.tex"), width = 12, height = 3.2, units = "cm", device = tikz)
 })
 
 

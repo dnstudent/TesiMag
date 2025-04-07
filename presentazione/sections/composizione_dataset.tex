@@ -10,6 +10,7 @@
     \item 11 dataset ARPA/SIR o provinciali;
     \item 9 dataset sovraregionali (3 italiani, 6 esteri).
   \end{itemize}
+  per un totale di circa 12350 serie.
 
   \begin{figure}
     \centering
@@ -20,18 +21,14 @@
 \end{frame}
 
 \begin{frame}{Raccolta dei dati giornalieri}
-  Problemi incontrati:
+  Esito della raccolta è un dataset molto eterogeneo, con:
   \begin{itemize}
-    \item disomogeneità e obsolescenza delle interfacce di accesso ai dati;
-    \item disomogeneità e incoerenze tra dataset differenti;
     \item presenza di serie completamente o parzialmente duplicate;
+    \item disomogeneità e incoerenze tra dati e metadati di sorgenti differenti;
     \item generale carenza di tracce storiche delle stazioni.
   \end{itemize}
-  Soluzioni:
-  \begin{itemize}
-    \item \emph{merging} intra- e inter-dataset;
-    \item controllo manuale delle collocazioni dubbie.
-  \end{itemize}
+
+  La situazione ha richiesto un lavoro approfondito di \emph{merging} intra- e inter-dataset e di controllo manuale dei metadati.
 \end{frame}
 
 \begin{frame}[t]{\emph{Merging}: procedura}
@@ -40,19 +37,19 @@
     \begin{column}{0.5\textwidth}
       \begin{itemize}
         \item Regione per regione:
-          \begin{itemize}
-            \item \emph{Matching}: corrispondenze tra singole serie;
+          \begin{enumerate}
+            \item \emph{Matching}: determinazione dell'unificabilità di coppie di serie;
             \item Raggruppamento in serie rappresentative;
-            \item Combinazione e integrazione;
+            \item Combinazione e integrazione ordinate;
             \item Correzione manuale dei metadati.
-          \end{itemize}
+          \end{enumerate}
         \item \emph{Merging} complessivo a posteriori.
       \end{itemize}
     \end{column}
     \begin{column}{0.5\textwidth}
       \begin{figure}
         \includegraphics{ASSETS/composizione_dataset/reggio_series_graph_pmod.pdf}
-        \caption*{Grafo dei \emph{match} di alcune serie di Reggio Emilia.}
+        \caption*{Dettaglio del grafo dei \emph{match}}
       \end{figure}
 
     \end{column}
@@ -61,7 +58,7 @@
 
 \begin{frame}{\emph{Merging}: risultati}
   \begin{itemize}
-    \item \(\approx 2500\) serie italiane di cui \(\approx 2350\) con almeno 5 anni di dati: \(\approx 3\) serie ogni \(\qty{100}{\kilo\meter^2}\);
+    \item \(\approx 2500\) serie italiane (più \(1680\) straniere) di cui \(\approx 2350\) con almeno 5 anni di dati: \(\approx 3\) serie ogni \(\qty{100}{\kilo\meter^2}\);
     \item Disponibilità temporale sul trentennio significativamente superiore ai dataset sorgenti;
     \item Distribuzione geografica ben rappresentativa del territorio.
   \end{itemize}
@@ -71,22 +68,23 @@
     \begin{subfigure}[t]{0.45\textwidth}
       \small
       \input{ASSETS/composizione_dataset/improvements}
-      \caption*{Numero di serie disponibili con almeno n anni.}
+      \caption*{Numero di serie disponibili con almeno n anni}
     \end{subfigure}
     \hfill
     \begin{subfigure}[t]{0.45\textwidth}
       \small
       \input{ASSETS/composizione_dataset/elevation_distribution}
-      \caption*{Distribuzione in quota delle serie ottenute.}
+      \caption*{Distribuzione in quota delle serie ottenute}
     \end{subfigure}
   \end{figure}
 \end{frame}
 
 \begin{frame}{Controllo qualità ed omogeneizzazione}
   \begin{enumerate}
-    \item Controllo degli errori palesi: \(\lvert \mathrm{T} \rvert > \qty{50}{\degreeCelsius}\) e dati ripetuti;
+    \item Controllo degli errori grossolani: e.g.\ \(\lvert \mathrm{T} \rvert > \qty{50}{\degreeCelsius}\) e dati ripetuti;
     \item Confronto con serie sintetiche ERA5;
     \item Confronto con serie limitrofe;
     \item \emph{Gap filling} dei dati mancanti.
   \end{enumerate}
+  Al termine del quality check sono state scartate per intero 15 serie italiane.
 \end{frame}

@@ -174,12 +174,13 @@ with_seed(0L, {
 })
 
 with_seed(0L, {
-    ggplot(data = tmavails |> filter(variable == 1L, is_month_available, dataset %in% c("merged", "SCIA", "ISAC", "DPC"), between(year(date), 1991L, 2020L)), mapping = aes(date, n, linetype = dataset)) +
+    ggplot(data = tmavails |> filter(variable == 1L, is_month_available, dataset %in% c("merged", "SCIA"), between(year(date), 1991L, 2020L)), mapping = aes(date, n, linetype = dataset)) +
         geom_line() +
+        scale_linetype_manual(values = linetype_values) +
         labs(y = NULL) +
-        theme(axis.title = element_blank(), axis.title.x = element_blank())
+        theme(axis.title = element_blank(), axis.title.x = element_blank(), legend.position = "top", legend.title = element_blank(), legend.margin = margin(b = -0.2, unit = "cm"))
 
-    ggsave(fs::path(pres_dir, "composizione_dataset", "monthly_availabilities.tex"), width = 8, height = 3, units = "cm", device = tikz)
+    ggsave(fs::path(pres_dir, "composizione_dataset", "monthly_availabilities.tex"), width = 6, height = 3.2, units = "cm", device = tikz)
 })
 
 
@@ -255,16 +256,16 @@ with_seed(0L, {
 
 with_seed(0L, {
     bind_rows(
-        merged = climav_metas$merged,
+        dataset = climav_metas$merged,
         dem = elevations_sample,
         .id = "Origine"
     ) |>
-        mutate(Origine = factor(Origine, levels = c("dem", "merged", "SCIA", "ISAC", "DPC"))) |>
+        mutate(Origine = factor(Origine, levels = c("dem", "dataset", "SCIA", "ISAC", "DPC"))) |>
         filter(!is.na(elevation)) |>
         ggplot() +
         geom_histogram(aes(elevation, fill = Origine, after_stat(density)), position = "dodge", binwidth = 250) +
-        labs(x = "Elevazione [m]", fill = "Sorgente") +
-        theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.title.y = element_blank(), legend.position = "top", legend.margin = margin(b = -0.3, unit = "cm"))
+        labs(x = "Elevazione [m]", fill = "Sorgente", y = "Densità") +
+        theme(legend.position = "top", legend.margin = margin(b = -0.3, unit = "cm"), legend.title = element_blank())
     ggsave(fs::path(pres_dir, "composizione_dataset", "elevation_distribution.tex"), width = 6, height = 3.1, units = "cm", device = tikz)
 })
 
@@ -308,14 +309,14 @@ with_seed(0L, {
 with_seed(0L, {
     raw_mavs |>
         cross_join(threshs) |>
-        filter(n_mavail >= at_least) |>
+        filter(n_mavail >= at_least, Origine %in% c("merged", "SCIA")) |>
         count(Origine, at_least) |>
         ggplot() +
         geom_step(aes(at_least, n, linetype = Origine)) +
         scale_linetype_manual(values = linetype_values) +
         labs(x = "Anni", linetype = "Origine") +
         theme(legend.position = "top", legend.margin = margin(b = -0.3, unit = "cm"), axis.title.y = element_blank(), legend.title = element_blank())
-    ggsave(fs::path(pres_dir, "composizione_dataset", "improvements.tex"), width = 7, height = 3.1, units = "cm", device = tikz)
+    ggsave(fs::path(pres_dir, "composizione_dataset", "improvements.tex"), width = 6, height = 3.1, units = "cm", device = tikz)
 })
 
 # Densità

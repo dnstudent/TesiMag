@@ -52,6 +52,7 @@ dss <- c("VDA", "PIE", "LIG", "LOM", "TOS", "UMB", "MAR", "VEN", "FVG", "ER", "T
 ita_dss <- c("VDA", "PIE", "LIG", "LOM", "TOS", "UMB", "MAR", "VEN", "FVG", "ER", "TAA2")
 # boundaries <- load_regional_boundaries(conns)
 clino_path <- fs::path("/Users/davidenicoli/Local_Workspace/Datasets/climats")
+upclino_path <- fs::path("/Users/davidenicoli/Local_Workspace/Datasets/CLINO7.5")
 merged_metas <- load_merged_meta(conns, boundaries = NULL) |> rename(series_key = sensor_key)
 meta <- query_parquet(fs::path(clino_path, "meta.parquet"), conns$data) |>
     filter(dataset %in% dss) |>
@@ -59,11 +60,21 @@ meta <- query_parquet(fs::path(clino_path, "meta.parquet"), conns$data) |>
     mutate(dseacat = cut(dsea, breaks = c(-Inf, 10, 50, Inf), labels = c("next", "close", "far")))
 data <- query_parquet(fs::path(clino_path, "data.parquet"), conns$data) |> semi_join(meta, by = c("dataset", "series_key"))
 geometa <- st_as_sf(collect(meta), coords = c("lon", "lat"), crs = "EPSG:4326", remove = FALSE)
+
+upmeta <- query_parquet(fs::path(upclino_path, "meta.parquet"), conns$data) |>
+    filter(dataset %in% dss) |>
+    semi_join(merged_metas, by = c("dataset", "series_key"), copy = TRUE) |>
+    mutate(dseacat = cut(dsea, breaks = c(-Inf, 10, 50, Inf), labels = c("next", "close", "far")))
+updata <- query_parquet(fs::path(upclino_path, "data.parquet"), conns$data) |> semi_join(upmeta, by = c("dataset", "series_key"))
+
 biases <- data |>
     pivot_wider(names_from = kind, values_from = value) |>
     mutate(BIAS = rec - obs) |>
     mutate(variable = case_match(variable, "tmax" ~ "TX", "tmin" ~ "TN", .default = variable))
-
+upbiases <- updata |>
+    pivot_wider(names_from = kind, values_from = value) |>
+    mutate(BIAS = rec - obs) |>
+    mutate(variable = case_match(variable, "tmax" ~ "TX", "tmin" ~ "TN", "tmean" ~ "TM7.5", .default = variable))
 # %% Table 1
 bias_table <- function(biases, .by) {
     biases |>
@@ -90,17 +101,31 @@ results <- bias_table(biases |> filter(italian), .by = c(variable, month)) |>
     left_join(tab2014, by = c("month" = "Mese"), copy = TRUE) |>
     arrange(month)
 
-# tab1 pres
-bias_table(collect(biases |> filter(italian)), .by = c(variable, month)) |>
-    bind_rows(tab2014 |> mutate(variable = "TM14") |> rename(month = Mese)) |>
-    group_by(variable) |>
-    summarise(BIAS = mean(BIAS, na.rm = TRUE), MAE = mean(MAE, na.rm = TRUE), RMSE = mean(RMSE, na.rm = TRUE))
-
 # TODO: aggiungere colori per semplicità di consultazione
 results |>
     kbl(format = "latex", booktabs = TRUE, col.names = col_names, digits = 2L) |>
     add_header_above(header, escape = FALSE) |>
     cat(file = fs::path(table_dir, "table1_ita.tex"), append = FALSE)
+
+# tab1 pres upd
+upresults <- bias_table(upbiases |> filter(italian), .by = c(variable, month)) |>
+    pivot_wider(id_cols = month, names_from = variable, values_from = c(BIAS, MAE, RMSE)) |>
+    relocate(month, BIAS_TM7.5, MAE_TM7.5, RMSE_TM7.5) |>
+    left_join(tab2014, by = c("month" = "Mese"), copy = TRUE) |>
+    arrange(month)
+
+upresults |>
+    kbl(
+        format = "latex",
+        booktabs = TRUE,
+        col.names = c("Mese", rep(c("BIAS", "MAE", "RMSE"), 2L)),
+        digits = 2L
+    ) |>
+    add_header_above(
+        c(" " = 1, "TM7.5 [\\\\unit{\\\\degreeCelsius}]" = 3, "TM14\\\\tnote{*} [\\\\unit{\\\\degreeCelsius}]" = 3),
+        escape = FALSE
+    ) |>
+    cat(file = fs::path(pres_dir, "conclusioni", "table1_ita.tex"), append = FALSE)
 
 bias_table(biases |> filter(!italian), .by = c(variable, month)) |>
     pivot_wider(id_cols = month, names_from = variable, values_from = c(BIAS, MAE, RMSE)) |>
@@ -117,8 +142,8 @@ maermse_plot <- function(stats) {
         pivot_longer(cols = c(MAE, RMSE), names_to = "stat") |>
         ggplot() +
         geom_line(aes(month, value, color = variable, linetype = stat)) +
-        labs(color = "Variabile", linetype = "Metrica", x = "Mese", y = "Valore [\\textdegree C]") +
-        scale_y_continuous(limits = c(0.4, 1.4))
+        labs(color = "Variabile", linetype = "Metrica", x = "Mese", y = "Valore [\\textdegree C]")
+    # scale_y_continuous(limits = c(0.4, 1.4))
 }
 
 bias_plot <- function(stats, label) {
@@ -194,6 +219,28 @@ with_seed(0L, {
     ggsave(fs::path(pres_dir, "valutazione_clino", "diff_stats.tex"), width = 12, height = 4.5, units = "cm", device = tikz)
 })
 
+with_seed(0L, {
+    istats <- bias_table(upbiases, .by = c(variable, month)) |>
+        collect() |>
+        bind_rows(tab2014 |> mutate(variable = "TM2014") |> rename(month = Mese))
+    # nistats <- bias_table(upbiases |> filter(!italian), .by = c(variable, month)) |>
+    #     collect() |>
+    #     bind_rows(tab2014 |> mutate(variable = "TM14") |> rename(month = Mese))
+
+    p2i <- maermse_plot(istats)
+    # p1i <- bias_plot(istats) + scale_y_continuous(breaks = c(-0.03, 0), limits = c(-0.07, 0.02))
+
+    # p2n <- maermse_plot(nistats) + labs(subtitle = "Serie estere")
+    # p1n <- bias_plot(nistats)
+
+    (p2i) & # plot_layout(nrow =12L, heights = c(2, 0.7), axes = "collect", guides = "collect") &
+        scale_color_manual(values = c(tntx_scale, "TM2014" = "black", "TM7.5" = "#ff00e6")) &
+        scale_x_continuous(breaks = seq(1L, 12L, by = 2L)) &
+        scale_linetype_manual(values = c("MAE" = "dashed", "RMSE" = "solid")) &
+        theme(legend.title = element_blank())
+    ggsave(fs::path(pres_dir, "conclusioni", "diff_stats.tex"), width = 12, height = 4.1, units = "cm", device = tikz)
+})
+
 # %%
 with_seed(0L, {
     pds <- biases |>
@@ -205,7 +252,7 @@ with_seed(0L, {
         arrange(dataset) |>
         ggplot() +
         geom_hline(yintercept = 0, color = "black", size = 0.1) +
-        geom_boxplot(aes(x = dataset, y = BIAS, color = variable), position = "dodge", outliers = FALSE, fill = NA) +
+        geom_boxplot(aes(x = dataset, y = BIAS, color = variable), position = "dodge", outliers = FALSE, fill = NA, coef = 0) +
         labs(x = "Regione", y = "BIAS [\\textdegree C]", color = "Variabile")
 
     ph <- biases |>
@@ -221,7 +268,8 @@ with_seed(0L, {
             ),
             fill = NA,
             position = "dodge",
-            outliers = FALSE
+            outliers = FALSE,
+            coef = 0
         ) +
         labs(x = "Quota [m]", y = "BIAS [\\textdegree C]", color = "Variabile")
 
@@ -235,6 +283,46 @@ with_seed(0L, {
 
     # ggsave(fs::path(image_dir, "bplots.tex"), width = 13.5, height = 9, units = "cm", device = tikz)
     ggsave(fs::path(pres_dir, "valutazione_clino", "bplots.tex"), width = 12, height = 4.5, units = "cm", device = tikz)
+})
+
+with_seed(0L, {
+    pds <- upbiases |>
+        filter(dataset %in% c("LIG", "LOM", "VDA", "PIE", "MAR", "AUT")) |>
+        # filter(italian) |>
+        mutate(
+            dataset = case_match(dataset, "TAA2" ~ "TAA", .default = dataset)
+        ) |>
+        arrange(dataset) |>
+        ggplot() +
+        geom_hline(yintercept = 0, color = "black", size = 0.1) +
+        geom_boxplot(aes(x = dataset, y = BIAS, color = variable), position = "dodge", outliers = FALSE, fill = NA) +
+        labs(x = "Regione", y = "BIAS [\\textdegree C]", color = "Variabile")
+
+    ph <- upbiases |>
+        # filter(!italian) |>
+        left_join(upmeta |> select(dataset, series_key, elevation), by = c("dataset", "series_key")) |>
+        ggplot() +
+        geom_hline(yintercept = 0, color = "black", size = 0.1) +
+        geom_boxplot(
+            aes(
+                x = cut(elevation, breaks = c(-Inf, 500, 1000, 1500, 2000, Inf), labels = c("<500", "(500, 1000]", "(1000, 1500]", "(1500, 2000]", ">2000")),
+                y = BIAS,
+            ),
+            fill = NA,
+            position = "dodge",
+            outliers = FALSE
+        ) +
+        labs(x = "Quota [m]", y = "Errore [\\textdegree C]", color = "Variabile")
+
+    ph +
+        # plot_layout(guides = "collect", axes = "collect", widths = c(6L, 5L)) &
+        # plot_annotation(title = "Distribuzione dei BIAS del modello") &
+        # ylim(c(-2.5, 2.5)) +
+        theme(axis.text.x = element_text(angle = 30, hjust = 1), axis.title.x = element_text(margin = margin(10))) +
+        theme(axis.title.x = element_blank())
+
+    # ggsave(fs::path(image_dir, "bplots.tex"), width = 13.5, height = 9, units = "cm", device = tikz)
+    ggsave(fs::path(pres_dir, "conclusioni", "bplots.tex"), width = 5, height = 4.5, units = "cm", device = tikz)
 })
 
 # %%
@@ -275,6 +363,31 @@ with_seed(0L, {
         scale_linetype_manual(values = c("Vicina (<10km)" = "solid", "Intermedia (<50km)" = "dashed", "Lontana (>50km)" = "dotdash"))
     # ggsave(fs::path(image_dir, "sea_lplot.tex"), width = 13.5, height = 6, units = "cm", device = tikz)
     ggsave(fs::path(pres_dir, "valutazione_clino", "sea_lplot.tex"), width = 12, height = 4.5, units = "cm", device = tikz)
+})
+
+with_seed(0L, {
+    stats <- upbiases |>
+        left_join(upmeta |> select(dataset, series_key, dseacat, elevation), by = c("dataset", "series_key")) |>
+        filter(elevation < 500) |>
+        summarise(BIAS = mean(BIAS, na.rm = TRUE), RMSE = mean(abs(BIAS^2), na.rm = TRUE), .by = c(variable, month, dseacat)) |>
+        collect() |>
+        mutate(dseacat = factor(dseacat, levels = c("next", "close", "far"), labels = c("<10km", "<50km", ">50km")))
+    pbias <- stats |>
+        ggplot() +
+        geom_line(aes(x = month, y = BIAS, color = variable, linetype = dseacat)) +
+        labs(x = "Mese", y = "BIAS [\\textdegree C]", color = "Variabile", linetype = "Distanza dal mare")
+
+    prmse <- stats |> ggplot() +
+        geom_line(aes(x = month, y = RMSE, linetype = dseacat)) +
+        labs(x = "Mese", y = "RMSE [\\textdegree C]", color = "Variabile", linetype = "Distanza dal mare")
+
+    prmse +
+        # plot_annotation(title = "Errori del modello", subtitle = "Relazione con la distanza dal mare") &
+        scale_x_continuous(breaks = seq(1L, 12L, by = 2L)) +
+        scale_linetype_manual(values = c("<10km" = "solid", "<50km" = "dashed", ">50km" = "dotdash")) +
+        theme(legend.title = element_blank(), legend.position.inside = c(0.5, 0.7), legend.position = "inside", legend.background = element_rect(fill = "transparent"))
+    # ggsave(fs::path(image_dir, "sea_lplot.tex"), width = 13.5, height = 6, units = "cm", device = tikz)
+    ggsave(fs::path(pres_dir, "conclusioni", "sea_lplot.tex"), width = 5, height = 4.5, units = "cm", device = tikz)
 })
 
 # %%

@@ -1,19 +1,19 @@
 # Introduzione
-> Buongiorno a tutti ecc. ecc.
-> Presento il lavoro che ho fatto per costruire un dataset delle temperature minime e massime giornaliere per il territorio del centro-nord Italia utilizzabile come base per il calcolo di normali climatiche 1991-2020.
+- Buongiorno a tutti ecc. ecc.
+- Presento il procedimento di costruzione di un dataset di variabili meterologiche a risoluzione giornaliera che ho elaborato come progetto di tesi.
 
 ## Caratteristiche del Dataset
 
 - Temperature minime e massime giornaliere;
-- Copertura del centro-nord Italia e delle regioni alpine limitrofe. I dati delle regioni limitrofe rendono più accurata la procedura di interpolazione al bordo (immagine).
+- Copertura del centro-nord Italia e delle regioni alpine limitrofe.
 - Copertura del trentennio più recente, 1991-2020. Periodo di passaggio dalle stazioni meccaniche a quelle automatiche e di passaggio di competenze dal SIMN alle regioni.
-- Orientato al calcolo delle normali climatiche mensili: tutte le scelte e le priorità stabilite tengono conto di questo indirizzo.
+- Orientato al calcolo delle normali climatiche mensili di stazione e su griglia: tutte le scelte e le priorità stabilite tengono conto di questo indirizzo.
 
 
 ## Normali Climatiche
 
-- descrizione del clima di un'area geografica, ovvero le componenti principali del segnale meteorologico direttamente correlate alle caratteristiche topografiche di un luogo;
-- statistica dei dati meteorologici giornalieri: pone determinati requisiti di completezza (WMO);
+- descrizione del clima di una località geografica, ovvero le componenti principali del segnale meteorologico, che sono fortemente correlate alle caratteristiche topografiche di un luogo;
+- statistica dei dati meteorologici giornalieri: impone determinati requisiti di completezza ed omogeneità (WMO);
 - due livelli: normali di stazione e di area.
 - Di conseguenza: priorità alla completezza temporale e all'accuratezza dei metadati in vista del modello.
 
@@ -27,13 +27,7 @@
 *Figura 3: Normali climatiche di area*
 > Nelle immagini qualche esempio di come vengono forniti i dati, del risultato dell'aggregazione e dell'interpolazione.
 
-
-
-![Distribuzione delle serie risultanti](ASSETS/introduzione/merged_map.pdf)
-*Figura 4: Distribuzione delle serie risultanti*
-> Risultato in figura. Comprese solo le stazioni utilizzate per le climatologie.
-
 ## Lavori di Riferimento
 
 - aggiornamento del lavoro di Brunetti et al. (2014) per le normali climatiche 1961--1990.
-- esiste già SCIA, ma si parte dall'idea che sia migliorabile secondo i criteri esposti.
+- esiste già SCIA, ma si parte dall'idea che sia migliorabile in quanto a completezza temporale e accuratezza delle informazioni spaziali.

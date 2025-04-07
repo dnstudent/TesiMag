@@ -4,37 +4,59 @@
 % !TEX program = xelatex
 
 \section{Ricostruzione preliminare delle normali}
-\begin{frame}[t]{Bias del modello preliminare}
-  I confronti tra le normali ricostruite tramite interpolazione \emph{leave one out} con modello Locally Weighted Linear Regression (LWLR) su DEM GTOPO30 e quelle dei dati mostrano che:
+\begin{frame}[t]{Errori del modello preliminare}
+  Una prima analisi delle interpolazioni \emph{leave one out} con il modello impiegato da Brunetti et.\ al e DEM a \qty{30}{\arcsecond} ha mostrato che:
   \begin{itemize}
-    \item il bias del modello è contenuto per tutti i mesi (\(\lvert \mathrm{BIAS} \rvert < \qty{0.05}{\degreeCelsius}\));
-    \item la variabilità del bias è rilevante e confrontabile o maggiore rispetto a quella delle ricostruzioni di Brunetti et al. (2014), in particolare si sono notate differenze nella ricostruzione di:
+    \item l'errore medio del modello (BIAS) è contenuto per tutti i mesi: (\(\lvert \mathrm{BIAS} \rvert < \qty{0.05}{\degreeCelsius}\));
+    \item la variabilità dell'errore (Root Mean Squared Error e Mean Absolute Error degli scostamenti) è rilevante e confrontabile o maggiore rispetto a quella delle ricostruzioni di Brunetti et al. (2014);
+    \item RMSE e MAE erano correlati a:
       \begin{itemize}
-        \item serie di temperatura massima rispetto a quelle di temperatura minima;
-        \item serie estere rispetto a quelle italiane;
-        \item serie a quote elevate rispetto a quelle a quote basse;
-        \item serie vicine alla costa rispetto a quelle interne.
+        \item la variabile ricostruita (temperatura minima o massima);
+        \item la quota della ricostruzione;
+        \item la vicinanza alla costa.
       \end{itemize}
   \end{itemize}
 \end{frame}
 
-\begin{frame}[t]{Bias del modello preliminare}
+\begin{frame}{Utilizzo di un DEM più fine}
+  Una seconda interpolazione effettuata con un DEM più fine (\qty{7.5}{\arcsecond}) evidenzia un sostanziale miglioramento rispetto ai risultati del 2014:
   \begin{figure}
-    \input{ASSETS/valutazione_clino/diff_stats}
-    \caption*{Statistiche del bias del modello LWLR per i dati di temperatura massima e minima. Confronto tra serie italiane ed estere.}
+    \input{ASSETS/conclusioni/diff_stats}
+    \caption*{Errore di LWLR per i dati di temperatura media con DEM a \qty{7.5}{\arcsecond}.}
   \end{figure}
 \end{frame}
 
-\begin{frame}[t]{Bias del modello preliminare}
-  \begin{figure}
-    \input{ASSETS/valutazione_clino/bplots}
-    \caption*{Statistiche del bias del modello LWLR per i dati di temperatura massima e minima. Confronto tra serie di regioni e fasce di quota diverse.}
-  \end{figure}
-\end{frame}
+% \begin{frame}[t]{Bias del modello preliminare}
+%   \begin{figure}
+%     \input{ASSETS/valutazione_clino/diff_stats}
+%     \caption*{Statistiche del bias del modello LWLR per i dati di temperatura massima e minima. Confronto tra serie italiane ed estere.}
+%   \end{figure}
+% \end{frame}
 
-\begin{frame}[t]{Bias del modello preliminare}
+% \begin{frame}[t]{Bias del modello preliminare}
+%   \begin{figure}
+%     \input{ASSETS/valutazione_clino/bplots}
+%     \caption*{Statistiche del bias del modello LWLR per i dati di temperatura massima e minima. Confronto tra serie di regioni e fasce di quota diverse.}
+%   \end{figure}
+% \end{frame}
+
+% \begin{frame}[t]{Bias del modello preliminare}
+%   \begin{figure}
+%     \input{ASSETS/valutazione_clino/sea_lplot}
+%     \caption*{Statistiche del bias del modello LWLR per i dati di temperatura massima e minima. Confronto tra serie a diversa distanza dal mare.}
+%   \end{figure}
+% \end{frame}
+
+\begin{frame}{Utilizzo di un DEM più fine}
+  L'errore presenta, con il DEM fine, scarsa correlazione con la quota, mentre il rapporto con la distanza dal mare è ancora da indagare.
   \begin{figure}
-    \input{ASSETS/valutazione_clino/sea_lplot}
-    \caption*{Statistiche del bias del modello LWLR per i dati di temperatura massima e minima. Confronto tra serie a diversa distanza dal mare.}
+    \begin{subfigure}{0.45\textwidth}
+      \input{ASSETS/conclusioni/bplots}
+
+    \end{subfigure}
+    \begin{subfigure}{0.45\textwidth}
+      \input{ASSETS/conclusioni/sea_lplot}
+    \end{subfigure}
+    \caption*{Errore di LWLR per i dati di temperatura media con DEM a \qty{7.5}{\arcsecond}.}
   \end{figure}
 \end{frame}
