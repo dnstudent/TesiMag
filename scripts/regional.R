@@ -26,6 +26,10 @@ table_dir <- fs::path(Sys.getenv("TABLES_DIR"), "datasets")
 if (!fs::dir_exists(table_dir)) {
     fs::dir_create(table_dir)
 }
+pres_dir <- fs::path(Sys.getenv("PRES_DIR"), "composizione_dataset")
+if (!fs::dir_exists(pres_dir)) {
+    fs::dir_create(pres_dir)
+}
 
 monthly_availability_by_series <- function(data, ...) {
     data |>
@@ -74,6 +78,15 @@ with_seed(0L, {
         scale_linetype_manual(values = linetype_values) +
         labs(x = "Data")
     ggsave(fs::path(image_dir, "regional_monthly_availability.tex"), width = 13.5, height = 16, units = "cm", device = tikz)
+})
+
+with_seed(0L, {
+    ggplot(bind_rows(mavails, mmavails) |> filter(variable == 1L, between(year(date), 1991L, 2020L), !is.na(district), is_month_available, district %in% c("Piemonte", "Friuli-Venezia Giulia", "Veneto"))) +
+        geom_line(aes(date, n, color = dataset, linetype = dataset)) +
+        facet_wrap(~district, ncol = 6L) +
+        scale_linetype_manual(values = linetype_values) +
+        theme(axis.text.x = element_text(angle = 30, vjust = 1), axis.title.x = element_blank(), axis.title.y = element_blank(), legend.margin = margin(l = -0.1, unit = "cm"))
+    ggsave(fs::path(pres_dir, "sources_availability.tex"), width = 14, height = 4, units = "cm", device = tikz)
 })
 
 

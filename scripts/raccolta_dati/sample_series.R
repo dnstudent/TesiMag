@@ -28,7 +28,7 @@ table_dir <- fs::path(Sys.getenv("TABLES_DIR"), "creazione_dataset", "raccolta_d
 if (!fs::dir_exists(table_dir)) {
     fs::dir_create(table_dir)
 }
-pres_dir <- fs::path(Sys.getenv("PRES_DIR"), "introduzione")
+pres_dir <- fs::path(Sys.getenv("PRES_DIR"))
 if (!fs::dir_exists(pres_dir)) {
     fs::dir_create(pres_dir)
 }
@@ -38,6 +38,7 @@ on.exit(close_dbs(conns))
 
 reggio_series <- query_checkpoint_meta(c("Dext3r", "SCIA", "ISAC"), "raw", conns$data) |>
     filter(between(lon, 10.42, 10.80), between(lat, 44.64, 44.774642)) |>
+    filter(str_detect(str_to_lower(name), "correggio") | str_detect(str_to_lower(name), "rivalta")) |>
     collect() |>
     mutate(display_dataset = if_else(dataset == "ISAC", network, dataset), sequence = str_c(display_dataset, sensor_key, sep = "/")) |>
     sf::st_as_sf(coords = c("lon", "lat"), crs = "EPSG:4326", remove = FALSE)
@@ -119,6 +120,8 @@ labels <- c("[0, 0.3)", "[0.3, 1)", "[1, 11)")
 edges <- openxlsx::read.xlsx("elaborato/chapters/creazione_dataset/raccolta_dati/tagged_analysis.xlsx") |>
     as_tibble() |>
     filter(variable == 1, tag_same_series) |>
+    semi_join(reggio_series, by = c("dataset_x" = "dataset", "sensor_key_x" = "sensor_key")) |>
+    semi_join(reggio_series, by = c("dataset_y" = "dataset", "sensor_key_y" = "sensor_key")) |>
     mutate(
         display_dataset_x = if_else(dataset_x == "ISAC", network_x, dataset_x),
         display_dataset_y = if_else(dataset_y == "ISAC", network_y, dataset_y),
@@ -141,6 +144,19 @@ with_seed(17, {
         scale_edge_linetype_manual(values = c("[0, 0.3)" = "solid", "[0.3, 1)" = "dotdash", "[1, 11)" = "dotted"))
 
     ggsave(fs::path(image_dir, "reggio_series_graph_p.pdf"), width = 13.5 * 1.5, height = 18 * 1.5, units = "cm")
+})
+
+with_seed(2L, {
+    ggraph(graph, layout = "fr") +
+        geom_edge_link() +
+        geom_node_point(aes(color = display_dataset)) +
+        geom_node_label(aes(label = name, color = display_dataset), repel = TRUE, seed = 0L, size = 1.5) +
+        theme_graph(base_family = "", border = TRUE) +
+        labs(color = "Dataset", shape = "Dataset", edge_linetype = "Distanza [km]") +
+        scale_edge_linetype_manual(values = c("[0, 0.3)" = "solid", "[0.3, 1)" = "dotdash", "[1, 11)" = "dotted")) +
+        guides(color = "none", edge_linetype = "none", edge_color = "none")
+
+    ggsave(fs::path(pres_dir, "composizione_dataset", "reggio_series_graph_p.pdf"), width = 6, height = 5, units = "cm")
 })
 
 library(knitr)

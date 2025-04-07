@@ -26,7 +26,7 @@ if (!fs::dir_exists(pres_dir)) {
 conns <- load_dbs()
 on.exit(close_dbs(conns))
 
-meta <- query_checkpoint_meta("SCIA", "raw", conns$data) |>
+meta <- query_checkpoint_meta("full", "merged_corrected", conns$data) |>
     collect() |>
     st_as_sf(coords = c("lon", "lat"), crs = "EPSG:4326", remove = FALSE)
 # data <- query_checkpoint_data("SCIA", "raw", conns$data)

@@ -4,6 +4,37 @@
 % !TEX program = xelatex
 
 \section{Ricostruzione preliminare delle normali}
-\begin{frame}{Bias del modello LWLR}
+\begin{frame}[t]{Bias del modello LWLR}
+  I confronti tra le normali ricostruite tramite interpolazione \emph{leave one out} con modello Locally Weighted Linear Regression (LWLR) su DEM GTOPO30 e quelle dei dati mostrano che:
+  \begin{itemize}
+    \item il bias del modello è contenuto per tutti i mesi (\(\lvert \Delta \rvert < \qty{0.05}{\degreeCelsius}\));
+    \item la variabilità del bias è rilevante e confrontabile o maggiore rispetto a quella delle ricostruzioni di Brunetti et al. (2014), in particolare si distinguono:
+      \begin{itemize}
+        \item le serie di temperatura massima rispetto a quelle di temperatura minima;
+        \item le serie estere rispetto a quelle italiane;
+        \item le serie a quote elevate rispetto a quelle a quote basse;
+        \item le serie vicine alla costa rispetto a quelle interne.
+      \end{itemize}
+  \end{itemize}
+\end{frame}
 
+\begin{frame}[t]{Bias del modello LWLR}
+  \begin{figure}
+    \input{ASSETS/valutazione_clino/diff_stats}
+    \caption*{Statistiche del bias del modello LWLR per i dati di temperatura massima e minima. Confronto tra serie italiane ed estere.}
+  \end{figure}
+\end{frame}
+
+\begin{frame}[t]{Bias del modello LWLR}
+  \begin{figure}
+    \input{ASSETS/valutazione_clino/bplots}
+    \caption*{Statistiche del bias del modello LWLR per i dati di temperatura massima e minima. Confronto tra serie di regioni e fasce di quota diverse.}
+  \end{figure}
+\end{frame}
+
+\begin{frame}[t]{Bias del modello LWLR}
+  \begin{figure}
+    \input{ASSETS/valutazione_clino/sea_lplot}
+    \caption*{Statistiche del bias del modello LWLR per i dati di temperatura massima e minima. Confronto tra serie a diversa distanza dal mare.}
+  \end{figure}
 \end{frame}

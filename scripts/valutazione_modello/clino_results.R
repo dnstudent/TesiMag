@@ -35,7 +35,7 @@ table_dir <- fs::path(Sys.getenv("TABLES_DIR"), "valutazione_modello", "risultat
 if (!fs::dir_exists(table_dir)) {
     fs::dir_create(table_dir)
 }
-pres_dir <- fs::path(Sys.getenv("PRES_DIR"), "introduzione")
+pres_dir <- fs::path(Sys.getenv("PRES_DIR"))
 if (!fs::dir_exists(pres_dir)) {
     fs::dir_create(pres_dir)
 }
@@ -90,6 +90,12 @@ results <- bias_table(biases |> filter(italian), .by = c(variable, month)) |>
     left_join(tab2014, by = c("month" = "Mese"), copy = TRUE) |>
     arrange(month)
 
+# tab1 pres
+bias_table(collect(biases |> filter(italian)), .by = c(variable, month)) |>
+    bind_rows(tab2014 |> mutate(variable = "TM14") |> rename(month = Mese)) |>
+    group_by(variable) |>
+    summarise(BIAS = mean(BIAS, na.rm = TRUE), MAE = mean(MAE, na.rm = TRUE), RMSE = mean(RMSE, na.rm = TRUE))
+
 # TODO: aggiungere colori per semplicità di consultazione
 results |>
     kbl(format = "latex", booktabs = TRUE, col.names = col_names, digits = 2L) |>
@@ -120,7 +126,7 @@ bias_plot <- function(stats, label) {
         ggplot() +
         geom_line(aes(month, BIAS, color = variable), show.legend = FALSE) +
         labs(color = "Variabile", x = "Mese", y = "BIAS [\\textdegree C]") +
-        scale_y_continuous(breaks = c(-0.05, 0, 0.05), limits = c(-0.08, 0.08))
+        scale_y_continuous(breaks = c(-0.03, 0.03), limits = c(-0.08, 0.08))
 }
 
 with_seed(0L, {
@@ -167,9 +173,31 @@ with_seed(0L, {
     ggsave(fs::path(image_dir, "diff_stats_nonita.tex"), width = 13.5, height = 7, units = "cm", device = tikz)
 })
 
+with_seed(0L, {
+    istats <- bias_table(biases |> filter(italian), .by = c(variable, month)) |>
+        collect() |>
+        bind_rows(tab2014 |> mutate(variable = "TM14") |> rename(month = Mese))
+    nistats <- bias_table(biases |> filter(!italian), .by = c(variable, month)) |>
+        collect() |>
+        bind_rows(tab2014 |> mutate(variable = "TM14") |> rename(month = Mese))
+
+    p2i <- maermse_plot(istats) + labs(subtitle = "Serie italiane")
+    p1i <- bias_plot(istats)
+
+    p2n <- maermse_plot(nistats) + labs(subtitle = "Serie estere")
+    p1n <- bias_plot(nistats)
+
+    (p2i + p2n + p1i + p1n) + plot_layout(nrow = 2L, ncol = 2L, heights = c(2, 0.7), widths = c(1, 1), axes = "collect", guides = "collect") &
+        scale_color_manual(values = c(tntx_scale, "TM14" = "black")) &
+        scale_x_continuous(breaks = seq(1L, 12L, by = 2L)) &
+        scale_linetype_manual(values = c("BIAS" = "solid", "MAE" = "dotdash", "RMSE" = "dashed"))
+    ggsave(fs::path(pres_dir, "valutazione_clino", "diff_stats.tex"), width = 12, height = 4.5, units = "cm", device = tikz)
+})
+
 # %%
 with_seed(0L, {
     pds <- biases |>
+        filter(dataset %in% c("LIG", "LOM", "VDA", "PIE", "MAR", "AUT")) |>
         # filter(italian) |>
         mutate(
             dataset = case_match(dataset, "TAA2" ~ "TAA", .default = dataset)
@@ -198,13 +226,15 @@ with_seed(0L, {
         labs(x = "Quota [m]", y = "BIAS [\\textdegree C]", color = "Variabile")
 
     pds + ph +
-        plot_layout(guides = "collect", axes = "collect", widths = c(15L, 5L)) +
-        plot_annotation(title = "Distribuzione dei BIAS del modello") &
-        ylim(c(-5, 5)) &
-        theme(axis.text.x = element_text(angle = 45, hjust = 1), axis.title.x = element_text(margin = margin(10))) &
+        plot_layout(guides = "collect", axes = "collect", widths = c(6L, 5L)) &
+        # plot_annotation(title = "Distribuzione dei BIAS del modello") &
+        ylim(c(-2.5, 2.5)) &
+        theme(axis.text.x = element_text(angle = 30, hjust = 1), axis.title.x = element_text(margin = margin(10))) &
+        theme(axis.title.x = element_blank()) &
         scale_color_manual(values = tntx_scale)
 
-    ggsave(fs::path(image_dir, "bplots.tex"), width = 13.5, height = 9, units = "cm", device = tikz)
+    # ggsave(fs::path(image_dir, "bplots.tex"), width = 13.5, height = 9, units = "cm", device = tikz)
+    ggsave(fs::path(pres_dir, "valutazione_clino", "bplots.tex"), width = 12, height = 4.5, units = "cm", device = tikz)
 })
 
 # %%
@@ -238,12 +268,13 @@ with_seed(0L, {
         labs(x = "Mese", y = "RMSE [\\textdegree C]", color = "Variabile", linetype = "Distanza dal mare")
 
     pbias + prmse +
-        plot_layout(guides = "collect") +
-        plot_annotation(title = "Errori del modello", subtitle = "Relazione con la distanza dal mare") &
+        plot_layout(guides = "collect") &
+        # plot_annotation(title = "Errori del modello", subtitle = "Relazione con la distanza dal mare") &
         scale_x_continuous(breaks = seq(1L, 12L, by = 2L)) &
         scale_color_manual(values = tntx_scale) &
         scale_linetype_manual(values = c("Vicina (<10km)" = "solid", "Intermedia (<50km)" = "dashed", "Lontana (>50km)" = "dotdash"))
-    ggsave(fs::path(image_dir, "sea_lplot.tex"), width = 13.5, height = 6, units = "cm", device = tikz)
+    # ggsave(fs::path(image_dir, "sea_lplot.tex"), width = 13.5, height = 6, units = "cm", device = tikz)
+    ggsave(fs::path(pres_dir, "valutazione_clino", "sea_lplot.tex"), width = 12, height = 4.5, units = "cm", device = tikz)
 })
 
 # %%
