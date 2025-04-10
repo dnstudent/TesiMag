@@ -57,7 +57,8 @@ merged_metas <- load_merged_meta(conns, boundaries = NULL) |> rename(series_key 
 meta <- query_parquet(fs::path(clino_path, "meta.parquet"), conns$data) |>
     filter(dataset %in% dss) |>
     semi_join(merged_metas, by = c("dataset", "series_key"), copy = TRUE) |>
-    mutate(dseacat = cut(dsea, breaks = c(-Inf, 10, 50, Inf), labels = c("next", "close", "far")))
+    mutate(dseacat = cut(dsea, breaks = c(-Inf, 10, 50, Inf), labels = c("next", "close", "far"))) |>
+    mutate(dseacat = if_else(dataset == "AUT", "far", dseacat))
 data <- query_parquet(fs::path(clino_path, "data.parquet"), conns$data) |> semi_join(meta, by = c("dataset", "series_key"))
 geometa <- st_as_sf(collect(meta), coords = c("lon", "lat"), crs = "EPSG:4326", remove = FALSE)
 
@@ -136,6 +137,19 @@ bias_table(biases |> filter(!italian), .by = c(variable, month)) |>
     add_header_above(header, escape = FALSE) |>
     cat(file = fs::path(table_dir, "table1_non_ita.tex"), append = FALSE)
 
+bupd <- bias_table(upbiases, .by = c("dataset", "series_key", "variable"))
+wrongest <- bupd |>
+    semi_join(meta |> filter(dseacat == "next"), by = c("dataset", "series_key")) |>
+    slice_max(MAE, n = 50L)
+
+
+ggplot() +
+    geom_sf(data = boundaries, fill = NA) +
+    geom_sf(data = geometa |> inner_join(wrongest, copy = TRUE), aes(color = MAE), size = 1) +
+    theme(legend.position = "right", legend.key.width = rel(0.3)) +
+    labs(color = "MAE [°C]") +
+    theme_quartz
+ggsave(fs::path(pres_dir, "conclusioni", "wrongest.pdf"), width = 6, height = 4, units = "cm", scale = 1.1)
 # %%
 maermse_plot <- function(stats) {
     stats |>

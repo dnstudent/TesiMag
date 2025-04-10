@@ -36,6 +36,7 @@ kml_metadata/
 notebooks/julia
 
 build/
+!build/main.pdf
 *.aux
 *.log
 *.toc
